@@ -1,0 +1,15 @@
+<%- include('layout', { body: ` 
+<section class="py-16">
+    <div class="max-w-md mx-auto px-4 text-center">
+        <div class="text-8xl mb-6">⚠️</div>
+        <h1 class="text-4xl font-bold mb-4">Oops!</h1>
+        <p class="text-xl text-gray-600 mb-8">Something went wrong</p>
+        <p class="text-gray-500 mb-8">
+            ${typeof error !== 'undefined' ? error : 'An unexpected error occurred. Please try again.'}
+        </p>
+        <a href="/" class="inline-block bg-bitcoin text-white px-8 py-3 rounded-lg font-bold hover:bg-bitcoin-dark transition">
+            Go Home
+        </a>
+    </div>
+</section>
+` }) %>

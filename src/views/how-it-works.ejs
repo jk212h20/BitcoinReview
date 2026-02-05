@@ -1,0 +1,223 @@
+<%- include('layout', { body: ` 
+<!-- Header -->
+<section class="bg-gradient-to-br from-orange-500 to-yellow-500 text-white py-12">
+    <div class="max-w-4xl mx-auto px-4 text-center">
+        <h1 class="text-3xl md:text-4xl font-bold mb-4">How It Works</h1>
+        <p class="text-lg opacity-90">
+            Everything you need to know about the Bitcoin Review Raffle
+        </p>
+    </div>
+</section>
+
+<!-- Steps -->
+<section class="py-16">
+    <div class="max-w-4xl mx-auto px-4">
+        <div class="space-y-12">
+            <!-- Step 1 -->
+            <div class="flex gap-6">
+                <div class="flex-shrink-0">
+                    <div class="w-12 h-12 bg-bitcoin text-white rounded-full flex items-center justify-center text-xl font-bold">1</div>
+                </div>
+                <div>
+                    <h3 class="text-xl font-bold mb-2">Register for the Raffle</h3>
+                    <p class="text-gray-600 mb-4">
+                        Sign up with your email address and Lightning address (or LNURL). 
+                        No password needed - we keep it simple!
+                    </p>
+                    <ul class="text-gray-500 text-sm space-y-1">
+                        <li>✓ Your email is used to identify your review submissions</li>
+                        <li>✓ Your Lightning address is where we send prizes</li>
+                        <li>✓ You can opt out anytime via the link in your confirmation email</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- Step 2 -->
+            <div class="flex gap-6">
+                <div class="flex-shrink-0">
+                    <div class="w-12 h-12 bg-bitcoin text-white rounded-full flex items-center justify-center text-xl font-bold">2</div>
+                </div>
+                <div>
+                    <h3 class="text-xl font-bold mb-2">Pay with Bitcoin</h3>
+                    <p class="text-gray-600 mb-4">
+                        Visit any merchant that accepts Bitcoin or Lightning payments. 
+                        This can be anywhere in the world, but we especially love supporting Roatan businesses!
+                    </p>
+                    <ul class="text-gray-500 text-sm space-y-1">
+                        <li>✓ Check our <a href="/merchants" class="text-bitcoin hover:underline">merchant list</a> for Bitcoin-accepting businesses in Roatan</li>
+                        <li>✓ Pay with Lightning for instant transactions</li>
+                        <li>✓ On-chain Bitcoin works too!</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- Step 3 -->
+            <div class="flex gap-6">
+                <div class="flex-shrink-0">
+                    <div class="w-12 h-12 bg-bitcoin text-white rounded-full flex items-center justify-center text-xl font-bold">3</div>
+                </div>
+                <div>
+                    <h3 class="text-xl font-bold mb-2">Write a Google Review</h3>
+                    <p class="text-gray-600 mb-4">
+                        Leave an honest Google review for the merchant. Make sure to mention that you paid with Bitcoin!
+                    </p>
+                    <div class="bg-gray-50 p-4 rounded-lg mb-4">
+                        <p class="text-sm text-gray-600 italic">
+                            "Great coffee and amazing service! Loved that I could pay with Bitcoin - 
+                            the Lightning payment was instant. Will definitely be back! ⚡"
+                        </p>
+                    </div>
+                    <ul class="text-gray-500 text-sm space-y-1">
+                        <li>✓ Mention "Bitcoin", "Lightning", or "sats" in your review</li>
+                        <li>✓ Write about your genuine experience</li>
+                        <li>✓ Be helpful to other potential customers</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- Step 4 -->
+            <div class="flex gap-6">
+                <div class="flex-shrink-0">
+                    <div class="w-12 h-12 bg-bitcoin text-white rounded-full flex items-center justify-center text-xl font-bold">4</div>
+                </div>
+                <div>
+                    <h3 class="text-xl font-bold mb-2">Submit Your Review</h3>
+                    <p class="text-gray-600 mb-4">
+                        Come back to our site and submit your review link along with the review text. 
+                        Our AI will verify it mentions a Bitcoin payment.
+                    </p>
+                    <ul class="text-gray-500 text-sm space-y-1">
+                        <li>✓ Copy your Google review link</li>
+                        <li>✓ Paste your review text</li>
+                        <li>✓ Get instant validation</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- Step 5 -->
+            <div class="flex gap-6">
+                <div class="flex-shrink-0">
+                    <div class="w-12 h-12 bg-bitcoin text-white rounded-full flex items-center justify-center text-xl font-bold">5</div>
+                </div>
+                <div>
+                    <h3 class="text-xl font-bold mb-2">Win Bitcoin!</h3>
+                    <p class="text-gray-600 mb-4">
+                        Every Bitcoin difficulty adjustment (~2 weeks), we randomly select a winner 
+                        from all valid review submissions!
+                    </p>
+                    <ul class="text-gray-500 text-sm space-y-1">
+                        <li>✓ Winner selected using Bitcoin block hash (provably fair!)</li>
+                        <li>✓ Prize sent directly to your Lightning address</li>
+                        <li>✓ More reviews = more chances to win</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Raffle Mechanics -->
+<section class="py-16 bg-gray-50">
+    <div class="max-w-4xl mx-auto px-4">
+        <h2 class="text-2xl font-bold mb-8 text-center">🎲 Provably Fair Raffle</h2>
+        
+        <div class="bg-white rounded-lg p-6 shadow-sm mb-8">
+            <h3 class="font-bold mb-4">How Winners Are Selected</h3>
+            <p class="text-gray-600 mb-4">
+                Our raffle uses Bitcoin's blockchain for provably fair winner selection:
+            </p>
+            <ol class="text-gray-600 space-y-3">
+                <li><strong>1.</strong> Every 2016 blocks (~2 weeks), Bitcoin adjusts its mining difficulty</li>
+                <li><strong>2.</strong> We use the hash of this difficulty adjustment block</li>
+                <li><strong>3.</strong> The winner is: <code class="bg-gray-100 px-2 py-1 rounded">block_hash mod total_tickets</code></li>
+                <li><strong>4.</strong> This is deterministic and verifiable by anyone!</li>
+            </ol>
+        </div>
+        
+        ${typeof raffleInfo !== 'undefined' && raffleInfo ? `
+        <div class="bg-white rounded-lg p-6 shadow-sm">
+            <h3 class="font-bold mb-4">Current Raffle Period</h3>
+            <div class="grid md:grid-cols-3 gap-4 text-center">
+                <div>
+                    <div class="text-2xl font-bold text-bitcoin">#${raffleInfo.nextRaffleBlock.toLocaleString()}</div>
+                    <div class="text-gray-500 text-sm">Target Block</div>
+                </div>
+                <div>
+                    <div class="text-2xl font-bold text-bitcoin">${raffleInfo.blocksUntilNext.toLocaleString()}</div>
+                    <div class="text-gray-500 text-sm">Blocks Away</div>
+                </div>
+                <div>
+                    <div class="text-2xl font-bold text-bitcoin">${raffleInfo.timeEstimate}</div>
+                    <div class="text-gray-500 text-sm">Estimated</div>
+                </div>
+            </div>
+        </div>
+        ` : ''}
+    </div>
+</section>
+
+<!-- FAQ -->
+<section class="py-16">
+    <div class="max-w-4xl mx-auto px-4">
+        <h2 class="text-2xl font-bold mb-8 text-center">Frequently Asked Questions</h2>
+        
+        <div class="space-y-6">
+            <div class="bg-white rounded-lg p-6 shadow-sm">
+                <h3 class="font-bold mb-2">Can I submit multiple reviews?</h3>
+                <p class="text-gray-600">
+                    Yes! Each valid review is a separate entry. Review different merchants to increase your chances.
+                </p>
+            </div>
+            
+            <div class="bg-white rounded-lg p-6 shadow-sm">
+                <h3 class="font-bold mb-2">Do I need to be in Roatan?</h3>
+                <p class="text-gray-600">
+                    No! You can review any Bitcoin-accepting merchant anywhere. We just have a special focus on Roatan.
+                </p>
+            </div>
+            
+            <div class="bg-white rounded-lg p-6 shadow-sm">
+                <h3 class="font-bold mb-2">What if my review isn't validated?</h3>
+                <p class="text-gray-600">
+                    Make sure your review clearly mentions paying with Bitcoin, Lightning, or sats. 
+                    If you believe there was an error, contact us.
+                </p>
+            </div>
+            
+            <div class="bg-white rounded-lg p-6 shadow-sm">
+                <h3 class="font-bold mb-2">How are prizes funded?</h3>
+                <p class="text-gray-600">
+                    Prizes come from community donations. Want to support Bitcoin adoption? 
+                    Donate to our prize pool!
+                </p>
+            </div>
+            
+            <div class="bg-white rounded-lg p-6 shadow-sm">
+                <h3 class="font-bold mb-2">What's a Lightning address?</h3>
+                <p class="text-gray-600">
+                    A Lightning address looks like an email (you@wallet.com) and lets you receive Bitcoin instantly. 
+                    Get one from wallets like Phoenix, Wallet of Satoshi, or Alby.
+                </p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA -->
+<section class="py-16 bg-gradient-to-r from-orange-500 to-yellow-500 text-white">
+    <div class="max-w-4xl mx-auto px-4 text-center">
+        <h2 class="text-3xl font-bold mb-6">Ready to Get Started?</h2>
+        <p class="text-lg mb-8 opacity-90">
+            Register now and start earning raffle entries with your Bitcoin reviews!
+        </p>
+        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+            <a href="/#register" class="bg-white text-orange-600 px-8 py-3 rounded-lg font-bold hover:bg-gray-100 transition">
+                Register Now
+            </a>
+            <a href="/merchants" class="border-2 border-white px-8 py-3 rounded-lg font-bold hover:bg-white/10 transition">
+                Find Merchants
+            </a>
+        </div>
+    </div>
+</section>
+` }) %>

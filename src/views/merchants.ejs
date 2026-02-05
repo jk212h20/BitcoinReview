@@ -1,0 +1,127 @@
+<%- include('layout', { body: ` 
+<!-- Header -->
+<section class="bg-gradient-to-br from-orange-500 to-yellow-500 text-white py-12">
+    <div class="max-w-4xl mx-auto px-4 text-center">
+        <h1 class="text-3xl md:text-4xl font-bold mb-4">Bitcoin Merchants in Roatan</h1>
+        <p class="text-lg opacity-90">
+            Find businesses that accept Bitcoin and Lightning payments
+        </p>
+    </div>
+</section>
+
+<!-- Merchant List -->
+<section class="py-12">
+    <div class="max-w-6xl mx-auto px-4">
+        ${typeof error !== 'undefined' && error ? `
+        <div class="bg-red-100 text-red-700 p-4 rounded-lg mb-8">
+            ${error}
+        </div>
+        ` : ''}
+        
+        ${typeof merchants !== 'undefined' && merchants.length > 0 ? `
+        <div class="mb-8">
+            <p class="text-gray-600">
+                Found <strong>${merchants.length}</strong> Bitcoin-accepting merchants in the Roatan area.
+                Data from <a href="https://btcmap.org" target="_blank" class="text-bitcoin hover:underline">BTCMap.org</a>
+            </p>
+        </div>
+        
+        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            ${merchants.map(m => `
+            <div class="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition">
+                <div class="flex items-start justify-between mb-3">
+                    <h3 class="font-bold text-lg">${m.name}</h3>
+                    <div class="flex gap-1">
+                        ${m.lightning ? '<span class="text-yellow-500" title="Lightning">⚡</span>' : ''}
+                        ${m.onchain ? '<span class="text-orange-500" title="On-chain">₿</span>' : ''}
+                    </div>
+                </div>
+                
+                <div class="text-sm text-gray-500 mb-3">
+                    <span class="inline-block bg-gray-100 px-2 py-1 rounded">${m.type}</span>
+                </div>
+                
+                ${m.address ? `
+                <p class="text-gray-600 text-sm mb-3">
+                    📍 ${m.address}
+                </p>
+                ` : ''}
+                
+                ${m.phone ? `
+                <p class="text-gray-600 text-sm mb-3">
+                    📞 <a href="tel:${m.phone}" class="hover:text-bitcoin">${m.phone}</a>
+                </p>
+                ` : ''}
+                
+                ${m.website ? `
+                <p class="text-sm mb-3">
+                    🌐 <a href="${m.website}" target="_blank" class="text-bitcoin hover:underline">Website</a>
+                </p>
+                ` : ''}
+                
+                ${m.openingHours ? `
+                <p class="text-gray-500 text-xs">
+                    🕐 ${m.openingHours}
+                </p>
+                ` : ''}
+                
+                <div class="mt-4 pt-4 border-t">
+                    <a 
+                        href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(m.name + ' Roatan')}" 
+                        target="_blank"
+                        class="text-sm text-bitcoin hover:underline"
+                    >
+                        View on Google Maps →
+                    </a>
+                </div>
+            </div>
+            `).join('')}
+        </div>
+        ` : `
+        <div class="text-center py-12">
+            <div class="text-6xl mb-4">🔍</div>
+            <h2 class="text-2xl font-bold mb-4">No Merchants Found</h2>
+            <p class="text-gray-600 mb-8">
+                We couldn't find any Bitcoin merchants in the Roatan area right now.
+                <br>Check back later or visit <a href="https://btcmap.org" target="_blank" class="text-bitcoin hover:underline">BTCMap.org</a> directly.
+            </p>
+        </div>
+        `}
+    </div>
+</section>
+
+<!-- Add Your Business -->
+<section class="py-12 bg-gray-50">
+    <div class="max-w-4xl mx-auto px-4 text-center">
+        <h2 class="text-2xl font-bold mb-4">Accept Bitcoin at Your Business?</h2>
+        <p class="text-gray-600 mb-6">
+            Add your business to BTCMap.org to be listed here and help grow Bitcoin adoption in Roatan!
+        </p>
+        <a 
+            href="https://btcmap.org/add-location" 
+            target="_blank"
+            class="inline-block bg-bitcoin text-white px-8 py-3 rounded-lg font-bold hover:bg-bitcoin-dark transition"
+        >
+            Add Your Business to BTCMap
+        </a>
+    </div>
+</section>
+
+<!-- CTA -->
+<section class="py-12 bg-white">
+    <div class="max-w-4xl mx-auto px-4 text-center">
+        <h2 class="text-2xl font-bold mb-4">Visited a Merchant?</h2>
+        <p class="text-gray-600 mb-6">
+            Write a Google review mentioning your Bitcoin payment and enter our raffle!
+        </p>
+        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+            <a href="/#register" class="bg-bitcoin text-white px-8 py-3 rounded-lg font-bold hover:bg-bitcoin-dark transition">
+                Register for Raffle
+            </a>
+            <a href="/submit" class="border-2 border-bitcoin text-bitcoin px-8 py-3 rounded-lg font-bold hover:bg-bitcoin hover:text-white transition">
+                Submit a Review
+            </a>
+        </div>
+    </div>
+</section>
+` }) %>

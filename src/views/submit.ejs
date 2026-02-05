@@ -1,0 +1,225 @@
+<%- include('layout', { body: ` 
+<!-- Header -->
+<section class="bg-gradient-to-br from-orange-500 to-yellow-500 text-white py-12">
+    <div class="max-w-4xl mx-auto px-4 text-center">
+        <h1 class="text-3xl md:text-4xl font-bold mb-4">Submit Your Review</h1>
+        <p class="text-lg opacity-90">
+            Already wrote a Google review mentioning Bitcoin? Submit it here to enter the raffle!
+        </p>
+    </div>
+</section>
+
+<!-- Submission Form -->
+<section class="py-12">
+    <div class="max-w-2xl mx-auto px-4">
+        <div x-data="submitForm()" class="bg-white rounded-lg shadow-sm p-8">
+            <form @submit.prevent="submit">
+                <!-- Email -->
+                <div class="mb-6">
+                    <label class="block text-gray-700 font-medium mb-2">
+                        Your Email Address
+                        <span class="text-red-500">*</span>
+                    </label>
+                    <input 
+                        type="email" 
+                        x-model="email"
+                        required
+                        class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-bitcoin focus:border-transparent"
+                        placeholder="The email you registered with"
+                    >
+                    <p class="text-sm text-gray-500 mt-1">Must match your registered email</p>
+                </div>
+                
+                <!-- Review Link -->
+                <div class="mb-6">
+                    <label class="block text-gray-700 font-medium mb-2">
+                        Google Review Link
+                        <span class="text-red-500">*</span>
+                    </label>
+                    <input 
+                        type="url" 
+                        x-model="reviewLink"
+                        required
+                        class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-bitcoin focus:border-transparent"
+                        placeholder="https://maps.google.com/..."
+                    >
+                    <p class="text-sm text-gray-500 mt-1">
+                        Copy the link to your Google review. 
+                        <a href="#how-to-link" class="text-bitcoin hover:underline">How to get this?</a>
+                    </p>
+                </div>
+                
+                <!-- Review Text -->
+                <div class="mb-6">
+                    <label class="block text-gray-700 font-medium mb-2">
+                        Your Review Text
+                        <span class="text-red-500">*</span>
+                    </label>
+                    <textarea 
+                        x-model="reviewText"
+                        required
+                        rows="4"
+                        class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-bitcoin focus:border-transparent"
+                        placeholder="Paste the text of your Google review here..."
+                    ></textarea>
+                    <p class="text-sm text-gray-500 mt-1">
+                        Must mention paying with Bitcoin, Lightning, or sats
+                    </p>
+                </div>
+                
+                <!-- Merchant Name (Optional) -->
+                <div class="mb-8">
+                    <label class="block text-gray-700 font-medium mb-2">
+                        Merchant Name
+                        <span class="text-gray-400">(optional)</span>
+                    </label>
+                    <input 
+                        type="text" 
+                        x-model="merchantName"
+                        list="merchant-list"
+                        class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-bitcoin focus:border-transparent"
+                        placeholder="Name of the business"
+                    >
+                    <datalist id="merchant-list">
+                        ${typeof merchants !== 'undefined' && merchants.length > 0 ? 
+                            merchants.map(m => '<option value="' + m.name + '">').join('') : ''}
+                    </datalist>
+                </div>
+                
+                <!-- Submit Button -->
+                <button 
+                    type="submit"
+                    :disabled="loading"
+                    class="w-full bg-bitcoin text-white py-4 rounded-lg font-bold text-lg hover:bg-bitcoin-dark transition disabled:opacity-50"
+                >
+                    <span x-show="!loading">Submit Review</span>
+                    <span x-show="loading">Validating...</span>
+                </button>
+            </form>
+            
+            <!-- Success/Error Messages -->
+            <div x-show="message" x-cloak class="mt-6 p-4 rounded-lg" :class="success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'">
+                <p class="font-medium" x-text="message"></p>
+                <p x-show="raffleBlock" class="mt-2 text-sm">
+                    You're entered for raffle block #<span x-text="raffleBlock"></span>
+                </p>
+            </div>
+        </div>
+        
+        <!-- Info Box -->
+        <div class="mt-8 bg-blue-50 rounded-lg p-6">
+            <h3 class="font-bold text-blue-800 mb-3">📝 Tips for a Valid Review</h3>
+            <ul class="text-blue-700 space-y-2">
+                <li>✓ Mention that you paid with <strong>Bitcoin</strong>, <strong>Lightning</strong>, or <strong>sats</strong></li>
+                <li>✓ Write about your actual experience at the merchant</li>
+                <li>✓ Be genuine - fake reviews will be rejected</li>
+                <li>✓ One review per merchant per raffle period</li>
+            </ul>
+        </div>
+        
+        <!-- How to Get Link -->
+        <div id="how-to-link" class="mt-8 bg-gray-50 rounded-lg p-6">
+            <h3 class="font-bold text-gray-800 mb-3">🔗 How to Get Your Review Link</h3>
+            <ol class="text-gray-600 space-y-3">
+                <li><strong>1.</strong> Go to Google Maps and find the business</li>
+                <li><strong>2.</strong> Click on "Reviews" and find your review</li>
+                <li><strong>3.</strong> Click the three dots (⋮) on your review</li>
+                <li><strong>4.</strong> Select "Share review" and copy the link</li>
+                <li><strong>5.</strong> Paste the link above!</li>
+            </ol>
+            <p class="mt-4 text-sm text-gray-500">
+                Alternatively, you can share the link to the business's Google Maps page.
+            </p>
+        </div>
+    </div>
+</section>
+
+<!-- Current Raffle Info -->
+${typeof raffleInfo !== 'undefined' && raffleInfo ? `
+<section class="py-12 bg-gray-50">
+    <div class="max-w-4xl mx-auto px-4 text-center">
+        <h2 class="text-2xl font-bold mb-6">Current Raffle Period</h2>
+        <div class="grid md:grid-cols-3 gap-6">
+            <div class="bg-white rounded-lg p-6 shadow-sm">
+                <div class="text-3xl font-bold text-bitcoin">#${raffleInfo.nextRaffleBlock.toLocaleString()}</div>
+                <div class="text-gray-600">Target Block</div>
+            </div>
+            <div class="bg-white rounded-lg p-6 shadow-sm">
+                <div class="text-3xl font-bold text-bitcoin">${raffleInfo.blocksUntilNext.toLocaleString()}</div>
+                <div class="text-gray-600">Blocks Away</div>
+            </div>
+            <div class="bg-white rounded-lg p-6 shadow-sm">
+                <div class="text-3xl font-bold text-bitcoin">${raffleInfo.timeEstimate}</div>
+                <div class="text-gray-600">Estimated Time</div>
+            </div>
+        </div>
+    </div>
+</section>
+` : ''}
+
+<!-- Not Registered? -->
+<section class="py-12 bg-white">
+    <div class="max-w-4xl mx-auto px-4 text-center">
+        <h2 class="text-2xl font-bold mb-4">Not Registered Yet?</h2>
+        <p class="text-gray-600 mb-6">
+            You need to register with your email and Lightning address before submitting reviews.
+        </p>
+        <a href="/#register" class="inline-block bg-bitcoin text-white px-8 py-3 rounded-lg font-bold hover:bg-bitcoin-dark transition">
+            Register Now
+        </a>
+    </div>
+</section>
+
+<script>
+function submitForm() {
+    return {
+        email: '',
+        reviewLink: '',
+        reviewText: '',
+        merchantName: '',
+        loading: false,
+        message: '',
+        success: false,
+        raffleBlock: null,
+        
+        async submit() {
+            this.loading = true;
+            this.message = '';
+            this.raffleBlock = null;
+            
+            try {
+                const response = await fetch('/api/submit-review', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: this.email,
+                        reviewLink: this.reviewLink,
+                        reviewText: this.reviewText,
+                        merchantName: this.merchantName
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    this.success = true;
+                    this.message = data.message;
+                    this.raffleBlock = data.raffleBlock;
+                    this.reviewLink = '';
+                    this.reviewText = '';
+                    this.merchantName = '';
+                } else {
+                    this.success = false;
+                    this.message = data.error;
+                }
+            } catch (error) {
+                this.success = false;
+                this.message = 'Something went wrong. Please try again.';
+            }
+            
+            this.loading = false;
+        }
+    }
+}
+</script>
+` }) %>

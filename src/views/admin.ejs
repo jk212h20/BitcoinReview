@@ -1,0 +1,314 @@
+<%- include('layout', { body: ` 
+<!-- Header -->
+<section class="bg-gray-800 text-white py-8">
+    <div class="max-w-6xl mx-auto px-4">
+        <h1 class="text-2xl font-bold">Admin Dashboard</h1>
+    </div>
+</section>
+
+<section class="py-8" x-data="adminDashboard()">
+    <div class="max-w-6xl mx-auto px-4">
+        ${typeof error !== 'undefined' && error ? `
+        <div class="bg-red-100 text-red-700 p-4 rounded-lg mb-8">
+            ${error}
+        </div>
+        ` : ''}
+        
+        <!-- Stats Overview -->
+        <div class="grid md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-lg p-6 shadow-sm">
+                <div class="text-3xl font-bold text-bitcoin">${typeof users !== 'undefined' ? users.length : 0}</div>
+                <div class="text-gray-600">Registered Users</div>
+            </div>
+            <div class="bg-white rounded-lg p-6 shadow-sm">
+                <div class="text-3xl font-bold text-bitcoin">${typeof tickets !== 'undefined' ? tickets.length : 0}</div>
+                <div class="text-gray-600">Total Tickets</div>
+            </div>
+            <div class="bg-white rounded-lg p-6 shadow-sm">
+                <div class="text-3xl font-bold text-yellow-500">${typeof pendingTickets !== 'undefined' ? pendingTickets.length : 0}</div>
+                <div class="text-gray-600">Pending Validation</div>
+            </div>
+            <div class="bg-white rounded-lg p-6 shadow-sm">
+                <div class="text-3xl font-bold text-green-500">${typeof raffles !== 'undefined' ? raffles.length : 0}</div>
+                <div class="text-gray-600">Raffles Run</div>
+            </div>
+        </div>
+        
+        <!-- Blockchain Info -->
+        ${typeof raffleInfo !== 'undefined' && raffleInfo ? `
+        <div class="bg-white rounded-lg p-6 shadow-sm mb-8">
+            <h2 class="text-xl font-bold mb-4">Current Raffle Period</h2>
+            <div class="grid md:grid-cols-4 gap-4">
+                <div>
+                    <div class="text-sm text-gray-500">Current Block</div>
+                    <div class="font-bold">#${raffleInfo.currentHeight.toLocaleString()}</div>
+                </div>
+                <div>
+                    <div class="text-sm text-gray-500">Next Raffle Block</div>
+                    <div class="font-bold">#${raffleInfo.nextRaffleBlock.toLocaleString()}</div>
+                </div>
+                <div>
+                    <div class="text-sm text-gray-500">Blocks Away</div>
+                    <div class="font-bold">${raffleInfo.blocksUntilNext.toLocaleString()}</div>
+                </div>
+                <div>
+                    <div class="text-sm text-gray-500">Estimated Time</div>
+                    <div class="font-bold">${raffleInfo.timeEstimate}</div>
+                </div>
+            </div>
+        </div>
+        ` : ''}
+        
+        <!-- Run Raffle -->
+        <div class="bg-white rounded-lg p-6 shadow-sm mb-8">
+            <h2 class="text-xl font-bold mb-4">Run Raffle</h2>
+            <form @submit.prevent="runRaffle" class="flex flex-wrap gap-4 items-end">
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">Block Height</label>
+                    <input 
+                        type="number" 
+                        x-model="raffleBlockHeight"
+                        class="px-4 py-2 border rounded-lg"
+                        placeholder="e.g., 880992"
+                    >
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">Prize (sats)</label>
+                    <input 
+                        type="number" 
+                        x-model="prizeAmount"
+                        class="px-4 py-2 border rounded-lg"
+                        placeholder="e.g., 100000"
+                    >
+                </div>
+                <button 
+                    type="submit"
+                    :disabled="raffleLoading"
+                    class="bg-green-500 text-white px-6 py-2 rounded-lg font-bold hover:bg-green-600 disabled:opacity-50"
+                >
+                    Run Raffle
+                </button>
+            </form>
+            <div x-show="raffleResult" x-cloak class="mt-4 p-4 rounded-lg" :class="raffleSuccess ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'">
+                <pre x-text="JSON.stringify(raffleResult, null, 2)" class="text-sm overflow-auto"></pre>
+            </div>
+        </div>
+        
+        <!-- Tabs -->
+        <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+            <div class="border-b flex">
+                <button 
+                    @click="activeTab = 'tickets'"
+                    :class="activeTab === 'tickets' ? 'bg-bitcoin text-white' : 'text-gray-600 hover:bg-gray-100'"
+                    class="px-6 py-3 font-medium"
+                >
+                    Tickets
+                </button>
+                <button 
+                    @click="activeTab = 'users'"
+                    :class="activeTab === 'users' ? 'bg-bitcoin text-white' : 'text-gray-600 hover:bg-gray-100'"
+                    class="px-6 py-3 font-medium"
+                >
+                    Users
+                </button>
+                <button 
+                    @click="activeTab = 'raffles'"
+                    :class="activeTab === 'raffles' ? 'bg-bitcoin text-white' : 'text-gray-600 hover:bg-gray-100'"
+                    class="px-6 py-3 font-medium"
+                >
+                    Raffles
+                </button>
+            </div>
+            
+            <!-- Tickets Tab -->
+            <div x-show="activeTab === 'tickets'" class="p-6">
+                <h3 class="font-bold mb-4">Recent Tickets</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b">
+                                <th class="text-left py-2">ID</th>
+                                <th class="text-left py-2">Email</th>
+                                <th class="text-left py-2">Merchant</th>
+                                <th class="text-left py-2">Valid</th>
+                                <th class="text-left py-2">Block</th>
+                                <th class="text-left py-2">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${typeof tickets !== 'undefined' && tickets.length > 0 ? 
+                                tickets.slice(0, 50).map(t => `
+                                <tr class="border-b hover:bg-gray-50">
+                                    <td class="py-2">${t.id}</td>
+                                    <td class="py-2">${t.email}</td>
+                                    <td class="py-2">${t.merchant_name || '-'}</td>
+                                    <td class="py-2">
+                                        ${t.is_valid ? 
+                                            '<span class="text-green-500">✓</span>' : 
+                                            (t.validation_reason ? '<span class="text-red-500">✗</span>' : '<span class="text-yellow-500">?</span>')}
+                                    </td>
+                                    <td class="py-2">${t.raffle_block}</td>
+                                    <td class="py-2">
+                                        <a href="${t.review_link}" target="_blank" class="text-bitcoin hover:underline">View</a>
+                                    </td>
+                                </tr>
+                                `).join('') : 
+                                '<tr><td colspan="6" class="py-4 text-center text-gray-500">No tickets yet</td></tr>'
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Users Tab -->
+            <div x-show="activeTab === 'users'" x-cloak class="p-6">
+                <h3 class="font-bold mb-4">Registered Users</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b">
+                                <th class="text-left py-2">ID</th>
+                                <th class="text-left py-2">Email</th>
+                                <th class="text-left py-2">LNURL</th>
+                                <th class="text-left py-2">Active</th>
+                                <th class="text-left py-2">Registered</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${typeof users !== 'undefined' && users.length > 0 ? 
+                                users.slice(0, 50).map(u => `
+                                <tr class="border-b hover:bg-gray-50">
+                                    <td class="py-2">${u.id}</td>
+                                    <td class="py-2">${u.email}</td>
+                                    <td class="py-2 max-w-xs truncate">${u.lnurl_address}</td>
+                                    <td class="py-2">${u.is_active ? '<span class="text-green-500">✓</span>' : '<span class="text-red-500">✗</span>'}</td>
+                                    <td class="py-2">${new Date(u.created_at).toLocaleDateString()}</td>
+                                </tr>
+                                `).join('') : 
+                                '<tr><td colspan="5" class="py-4 text-center text-gray-500">No users yet</td></tr>'
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Raffles Tab -->
+            <div x-show="activeTab === 'raffles'" x-cloak class="p-6">
+                <h3 class="font-bold mb-4">Raffle History</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b">
+                                <th class="text-left py-2">Block</th>
+                                <th class="text-left py-2">Tickets</th>
+                                <th class="text-left py-2">Winner</th>
+                                <th class="text-left py-2">Prize</th>
+                                <th class="text-left py-2">Paid</th>
+                                <th class="text-left py-2">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${typeof raffles !== 'undefined' && raffles.length > 0 ? 
+                                raffles.map(r => `
+                                <tr class="border-b hover:bg-gray-50">
+                                    <td class="py-2">#${r.block_height.toLocaleString()}</td>
+                                    <td class="py-2">${r.total_tickets}</td>
+                                    <td class="py-2">${r.email || '-'}</td>
+                                    <td class="py-2">${r.prize_amount_sats ? r.prize_amount_sats.toLocaleString() + ' sats' : '-'}</td>
+                                    <td class="py-2">${r.paid_at ? '<span class="text-green-500">✓</span>' : '<span class="text-yellow-500">Pending</span>'}</td>
+                                    <td class="py-2">
+                                        ${!r.paid_at ? `
+                                        <button 
+                                            @click="markPaid(${r.id})"
+                                            class="text-bitcoin hover:underline"
+                                        >
+                                            Mark Paid
+                                        </button>
+                                        ` : '-'}
+                                    </td>
+                                </tr>
+                                `).join('') : 
+                                '<tr><td colspan="6" class="py-4 text-center text-gray-500">No raffles yet</td></tr>'
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script>
+function adminDashboard() {
+    return {
+        activeTab: 'tickets',
+        raffleBlockHeight: '',
+        prizeAmount: '',
+        raffleLoading: false,
+        raffleResult: null,
+        raffleSuccess: false,
+        password: '${typeof password !== 'undefined' ? password : ''}',
+        
+        async runRaffle() {
+            if (!this.raffleBlockHeight) {
+                alert('Please enter a block height');
+                return;
+            }
+            
+            this.raffleLoading = true;
+            this.raffleResult = null;
+            
+            try {
+                const response = await fetch('/api/admin/raffle/run', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-Admin-Password': this.password
+                    },
+                    body: JSON.stringify({
+                        blockHeight: parseInt(this.raffleBlockHeight),
+                        prizeAmountSats: this.prizeAmount ? parseInt(this.prizeAmount) : null
+                    })
+                });
+                
+                const data = await response.json();
+                this.raffleResult = data;
+                this.raffleSuccess = data.success;
+                
+                if (data.success) {
+                    setTimeout(() => location.reload(), 2000);
+                }
+            } catch (error) {
+                this.raffleResult = { error: error.message };
+                this.raffleSuccess = false;
+            }
+            
+            this.raffleLoading = false;
+        },
+        
+        async markPaid(raffleId) {
+            if (!confirm('Mark this raffle as paid?')) return;
+            
+            try {
+                const response = await fetch('/api/admin/raffle/' + raffleId + '/mark-paid', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-Admin-Password': this.password
+                    }
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert(data.error);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+    }
+}
+</script>
+` }) %>

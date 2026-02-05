@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+        .bitcoin-orange { color: #f7931a; }
+        .bg-bitcoin-orange { background-color: #f7931a; }
+        .border-bitcoin-orange { border-color: #f7931a; }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        bitcoin: '#f7931a',
+                        'bitcoin-dark': '#e8850f'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-sm">
+        <div class="max-w-6xl mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <a href="/" class="flex items-center space-x-2">
+                    <span class="text-2xl">₿</span>
+                    <span class="font-bold text-xl">Bitcoin Review Raffle</span>
+                </a>
+                <div class="hidden md:flex space-x-6">
+                    <a href="/" class="text-gray-600 hover:text-bitcoin">Home</a>
+                    <a href="/submit" class="text-gray-600 hover:text-bitcoin">Submit Review</a>
+                    <a href="/merchants" class="text-gray-600 hover:text-bitcoin">Merchants</a>
+                    <a href="/how-it-works" class="text-gray-600 hover:text-bitcoin">How It Works</a>
+                </div>
+                <div class="md:hidden">
+                    <button id="mobile-menu-btn" class="text-gray-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <!-- Mobile menu -->
+            <div id="mobile-menu" class="hidden md:hidden mt-4 space-y-2">
+                <a href="/" class="block py-2 text-gray-600 hover:text-bitcoin">Home</a>
+                <a href="/submit" class="block py-2 text-gray-600 hover:text-bitcoin">Submit Review</a>
+                <a href="/merchants" class="block py-2 text-gray-600 hover:text-bitcoin">Merchants</a>
+                <a href="/how-it-works" class="block py-2 text-gray-600 hover:text-bitcoin">How It Works</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main>
+        <%- body %>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white mt-16">
+        <div class="max-w-6xl mx-auto px-4 py-8">
+            <div class="grid md:grid-cols-3 gap-8">
+                <div>
+                    <h3 class="font-bold text-lg mb-4">Bitcoin Review Raffle</h3>
+                    <p class="text-gray-400">Incentivizing Bitcoin adoption in Roatan through community reviews.</p>
+                </div>
+                <div>
+                    <h3 class="font-bold text-lg mb-4">Quick Links</h3>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="/submit" class="hover:text-white">Submit a Review</a></li>
+                        <li><a href="/merchants" class="hover:text-white">Find Merchants</a></li>
+                        <li><a href="/how-it-works" class="hover:text-white">How It Works</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h3 class="font-bold text-lg mb-4">Support the Raffle</h3>
+                    <p class="text-gray-400 text-sm mb-2">Donate to fund prizes:</p>
+                    <code class="text-xs bg-gray-700 px-2 py-1 rounded break-all"><%= typeof donationAddress !== 'undefined' ? donationAddress : 'Coming soon' %></code>
+                </div>
+            </div>
+            <div class="border-t border-gray-700 mt-8 pt-8 text-center text-gray-400">
+                <p>🌴 Made with ⚡ in Roatan</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Mobile menu toggle
+        document.getElementById('mobile-menu-btn')?.addEventListener('click', function() {
+            document.getElementById('mobile-menu').classList.toggle('hidden');
+        });
+    </script>
+</body>
+</html>
