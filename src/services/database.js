@@ -26,12 +26,12 @@ async function initializeDatabase() {
     
     // Create tables
     db.run(`
-        -- Users who register for the raffle
+        -- Users / participants (email and lnurl are both optional)
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            email TEXT UNIQUE NOT NULL,
-            lnurl_address TEXT NOT NULL,
-            opt_out_token TEXT UNIQUE NOT NULL,
+            email TEXT UNIQUE,
+            lnurl_address TEXT,
+            opt_out_token TEXT UNIQUE,
             is_active INTEGER DEFAULT 1,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
@@ -39,7 +39,7 @@ async function initializeDatabase() {
         -- Submitted reviews (raffle tickets)
         CREATE TABLE IF NOT EXISTS tickets (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
+            user_id INTEGER,
             review_link TEXT NOT NULL,
             review_text TEXT,
             merchant_name TEXT,
@@ -59,6 +59,9 @@ async function initializeDatabase() {
             winning_index INTEGER NOT NULL,
             winning_ticket_id INTEGER,
             prize_amount_sats INTEGER,
+            payment_status TEXT DEFAULT 'pending',
+            payment_hash TEXT,
+            payment_error TEXT,
             paid_at TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (winning_ticket_id) REFERENCES tickets(id)
@@ -67,6 +70,7 @@ async function initializeDatabase() {
     
     // Create indexes
     db.run(`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_users_lnurl ON users(lnurl_address);`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_users_opt_out_token ON users(opt_out_token);`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_tickets_user_id ON tickets(user_id);`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_tickets_raffle_block ON tickets(raffle_block);`);
@@ -116,7 +120,7 @@ function createUser(email, lnurlAddress, optOutToken) {
     try {
         const id = run(
             `INSERT INTO users (email, lnurl_address, opt_out_token) VALUES (?, ?, ?)`,
-            [email, lnurlAddress, optOutToken]
+            [email || null, lnurlAddress || null, optOutToken]
         );
         return { id };
     } catch (error) {
@@ -128,7 +132,63 @@ function createUser(email, lnurlAddress, optOutToken) {
 }
 
 function findUserByEmail(email) {
+    if (!email) return null;
     return queryOne(`SELECT * FROM users WHERE email = ? AND is_active = 1`, [email]);
+}
+
+function findUserByLnurl(lnurlAddress) {
+    if (!lnurlAddress) return null;
+    return queryOne(`SELECT * FROM users WHERE lnurl_address = ? AND is_active = 1`, [lnurlAddress]);
+}
+
+/**
+ * Find or create a user based on email and/or lnurl.
+ * Tries to match by email first, then lnurl, then creates new.
+ * Updates existing user with new info if found.
+ */
+function findOrCreateUser(email, lnurlAddress, optOutToken) {
+    let user = null;
+    
+    // Try to find by email first
+    if (email) {
+        user = findUserByEmail(email);
+    }
+    
+    // Try to find by lnurl if not found by email
+    if (!user && lnurlAddress) {
+        user = findUserByLnurl(lnurlAddress);
+    }
+    
+    if (user) {
+        // Update user with any new info
+        let updated = false;
+        if (email && !user.email) {
+            run(`UPDATE users SET email = ? WHERE id = ?`, [email, user.id]);
+            updated = true;
+        }
+        if (lnurlAddress && !user.lnurl_address) {
+            run(`UPDATE users SET lnurl_address = ? WHERE id = ?`, [lnurlAddress, user.id]);
+            updated = true;
+        }
+        // Also update lnurl if user had one but provided a new one
+        if (lnurlAddress && user.lnurl_address && lnurlAddress !== user.lnurl_address) {
+            run(`UPDATE users SET lnurl_address = ? WHERE id = ?`, [lnurlAddress, user.id]);
+            updated = true;
+        }
+        // Re-fetch if updated
+        if (updated) {
+            user = queryOne(`SELECT * FROM users WHERE id = ?`, [user.id]);
+        }
+        return { user, created: false };
+    }
+    
+    // Create new user
+    const result = createUser(email, lnurlAddress, optOutToken);
+    if (result.error) {
+        return { error: result.error };
+    }
+    user = queryOne(`SELECT * FROM users WHERE id = ?`, [result.id]);
+    return { user, created: true };
 }
 
 function findUserByOptOutToken(token) {
@@ -229,8 +289,23 @@ function findRaffleByBlock(blockHeight) {
     return queryOne(`SELECT * FROM raffles WHERE block_height = ?`, [blockHeight]);
 }
 
-function markRafflePaid(raffleId) {
-    run(`UPDATE raffles SET paid_at = datetime('now') WHERE id = ?`, [raffleId]);
+function markRafflePaid(raffleId, paymentHash = null) {
+    run(`UPDATE raffles SET payment_status = 'paid', payment_hash = ?, paid_at = datetime('now') WHERE id = ?`, [paymentHash, raffleId]);
+}
+
+function markRafflePaymentFailed(raffleId, error) {
+    run(`UPDATE raffles SET payment_status = 'failed', payment_error = ? WHERE id = ?`, [error, raffleId]);
+}
+
+function getUnpaidRaffles() {
+    return query(`
+        SELECT r.*, t.review_link, u.email, u.lnurl_address
+        FROM raffles r
+        LEFT JOIN tickets t ON r.winning_ticket_id = t.id
+        LEFT JOIN users u ON t.user_id = u.id
+        WHERE r.payment_status != 'paid'
+        ORDER BY r.created_at DESC
+    `);
 }
 
 function getAllRaffles() {
@@ -260,6 +335,8 @@ module.exports = {
     // User functions
     createUser,
     findUserByEmail,
+    findUserByLnurl,
+    findOrCreateUser,
     findUserByOptOutToken,
     deactivateUser,
     getAllUsers,
@@ -279,6 +356,8 @@ module.exports = {
     createRaffle,
     findRaffleByBlock,
     markRafflePaid,
+    markRafflePaymentFailed,
+    getUnpaidRaffles,
     getAllRaffles,
     getLatestRaffle
 };

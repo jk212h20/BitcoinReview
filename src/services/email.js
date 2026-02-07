@@ -1,32 +1,23 @@
 /**
- * Email service using Nodemailer
+ * Email service using Resend
+ * https://resend.com/docs
  */
 
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
-let transporter = null;
+let resend = null;
 
 /**
- * Initialize email transporter
+ * Initialize email service
  */
 function initializeEmail() {
-    // Skip if no SMTP config (for development)
-    if (!process.env.SMTP_HOST) {
-        console.log('⚠️  Email service not configured (SMTP_HOST missing)');
+    if (!process.env.RESEND_API_KEY) {
+        console.log('⚠️  Email service not configured (RESEND_API_KEY missing)');
         return;
     }
     
-    transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: parseInt(process.env.SMTP_PORT || '587', 10),
-        secure: process.env.SMTP_PORT === '465',
-        auth: {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS
-        }
-    });
-    
-    console.log('✅ Email service initialized');
+    resend = new Resend(process.env.RESEND_API_KEY);
+    console.log('✅ Email service initialized (Resend)');
 }
 
 /**
@@ -164,25 +155,34 @@ Thank you for supporting Bitcoin adoption in Roatan! 🌴⚡
 }
 
 /**
- * Generic send email function
+ * Generic send email function using Resend API
  */
 async function sendEmail(to, subject, html, text) {
-    if (!transporter) {
+    if (!resend) {
         console.log(`📧 [DEV] Would send email to ${to}: ${subject}`);
         return { success: true, dev: true };
     }
     
     try {
-        const result = await transporter.sendMail({
-            from: process.env.SMTP_FROM || 'Bitcoin Review Raffle <noreply@bitcoinreview.com>',
+        // EMAIL_FROM should be your verified domain address once you have one.
+        // Before domain verification, use 'onboarding@resend.dev' for testing.
+        const from = process.env.EMAIL_FROM || 'Bitcoin Review Raffle <onboarding@resend.dev>';
+        
+        const { data, error } = await resend.emails.send({
+            from,
             to,
             subject,
             html,
             text
         });
         
-        console.log(`📧 Email sent to ${to}: ${subject}`);
-        return { success: true, messageId: result.messageId };
+        if (error) {
+            console.error(`❌ Failed to send email to ${to}:`, error.message);
+            return { success: false, error: error.message };
+        }
+        
+        console.log(`📧 Email sent to ${to}: ${subject} (id: ${data.id})`);
+        return { success: true, messageId: data.id };
     } catch (error) {
         console.error(`❌ Failed to send email to ${to}:`, error.message);
         return { success: false, error: error.message };

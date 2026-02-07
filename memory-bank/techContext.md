@@ -16,7 +16,7 @@
 - **btcmap.org:** Fetch Bitcoin-accepting merchants
 - **Anthropic API:** Validate review content mentions Bitcoin
 - **Bitcoin Block API:** Fetch block hashes for raffle (mempool.space or blockstream.info)
-- **Email:** Nodemailer with SMTP (configurable provider)
+- **Email:** Resend API (https://resend.com) - handles SPF/DKIM/DMARC automatically
 
 ### Deployment
 - **Platform:** Railway.app
@@ -58,22 +58,22 @@ BitcoinReview/
 PORT=3000
 DATABASE_PATH=./data/reviews.db
 ANTHROPIC_API_KEY=
-SMTP_HOST=
-SMTP_PORT=
-SMTP_USER=
-SMTP_PASS=
-SMTP_FROM=
+RESEND_API_KEY=
+EMAIL_FROM=Bitcoin Review Raffle <onboarding@resend.dev>
 ADMIN_PASSWORD=
 BASE_URL=http://localhost:3000
 DONATION_ADDRESS=
+LND_REST_URL=
+LND_MACAROON=
+AUTO_PAY_ENABLED=false
+DEFAULT_PRIZE_SATS=100000
 ```
 
 ## Key Dependencies
 - express
 - better-sqlite3
 - ejs
-- nodemailer
-- node-fetch (or built-in fetch in Node 18+)
+- resend (email API)
 - @anthropic-ai/sdk
 - dotenv
 - uuid (for opt-out tokens)

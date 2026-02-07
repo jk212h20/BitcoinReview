@@ -40,24 +40,23 @@ router.get('/', async (req, res) => {
 
 /**
  * GET /submit
- * Review submission page
+ * Unified submission page (review link + optional email/lnurl)
  */
 router.get('/submit', async (req, res) => {
     try {
         const raffleInfo = await bitcoin.getRaffleInfo();
-        const merchants = await btcmap.getMerchantList();
         
         res.render('submit', {
             title: 'Submit Review - Bitcoin Review Raffle',
             raffleInfo,
-            merchants
+            donationAddress: process.env.DONATION_ADDRESS || 'Not configured'
         });
     } catch (error) {
         console.error('Submit page error:', error);
         res.render('submit', {
             title: 'Submit Review - Bitcoin Review Raffle',
             error: 'Failed to load page data',
-            merchants: []
+            donationAddress: process.env.DONATION_ADDRESS || 'Not configured'
         });
     }
 });

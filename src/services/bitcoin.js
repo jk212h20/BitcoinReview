@@ -5,11 +5,16 @@
 
 const MEMPOOL_API = 'https://mempool.space/api';
 
+// Cache for raffle info to avoid slow API calls on every page load
+let raffleInfoCache = null;
+let raffleCacheTime = 0;
+const CACHE_TTL_MS = 120 * 1000; // Cache for 2 minutes
+
 /**
  * Get current block height
  */
 async function getCurrentBlockHeight() {
-    const response = await fetch(`${MEMPOOL_API}/blocks/tip/height`);
+    const response = await fetch(`${MEMPOOL_API}/blocks/tip/height`, { signal: AbortSignal.timeout(5000) });
     if (!response.ok) {
         throw new Error('Failed to fetch block height');
     }
@@ -85,6 +90,12 @@ function selectWinnerIndex(blockHash, totalTickets) {
  * Get raffle info for display
  */
 async function getRaffleInfo() {
+    // Return cached data if fresh enough
+    const now = Date.now();
+    if (raffleInfoCache && (now - raffleCacheTime) < CACHE_TTL_MS) {
+        return raffleInfoCache;
+    }
+    
     const currentHeight = await getCurrentBlockHeight();
     const currentRaffleBlock = getCurrentRaffleBlock(currentHeight);
     const nextRaffleBlock = getNextRaffleBlock(currentHeight);
@@ -104,13 +115,32 @@ async function getRaffleInfo() {
         timeEstimate = `~${minutesUntilNext} minutes`;
     }
     
-    return {
+    const result = {
         currentHeight,
         currentRaffleBlock,
         nextRaffleBlock,
         blocksUntilNext,
         timeEstimate
     };
+    
+    // Update cache
+    raffleInfoCache = result;
+    raffleCacheTime = now;
+    
+    return result;
+}
+
+/**
+ * Pre-warm the cache on server startup so first page loads are instant
+ */
+async function warmCache() {
+    try {
+        console.log('Pre-warming raffle info cache...');
+        await getRaffleInfo();
+        console.log('Raffle info cache warmed successfully');
+    } catch (err) {
+        console.warn('Failed to warm raffle cache (will retry on first request):', err.message);
+    }
 }
 
 /**
@@ -130,5 +160,6 @@ module.exports = {
     getBlocksUntilNextRaffle,
     selectWinnerIndex,
     getRaffleInfo,
-    isRaffleBlockMined
+    isRaffleBlockMined,
+    warmCache
 };

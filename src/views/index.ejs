@@ -22,11 +22,11 @@
         </div>
         
         <div class="flex flex-col sm:flex-row gap-4 justify-center">
-            <a href="#register" class="bg-white text-orange-600 px-8 py-3 rounded-lg font-bold hover:bg-gray-100 transition">
-                Register Now
-            </a>
-            <a href="/submit" class="border-2 border-white px-8 py-3 rounded-lg font-bold hover:bg-white/10 transition">
+            <a href="/submit" class="bg-white text-orange-600 px-8 py-3 rounded-lg font-bold hover:bg-gray-100 transition">
                 Submit a Review
+            </a>
+            <a href="/how-it-works" class="border-2 border-white px-8 py-3 rounded-lg font-bold hover:bg-white/10 transition">
+                How It Works
             </a>
         </div>
     </div>
@@ -38,7 +38,7 @@
         <div class="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
             <div class="p-4">
                 <div class="text-3xl font-bold text-bitcoin">${typeof userCount !== 'undefined' ? userCount : 0}</div>
-                <div class="text-gray-600">Registered Users</div>
+                <div class="text-gray-600">Participants</div>
             </div>
             <div class="p-4">
                 <div class="text-3xl font-bold text-bitcoin">${typeof ticketCount !== 'undefined' ? ticketCount : 0}</div>
@@ -60,75 +60,27 @@
 <section class="py-16 bg-gray-50">
     <div class="max-w-6xl mx-auto px-4">
         <h2 class="text-3xl font-bold text-center mb-12">How It Works</h2>
-        <div class="grid md:grid-cols-4 gap-8">
+        <div class="grid md:grid-cols-3 gap-8">
             <div class="text-center">
                 <div class="w-16 h-16 bg-bitcoin text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">1</div>
-                <h3 class="font-bold mb-2">Register</h3>
-                <p class="text-gray-600">Sign up with your email and Lightning address</p>
+                <h3 class="font-bold mb-2">Pay with Bitcoin</h3>
+                <p class="text-gray-600">Visit a merchant in Roatan and pay with Bitcoin or Lightning</p>
             </div>
             <div class="text-center">
                 <div class="w-16 h-16 bg-bitcoin text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">2</div>
-                <h3 class="font-bold mb-2">Pay with Bitcoin</h3>
-                <p class="text-gray-600">Visit a merchant and pay with Bitcoin or Lightning</p>
+                <h3 class="font-bold mb-2">Write a Review</h3>
+                <p class="text-gray-600">Leave a Google review mentioning your Bitcoin experience</p>
             </div>
             <div class="text-center">
                 <div class="w-16 h-16 bg-bitcoin text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">3</div>
-                <h3 class="font-bold mb-2">Write a Review</h3>
-                <p class="text-gray-600">Leave a Google review mentioning your Bitcoin purchase</p>
-            </div>
-            <div class="text-center">
-                <div class="w-16 h-16 bg-bitcoin text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">4</div>
-                <h3 class="font-bold mb-2">Win Bitcoin!</h3>
-                <p class="text-gray-600">Every ~2 weeks, one lucky reviewer wins Bitcoin</p>
+                <h3 class="font-bold mb-2">Submit &amp; Win!</h3>
+                <p class="text-gray-600">Submit your review link with your Lightning address to enter the raffle</p>
             </div>
         </div>
-    </div>
-</section>
-
-<!-- Registration Form -->
-<section id="register" class="py-16 bg-white">
-    <div class="max-w-md mx-auto px-4">
-        <h2 class="text-3xl font-bold text-center mb-8">Register for the Raffle</h2>
-        
-        <div x-data="registrationForm()" class="bg-gray-50 rounded-lg p-6 shadow-sm">
-            <form @submit.prevent="submit">
-                <div class="mb-4">
-                    <label class="block text-gray-700 font-medium mb-2">Email Address</label>
-                    <input 
-                        type="email" 
-                        x-model="email"
-                        required
-                        class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-bitcoin focus:border-transparent"
-                        placeholder="you@example.com"
-                    >
-                </div>
-                
-                <div class="mb-6">
-                    <label class="block text-gray-700 font-medium mb-2">Lightning Address / LNURL</label>
-                    <input 
-                        type="text" 
-                        x-model="lnurl"
-                        required
-                        class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-bitcoin focus:border-transparent"
-                        placeholder="you@wallet.com or lnurl1..."
-                    >
-                    <p class="text-sm text-gray-500 mt-1">This is where we'll send your prize if you win!</p>
-                </div>
-                
-                <button 
-                    type="submit"
-                    :disabled="loading"
-                    class="w-full bg-bitcoin text-white py-3 rounded-lg font-bold hover:bg-bitcoin-dark transition disabled:opacity-50"
-                >
-                    <span x-show="!loading">Register</span>
-                    <span x-show="loading">Registering...</span>
-                </button>
-            </form>
-            
-            <!-- Success/Error Messages -->
-            <div x-show="message" x-cloak class="mt-4 p-4 rounded-lg" :class="success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'">
-                <span x-text="message"></span>
-            </div>
+        <div class="text-center mt-8">
+            <a href="/submit" class="inline-block bg-bitcoin text-white px-8 py-3 rounded-lg font-bold hover:bg-bitcoin-dark transition">
+                Submit Your Review →
+            </a>
         </div>
     </div>
 </section>
@@ -160,49 +112,4 @@ ${typeof latestRaffle !== 'undefined' && latestRaffle ? `
         </div>
     </div>
 </section>
-
-<script>
-function registrationForm() {
-    return {
-        email: '',
-        lnurl: '',
-        loading: false,
-        message: '',
-        success: false,
-        
-        async submit() {
-            this.loading = true;
-            this.message = '';
-            
-            try {
-                const response = await fetch('/api/register', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        email: this.email,
-                        lnurl: this.lnurl
-                    })
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    this.success = true;
-                    this.message = data.message;
-                    this.email = '';
-                    this.lnurl = '';
-                } else {
-                    this.success = false;
-                    this.message = data.error;
-                }
-            } catch (error) {
-                this.success = false;
-                this.message = 'Something went wrong. Please try again.';
-            }
-            
-            this.loading = false;
-        }
-    }
-}
-</script>
 ` }) %>

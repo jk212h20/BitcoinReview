@@ -8,6 +8,7 @@ const router = express.Router();
 const db = require('../services/database');
 const bitcoin = require('../services/bitcoin');
 const email = require('../services/email');
+const lightning = require('../services/lightning');
 
 /**
  * Simple password authentication middleware
@@ -191,6 +192,28 @@ router.post('/raffle/run', async (req, res) => {
             console.error('Failed to send winner email:', err);
         });
         
+        // Auto-pay via Lightning if enabled and winner has a Lightning Address
+        let paymentResult = null;
+        const autoPayEnabled = process.env.AUTO_PAY_ENABLED === 'true';
+        const prizeSats = prizeAmountSats || parseInt(process.env.DEFAULT_PRIZE_SATS) || 0;
+        
+        if (autoPayEnabled && winningTicket.lnurl_address && prizeSats > 0) {
+            try {
+                console.log(`⚡ Auto-paying ${prizeSats} sats to ${winningTicket.lnurl_address}...`);
+                paymentResult = await lightning.payLightningAddress(
+                    winningTicket.lnurl_address,
+                    prizeSats,
+                    `Bitcoin Review Raffle winner! Block #${blockHeight}`
+                );
+                db.markRafflePaid(raffle.id, paymentResult.paymentHash);
+                console.log(`✅ Auto-payment successful: ${paymentResult.paymentHash}`);
+            } catch (payErr) {
+                console.error('⚠️ Auto-payment failed:', payErr.message);
+                db.markRafflePaymentFailed(raffle.id, payErr.message);
+                paymentResult = { error: payErr.message };
+            }
+        }
+        
         res.json({
             success: true,
             raffle: {
@@ -205,7 +228,8 @@ router.post('/raffle/run', async (req, res) => {
                     lnurl: winningTicket.lnurl_address,
                     reviewLink: winningTicket.review_link
                 },
-                prizeAmountSats
+                prizeAmountSats: prizeSats,
+                payment: paymentResult
             }
         });
         
@@ -244,6 +268,112 @@ router.get('/raffles', (req, res) => {
         res.json({ success: true, raffles });
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch raffles' });
+    }
+});
+
+/**
+ * POST /admin/raffle/:id/pay
+ * Pay the raffle winner via Lightning
+ */
+router.post('/raffle/:id/pay', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { amountSats } = req.body;
+        
+        // Get raffle with winner info
+        const raffles = db.getAllRaffles();
+        const raffle = raffles.find(r => r.id === parseInt(id));
+        
+        if (!raffle) {
+            return res.status(404).json({ error: 'Raffle not found' });
+        }
+        
+        if (raffle.paid_at) {
+            return res.status(400).json({ error: 'Raffle already paid' });
+        }
+        
+        if (!raffle.lnurl_address) {
+            return res.status(400).json({ error: 'Winner has no Lightning Address' });
+        }
+        
+        const prizeSats = amountSats || raffle.prize_amount_sats || parseInt(process.env.DEFAULT_PRIZE_SATS) || 0;
+        if (prizeSats <= 0) {
+            return res.status(400).json({ error: 'No prize amount specified' });
+        }
+        
+        // Pay via Lightning
+        console.log(`⚡ Paying ${prizeSats} sats to ${raffle.lnurl_address} for raffle #${id}...`);
+        const paymentResult = await lightning.payLightningAddress(
+            raffle.lnurl_address,
+            prizeSats,
+            `Bitcoin Review Raffle winner! Block #${raffle.block_height}`
+        );
+        
+        db.markRafflePaid(parseInt(id), paymentResult.paymentHash);
+        console.log(`✅ Payment successful: ${paymentResult.paymentHash}`);
+        
+        res.json({
+            success: true,
+            payment: {
+                address: raffle.lnurl_address,
+                amountSats: prizeSats,
+                paymentHash: paymentResult.paymentHash
+            }
+        });
+        
+    } catch (error) {
+        console.error('Payment error:', error);
+        // Record the failure
+        try { db.markRafflePaymentFailed(parseInt(req.params.id), error.message); } catch(e) {}
+        res.status(500).json({ error: 'Payment failed: ' + error.message });
+    }
+});
+
+/**
+ * GET /admin/lightning/status
+ * Check LND node connection status and balance
+ */
+router.get('/lightning/status', async (req, res) => {
+    try {
+        const status = await lightning.isConfigured();
+        
+        if (!status.configured) {
+            return res.json({ 
+                success: true, 
+                lightning: { 
+                    configured: false, 
+                    reason: status.reason 
+                } 
+            });
+        }
+        
+        // Get balances
+        let channelBalance = null;
+        try {
+            const bal = await lightning.getChannelBalance();
+            channelBalance = {
+                localBalance: parseInt(bal.local_balance?.sat || bal.balance || 0),
+                remoteBalance: parseInt(bal.remote_balance?.sat || 0)
+            };
+        } catch (e) {
+            channelBalance = { error: e.message };
+        }
+        
+        res.json({
+            success: true,
+            lightning: {
+                configured: true,
+                alias: status.alias,
+                pubkey: status.pubkey,
+                synced: status.synced,
+                blockHeight: status.blockHeight,
+                channelBalance,
+                autoPayEnabled: process.env.AUTO_PAY_ENABLED === 'true',
+                defaultPrizeSats: parseInt(process.env.DEFAULT_PRIZE_SATS) || 0
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to check Lightning status: ' + error.message });
     }
 });
 

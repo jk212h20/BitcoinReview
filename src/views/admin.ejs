@@ -34,6 +34,42 @@
             </div>
         </div>
         
+        <!-- Lightning Node Status -->
+        <div class="bg-white rounded-lg p-6 shadow-sm mb-8" x-data="{ lnd: null, loading: true }" x-init="
+            fetch('/api/admin/lightning/status', { headers: { 'X-Admin-Password': password } })
+                .then(r => r.json())
+                .then(d => { lnd = d.lightning; loading = false; })
+                .catch(() => { lnd = { configured: false, reason: 'Failed to connect' }; loading = false; })
+        ">
+            <h2 class="text-xl font-bold mb-4">⚡ Lightning Node</h2>
+            <template x-if="loading"><div class="text-gray-500">Checking node status...</div></template>
+            <template x-if="!loading && lnd && !lnd.configured">
+                <div class="text-yellow-600">
+                    <span class="font-bold">Not Connected</span> — <span x-text="lnd.reason"></span>
+                </div>
+            </template>
+            <template x-if="!loading && lnd && lnd.configured">
+                <div class="grid md:grid-cols-4 gap-4">
+                    <div>
+                        <div class="text-sm text-gray-500">Node Alias</div>
+                        <div class="font-bold" x-text="lnd.alias"></div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-gray-500">Channel Balance</div>
+                        <div class="font-bold" x-text="lnd.channelBalance && !lnd.channelBalance.error ? lnd.channelBalance.localBalance.toLocaleString() + ' sats' : 'N/A'"></div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-gray-500">Auto-Pay</div>
+                        <div class="font-bold" :class="lnd.autoPayEnabled ? 'text-green-500' : 'text-yellow-500'" x-text="lnd.autoPayEnabled ? 'Enabled' : 'Disabled'"></div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-gray-500">Default Prize</div>
+                        <div class="font-bold" x-text="lnd.defaultPrizeSats ? lnd.defaultPrizeSats.toLocaleString() + ' sats' : 'Not set'"></div>
+                    </div>
+                </div>
+            </template>
+        </div>
+        
         <!-- Blockchain Info -->
         ${typeof raffleInfo !== 'undefined' && raffleInfo ? `
         <div class="bg-white rounded-lg p-6 shadow-sm mb-8">
@@ -216,15 +252,23 @@
                                     <td class="py-2">${r.email || '-'}</td>
                                     <td class="py-2">${r.prize_amount_sats ? r.prize_amount_sats.toLocaleString() + ' sats' : '-'}</td>
                                     <td class="py-2">${r.paid_at ? '<span class="text-green-500">✓</span>' : '<span class="text-yellow-500">Pending</span>'}</td>
-                                    <td class="py-2">
+                                    <td class="py-2 space-x-2">
                                         ${!r.paid_at ? `
+                                        ${r.lnurl_address ? `
+                                        <button 
+                                            @click="payWinner(${r.id}, ${r.prize_amount_sats || 0})"
+                                            class="text-yellow-600 hover:underline font-medium"
+                                        >
+                                            ⚡ Pay
+                                        </button>
+                                        ` : ''}
                                         <button 
                                             @click="markPaid(${r.id})"
                                             class="text-bitcoin hover:underline"
                                         >
                                             Mark Paid
                                         </button>
-                                        ` : '-'}
+                                        ` : '<span class="text-green-500">Done</span>'}
                                     </td>
                                 </tr>
                                 `).join('') : 
@@ -284,6 +328,33 @@ function adminDashboard() {
             }
             
             this.raffleLoading = false;
+        },
+        
+        async payWinner(raffleId, amountSats) {
+            const amount = amountSats || prompt('Enter amount in sats:');
+            if (!amount) return;
+            if (!confirm('Pay ' + amount + ' sats via Lightning?')) return;
+            
+            try {
+                const response = await fetch('/api/admin/raffle/' + raffleId + '/pay', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-Admin-Password': this.password
+                    },
+                    body: JSON.stringify({ amountSats: parseInt(amount) })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    alert('Payment sent! Hash: ' + data.payment.paymentHash);
+                    location.reload();
+                } else {
+                    alert('Payment failed: ' + data.error);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
         },
         
         async markPaid(raffleId) {

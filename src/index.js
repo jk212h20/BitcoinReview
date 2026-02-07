@@ -12,6 +12,7 @@ const rateLimit = require('express-rate-limit');
 const db = require('./services/database');
 const email = require('./services/email');
 const anthropic = require('./services/anthropic');
+const bitcoin = require('./services/bitcoin');
 
 // Import routes
 const apiRoutes = require('./routes/api');
@@ -85,6 +86,15 @@ async function startServer() {
     await db.initializeDatabase();
     email.initializeEmail();
     anthropic.initializeAnthropic();
+    
+    // Pre-warm the raffle info cache BEFORE accepting requests
+    try {
+        await bitcoin.warmCache();
+        const info = await bitcoin.getRaffleInfo();
+        console.log(`⛏️  Block height: ${info.currentHeight} | Next raffle: ${info.nextRaffleBlock}`);
+    } catch (err) {
+        console.warn('⚠️  Failed to pre-warm raffle cache:', err.message);
+    }
     
     app.listen(PORT, () => {
         console.log(`✅ Server running on http://localhost:${PORT}`);

@@ -16,9 +16,16 @@ function initializeAnthropic() {
         return;
     }
     
-    client = new Anthropic({
+    const options = {
         apiKey: process.env.ANTHROPIC_API_KEY
-    });
+    };
+    
+    if (process.env.ANTHROPIC_BASE_URL) {
+        options.baseURL = process.env.ANTHROPIC_BASE_URL;
+        console.log(`📡 Using custom API endpoint: ${process.env.ANTHROPIC_BASE_URL}`);
+    }
+    
+    client = new Anthropic(options);
     
     console.log('✅ Anthropic API initialized');
 }
@@ -70,7 +77,7 @@ Only respond with the JSON, no other text.`;
 
     try {
         const response = await client.messages.create({
-            model: 'claude-3-haiku-20240307',
+            model: 'claude-sonnet-4-20250514',
             max_tokens: 256,
             messages: [
                 { role: 'user', content: prompt }
