@@ -34,6 +34,14 @@ router.post('/submit', async (req, res) => {
             });
         }
         
+        // Lightning address is required
+        if (!hasLnurl) {
+            return res.status(400).json({
+                success: false,
+                error: 'Please provide your Lightning address'
+            });
+        }
+        
         // Validate email format if provided
         if (hasEmail) {
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -154,11 +162,6 @@ router.post('/submit', async (req, res) => {
             response.message = '🎉 Review submitted! You\'re entered in the raffle.';
             response.raffleTicket = true;
             response.raffleBlock = raffleBlock;
-            
-            if (!user.lnurl_address) {
-                response.message += ' Add a Lightning address to receive prizes if you win!';
-                response.needsLnurl = true;
-            }
         } else if (cleanReview && !hasRaffleTicket) {
             // Review only, no identity
             response.message = 'Thanks for sharing your review! Add your email or Lightning address to enter the raffle.';

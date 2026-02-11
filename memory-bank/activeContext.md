@@ -1,9 +1,25 @@
 # Active Context
 
-## Current Focus
+## Current Focus (Updated 2026-02-11)
+
+### Just Fixed: Donation Address "Not Configured" on Production
+- **Root cause**: Two issues compounded:
+  1. LND deposit integration code was committed but never deployed successfully
+  2. The `/api/stats` healthcheck endpoint called `bitcoin.getRaffleInfo()` which fetches from mempool.space — this timed out on Railway, causing healthcheck failures
+  3. Railway kept the old deployment (without LND code) running since new deploys never passed healthcheck
+- **Fix**: Made `/api/stats` resilient to blockchain API timeouts (returns 200 with partial data instead of 500)
+- **Result**: Healthcheck passes, new deploy goes live, Voltage LND node provides on-chain address + Lightning invoices
+
 **HTML scraping + AI validation pipeline** is now fully functional. Reviews are automatically scraped via Puppeteer and validated by Claude AI to determine if they mention Bitcoin payment. Scraping has been tested and confirmed working locally.
 
-## Recent Changes (Latest Session - Session 11)
+## Recent Changes (Latest Session - Session 12)
+1. **Filtered BTCMap merchants for validity and freshness (2026-02-11):**
+   - Added `isValidBitcoinMerchant()` filter in `src/services/btcmap.js`
+   - Merchants now require `payment:lightning=yes` OR `payment:onchain=yes` (or `payment:bitcoin=yes`)
+   - Merchants also require `survey:date` or `check_date:currency:XBT` within the last year
+   - Merchants with no date tags or stale data (>1 year) are excluded from the listing
+
+## Previous Session Changes (Session 11)
 1. **Fixed Chrome Detection for Local Development:**
    - Scraper now uses `puppeteer` (full, with bundled Chromium) as fallback when no system Chrome is found
    - Three-tier detection: production (@sparticuz/chromium) → system Chrome → bundled Chromium

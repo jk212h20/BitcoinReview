@@ -142,11 +142,42 @@ function formatAddress(tags) {
 }
 
 /**
+ * Check if a merchant has valid, recent Bitcoin payment data
+ * Requires: at least one payment method (lightning or onchain) = yes
+ * AND a survey:date or check_date:currency:XBT within the last year
+ */
+function isValidBitcoinMerchant(merchant) {
+    const tags = merchant.osm_json?.tags || {};
+    
+    // Must have at least one payment method confirmed as 'yes'
+    const hasLightning = tags['payment:lightning'] === 'yes';
+    const hasOnchain = tags['payment:onchain'] === 'yes' || tags['payment:bitcoin'] === 'yes';
+    if (!hasLightning && !hasOnchain) return false;
+    
+    // Must have a recent survey/check date (within 1 year)
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+    
+    const surveyDate = tags['survey:date'] ? new Date(tags['survey:date']) : null;
+    const checkDate = tags['check_date:currency:XBT'] ? new Date(tags['check_date:currency:XBT']) : null;
+    
+    // Use the most recent date available
+    const dates = [surveyDate, checkDate].filter(d => d && !isNaN(d.getTime()));
+    if (dates.length === 0) return false; // No valid date = exclude
+    
+    const mostRecent = dates.sort((a, b) => b - a)[0];
+    return mostRecent >= oneYearAgo;
+}
+
+/**
  * Get formatted merchant list for display
+ * Filters out merchants without confirmed payment methods or with stale data (>1 year)
  */
 async function getMerchantList() {
     const merchants = await getRoatanMerchants();
-    return merchants.map(formatMerchant);
+    return merchants
+        .filter(isValidBitcoinMerchant)
+        .map(formatMerchant);
 }
 
 /**
