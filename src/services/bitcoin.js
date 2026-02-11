@@ -8,7 +8,7 @@ const MEMPOOL_API = 'https://mempool.space/api';
 // Cache for raffle info to avoid slow API calls on every page load
 let raffleInfoCache = null;
 let raffleCacheTime = 0;
-const CACHE_TTL_MS = 120 * 1000; // Cache for 2 minutes
+const CACHE_TTL_MS = 300 * 1000; // Cache for 5 minutes
 
 /**
  * Get current block height
@@ -96,38 +96,47 @@ async function getRaffleInfo() {
         return raffleInfoCache;
     }
     
-    const currentHeight = await getCurrentBlockHeight();
-    const currentRaffleBlock = getCurrentRaffleBlock(currentHeight);
-    const nextRaffleBlock = getNextRaffleBlock(currentHeight);
-    const blocksUntilNext = nextRaffleBlock - currentHeight;
-    
-    // Estimate time (average 10 minutes per block)
-    const minutesUntilNext = blocksUntilNext * 10;
-    const hoursUntilNext = Math.floor(minutesUntilNext / 60);
-    const daysUntilNext = Math.floor(hoursUntilNext / 24);
-    
-    let timeEstimate;
-    if (daysUntilNext > 0) {
-        timeEstimate = `~${daysUntilNext} days`;
-    } else if (hoursUntilNext > 0) {
-        timeEstimate = `~${hoursUntilNext} hours`;
-    } else {
-        timeEstimate = `~${minutesUntilNext} minutes`;
+    try {
+        const currentHeight = await getCurrentBlockHeight();
+        const currentRaffleBlock = getCurrentRaffleBlock(currentHeight);
+        const nextRaffleBlock = getNextRaffleBlock(currentHeight);
+        const blocksUntilNext = nextRaffleBlock - currentHeight;
+        
+        // Estimate time (average 10 minutes per block)
+        const minutesUntilNext = blocksUntilNext * 10;
+        const hoursUntilNext = Math.floor(minutesUntilNext / 60);
+        const daysUntilNext = Math.floor(hoursUntilNext / 24);
+        
+        let timeEstimate;
+        if (daysUntilNext > 0) {
+            timeEstimate = `~${daysUntilNext} days`;
+        } else if (hoursUntilNext > 0) {
+            timeEstimate = `~${hoursUntilNext} hours`;
+        } else {
+            timeEstimate = `~${minutesUntilNext} minutes`;
+        }
+        
+        const result = {
+            currentHeight,
+            currentRaffleBlock,
+            nextRaffleBlock,
+            blocksUntilNext,
+            timeEstimate
+        };
+        
+        // Update cache
+        raffleInfoCache = result;
+        raffleCacheTime = now;
+        
+        return result;
+    } catch (err) {
+        // If API fails but we have stale cache, return it rather than crashing
+        if (raffleInfoCache) {
+            console.warn('Bitcoin API timeout, returning stale cache:', err.message);
+            return raffleInfoCache;
+        }
+        throw err;
     }
-    
-    const result = {
-        currentHeight,
-        currentRaffleBlock,
-        nextRaffleBlock,
-        blocksUntilNext,
-        timeEstimate
-    };
-    
-    // Update cache
-    raffleInfoCache = result;
-    raffleCacheTime = now;
-    
-    return result;
 }
 
 /**

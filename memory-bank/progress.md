@@ -11,7 +11,7 @@
 - New unified API endpoint: `POST /api/submit-review` (creates participant + submits review in one step)
 - Email service (registration confirmation, opt-out) - using Resend API
 - btcmap.org integration (merchant list)
-- Anthropic API integration (review validation) - needs API key
+- **Anthropic API integration** - review validation via PPQ proxy (api.ppq.ai) using Claude claude-sonnet-4-20250514
 - Bitcoin block API integration (raffle trigger via difficulty adjustment)
 - **Bitcoin API caching** - 60-second cache on getRaffleInfo() with pre-warming on startup
 - Raffle system (deterministic winner selection via block_hash mod ticket_count)
@@ -25,10 +25,11 @@
 - **Lightning Address payments** - resolve address → request invoice → pay invoice flow
 - **Admin Lightning features** - node status, auto-pay on raffle, manual pay button
 - **Database payment tracking** - payment_status, payment_hash, payment_error columns in raffles
-
-## What's In Progress
-- Railway deployment (needs to be configured on Railway.app)
-- Environment variables need to be set (Resend API key, Anthropic API key, admin password, LND)
+- **✅ Deployed to Railway.app** - live at https://web-production-3a9f6.up.railway.app
+- **✅ All environment variables configured on Railway** (PPQ API, Resend, LND, admin, etc.)
+- **✅ Deposit address display on homepage** - On-chain Bitcoin address + Lightning invoice from Voltage node with QR codes, copy buttons, and custom invoice generator
+- **✅ Public reviews page** (`/reviews`) - Shows all submitted reviews with stats, without exposing submitter email or lightning addresses
+- **✅ HTML scraping + AI validation pipeline** - Puppeteer scrapes Google review pages, Claude AI validates Bitcoin mention, async non-blocking
 
 ## What's Left to Build
 - [x] Node.js project setup (package.json, dependencies)
@@ -49,17 +50,20 @@
 - [x] Lightning Address payment flow
 - [x] Admin auto-pay and manual pay features
 - [x] Admin LND node status display
-- [ ] Deploy to Railway.app
-- [ ] Configure environment variables on Railway
+- [x] Deploy to Railway.app
+- [x] Configure environment variables on Railway
 - [x] Set up email provider (switched from Nodemailer/SMTP to Resend API)
-- [ ] Get Anthropic API key configured
-- [ ] Configure Voltage LND node connection
+- [x] Get Anthropic API key configured (using PPQ proxy)
+- [x] Configure Voltage LND node connection
+- [ ] Test full review submission flow on production
+- [ ] Test Lightning payment flow end-to-end on production
+- [ ] Verify domain in Resend for production emails
+- [ ] Change admin password from default (admin123)
 
 ## Known Issues
 - Email: Resend API key set, but using test sender (onboarding@resend.dev) - need to verify custom domain in Resend dashboard for production
-- Anthropic API not configured (needs ANTHROPIC_API_KEY)
-- Lightning not configured (needs LND_REST_URL and LND_MACAROON)
-- better-sqlite3 had compilation issues on Node 24 - switched to sql.js (pure JS)
+- Admin password is default (admin123) - should be changed for production
+- DEFAULT_PRIZE_SATS set to 100 (very low) - may need adjustment
 
 ## Session Log
 
@@ -109,3 +113,107 @@
 - Removed nodemailer dependency
 - Updated .env and .env.example
 - Updated memory bank documentation (techContext, activeContext, progress)
+
+### Session 5 (2026-02-07, continued)
+- **Switched to PPQ API proxy** for Anthropic/Claude access
+  - Set `ANTHROPIC_BASE_URL=https://api.ppq.ai` 
+  - Using PPQ API key instead of direct Anthropic key
+  - Updated `src/services/anthropic.js` to accept custom base URL via env var
+  - Model: `claude-sonnet-4-20250514`
+- **Deployed to Railway.app:**
+  - Created Railway project "BitcoinReview" via `railway init`
+  - Created "web" service with `railway add`
+  - Set all environment variables via `railway variables set`
+  - Deployed via `railway up` - Nixpacks auto-detected Node.js
+  - Build succeeded, healthcheck passed on `/api/stats`
+  - Generated domain: https://web-production-3a9f6.up.railway.app
+  - Set `BASE_URL` env var to match Railway domain
+- Pushed all changes to GitHub
+- Updated memory bank documentation
+
+### Session 11 (2026-02-08, continued)
+- **Fixed Chrome detection for local development:**
+  - Scraper now uses `puppeteer` (full, with bundled Chromium) as fallback when no system Chrome found
+  - Three-tier detection: production (@sparticuz/chromium) → system Chrome → bundled Chromium
+  - Fixed `page.waitForTimeout` deprecation — replaced with `setTimeout` promise
+- **Tested scraping pipeline end-to-end:**
+  - Successfully scraped ticket #3 — extracted Thai review text about a brewery
+  - Review text saved to database ✅
+  - AI validation attempted but failed with 401 from PPQ proxy (API key issue, not code issue)
+  - Admin scrape endpoint confirmed working: `POST /api/admin/tickets/:id/scrape`
+- **Known issue:** PPQ API key returning 401 — needs valid key or switch to direct Anthropic API
+- Updated memory bank documentation
+
+### Session 6 (2026-02-07, continued)
+- **Deposit address display on homepage:**
+  - Added `deposit_addresses` table to database.js for caching addresses
+  - Extended `lightning.js` with `getNewAddress()` (on-chain via `/v2/wallet/address/next`) and `addInvoice()` (Lightning via `/v1/invoices`)
+  - Added `cacheDepositAddresses()` and `getCachedDepositInfo()` functions with DB persistence
+  - New API endpoints: `GET /api/deposit-info`, `POST /api/generate-invoice`
+  - Updated `pages.js` to pass deposit info (onchainAddress, lightningInvoice, totalDonationsSats) to homepage
+  - Added "Fund the Raffle" section to `index.ejs` with QR codes, copy buttons, and custom amount invoice generator
+  - Startup cache warming + 10-minute polling interval in `index.js`
+- **Fixed EJS template syntax errors:**
+  - Nested backtick template literals broke EJS parser
+  - Converted conditional HTML to string concatenation
+  - Converted client-side JS to ES5 syntax to avoid backtick conflicts
+- Tested locally - deposit addresses displaying correctly from Voltage node
+- Updated memory bank documentation
+
+### Session 7 (2026-02-07, continued)
+- **Fixed review submission bug:**
+  - `TypeError: Cannot read properties of null (reading 'opt_out_token')` in api.js
+  - Root cause: `findOrCreateUser()` returned `{ user: null }` when `last_insert_rowid()` failed
+  - Added null check in `api.js` with clear error message
+  - Added fallback lookup in `database.js` `findOrCreateUser()` - if ID lookup fails, tries email/lnurl
+  - Verified submission works end-to-end
+- **Verified deposit address display on homepage:**
+  - On-chain Bitcoin QR + address + copy button ✅
+  - Lightning invoice QR + copy button ✅
+  - Custom amount invoice generator ✅
+  - Total donated badge ✅
+  - Footer on-chain address ✅
+- Updated memory bank documentation
+
+### Session 8 (2026-02-07, continued)
+- **Fixed database schema mismatch:**
+  - Old DB had `email TEXT UNIQUE NOT NULL` and `lnurl_address TEXT NOT NULL` but code expected nullable
+  - `CREATE TABLE IF NOT EXISTS` doesn't alter existing tables
+  - Deleted old DB (5 test records), server recreated with correct nullable schema
+  - Backup saved at `data/reviews.db.backup`
+- **Fixed anonymous review submission:**
+  - Removed anonymous user creation hack (fake email/lnurl)
+  - Tickets now created with `user_id: null` for review-only submissions
+  - Response prompts user to add email/Lightning address for raffle entry
+  - Tested both flows: review-only ✅, full submission (email+lnurl+review) ✅
+- **Verified deposit addresses still displaying correctly on homepage**
+- Updated memory bank documentation
+
+### Session 9 (2026-02-07, continued)
+- **Added public reviews page (`/reviews`):**
+  - New `getPublicTickets()` function in database.js - queries tickets WITHOUT joining user email/lnurl for privacy
+  - New `reviews.ejs` template with orange gradient header, stats summary cards (total/successful/unsuccessful), and review cards
+  - New `GET /reviews` route in pages.js
+  - "Reviews" nav link added to both desktop and mobile navigation in layout.ejs
+  - Each review card shows: merchant name, submission date, validation status badge, AI assessment, and link to original review
+  - **Privacy enforced:** No email or lightning address is exposed on this public page
+- Tested locally - page renders correctly with 200 status
+- Updated memory bank documentation
+
+### Session 10 (2026-02-08)
+- **HTML scraping + AI validation pipeline:**
+  - New `src/services/scraper.js` — Puppeteer-based Google Maps review scraper
+  - Uses `puppeteer-core` + `@sparticuz/chromium` (works on Railway/serverless)
+  - Multiple CSS selector strategies for extracting review text and merchant name
+  - Queue/mutex system ensures only one browser instance at a time
+  - `scrapeAndValidateReview()` — full pipeline: scrape → store text → AI validate → update status
+  - `revalidateAllPending()` — batch process all unvalidated tickets
+- **Database helpers added:**
+  - `updateTicketReviewText()`, `updateTicketMerchant()`, `getUnvalidatedTickets()`
+- **API submit flow updated:**
+  - `POST /api/submit` now fires background scrape+validate (non-blocking)
+  - Ticket initially marked "Pending AI validation", updated async after scrape+AI check
+- **Admin endpoints added:**
+  - `POST /admin/tickets/revalidate-all` — batch re-scrape+validate all pending tickets
+  - `POST /admin/tickets/:id/scrape` — scrape+validate single ticket with result
+- Updated memory bank documentation

@@ -4,8 +4,18 @@
  * Handles Lightning Address resolution and payments
  */
 
+const db = require('./database');
+
 const LND_REST_URL = process.env.LND_REST_URL;
 const LND_MACAROON = process.env.LND_MACAROON;
+
+// In-memory cache for deposit info
+let depositCache = {
+    onchainAddress: null,
+    lightningInvoice: null,  // zero-amount invoice bolt11
+    lightningPaymentHash: null,
+    lastChecked: 0
+};
 
 /**
  * Make an authenticated request to the LND REST API
@@ -221,6 +231,179 @@ async function isConfigured() {
     }
 }
 
+// ============================================================
+// Deposit Address Management (on-chain + lightning donations)
+// ============================================================
+
+/**
+ * Generate a new on-chain address from LND and track it in DB
+ */
+async function generateOnChainAddress() {
+    const result = await lndRequest('/v2/wallet/address/next', 'POST', {
+        type: 'TAPROOT_PUBKEY',
+        account: 'default'
+    });
+    const address = result.addr;
+    
+    // Deactivate old on-chain addresses
+    db.deactivateAllDepositAddresses('onchain');
+    
+    // Store in DB
+    db.createDepositAddress(address, 'onchain');
+    
+    // Update cache
+    depositCache.onchainAddress = address;
+    console.log(`🏠 New on-chain deposit address: ${address}`);
+    return address;
+}
+
+/**
+ * Create a Lightning invoice (zero-amount or specified amount) and track in DB
+ */
+async function createDonationInvoice(amountSats = 0, memo = 'Donation to Bitcoin Review Raffle') {
+    const body = { memo, expiry: '86400' }; // 24h expiry
+    if (amountSats > 0) {
+        body.value = String(amountSats);
+    }
+    
+    const result = await lndRequest('/v1/invoices', 'POST', body);
+    const bolt11 = result.payment_request;
+    const paymentHash = Buffer.from(result.r_hash, 'base64').toString('hex');
+    
+    // Only track zero-amount invoices as the "active" cached one
+    if (amountSats === 0) {
+        db.deactivateAllDepositAddresses('lightning');
+        db.createDepositAddress(bolt11, 'lightning', bolt11, paymentHash, memo);
+        depositCache.lightningInvoice = bolt11;
+        depositCache.lightningPaymentHash = paymentHash;
+        console.log(`⚡ New zero-amount Lightning invoice cached`);
+    } else {
+        // Track custom-amount invoices too but don't make them the active cached one
+        db.createDepositAddress(bolt11, 'lightning', bolt11, paymentHash, `${memo} (${amountSats} sats)`);
+        console.log(`⚡ Created ${amountSats} sat Lightning invoice`);
+    }
+    
+    return { bolt11, paymentHash };
+}
+
+/**
+ * Get the current active deposit info (from cache or DB)
+ */
+async function getDepositInfo() {
+    // Return from cache if available
+    if (depositCache.onchainAddress && depositCache.lightningInvoice) {
+        return {
+            onchainAddress: depositCache.onchainAddress,
+            lightningInvoice: depositCache.lightningInvoice
+        };
+    }
+    
+    // Try to load from DB
+    const onchain = db.getActiveDepositAddress('onchain');
+    const lightning = db.getActiveDepositAddress('lightning');
+    
+    if (onchain) depositCache.onchainAddress = onchain.address;
+    if (lightning) {
+        depositCache.lightningInvoice = lightning.invoice;
+        depositCache.lightningPaymentHash = lightning.payment_hash;
+    }
+    
+    // Generate if missing
+    if (!depositCache.onchainAddress) {
+        await generateOnChainAddress();
+    }
+    if (!depositCache.lightningInvoice) {
+        await createDonationInvoice(0);
+    }
+    
+    return {
+        onchainAddress: depositCache.onchainAddress,
+        lightningInvoice: depositCache.lightningInvoice
+    };
+}
+
+/**
+ * Check if the active on-chain address received funds; rotate if so
+ */
+async function checkOnChainDeposits() {
+    if (!depositCache.onchainAddress) return;
+    
+    try {
+        // List on-chain transactions and check for our address
+        const txns = await lndRequest('/v1/transactions');
+        if (!txns.transactions) return;
+        
+        for (const tx of txns.transactions) {
+            if (!tx.dest_addresses) continue;
+            if (tx.dest_addresses.includes(depositCache.onchainAddress) && parseInt(tx.amount) > 0) {
+                const amountSats = parseInt(tx.amount);
+                console.log(`💰 On-chain deposit detected: ${amountSats} sats to ${depositCache.onchainAddress}`);
+                
+                // Mark received in DB
+                const dbAddr = db.getDepositAddressByAddress(depositCache.onchainAddress);
+                if (dbAddr && dbAddr.is_active) {
+                    db.markDepositReceived(dbAddr.id, amountSats);
+                    // Generate new address
+                    await generateOnChainAddress();
+                }
+                break;
+            }
+        }
+    } catch (err) {
+        console.warn('⚠️  Error checking on-chain deposits:', err.message);
+    }
+}
+
+/**
+ * Check if the cached Lightning invoice was paid; rotate if so
+ */
+async function checkLightningDeposits() {
+    if (!depositCache.lightningPaymentHash) return;
+    
+    try {
+        const hashBase64 = Buffer.from(depositCache.lightningPaymentHash, 'hex').toString('base64')
+            .replace(/\+/g, '-').replace(/\//g, '_');
+        const invoice = await lndRequest(`/v2/invoices/lookup?payment_hash=${hashBase64}`);
+        
+        if (invoice.state === 'SETTLED') {
+            const amountSats = parseInt(invoice.amt_paid_sat || invoice.value || '0');
+            console.log(`⚡ Lightning deposit detected: ${amountSats} sats`);
+            
+            // Mark received in DB
+            const dbAddr = db.getDepositAddressByPaymentHash(depositCache.lightningPaymentHash);
+            if (dbAddr) {
+                db.markDepositReceived(dbAddr.id, amountSats);
+            }
+            
+            // Generate new zero-amount invoice
+            await createDonationInvoice(0);
+        }
+    } catch (err) {
+        console.warn('⚠️  Error checking Lightning deposits:', err.message);
+    }
+}
+
+/**
+ * Poll for deposits (called on interval)
+ */
+async function checkForDeposits() {
+    await checkOnChainDeposits();
+    await checkLightningDeposits();
+    depositCache.lastChecked = Date.now();
+}
+
+/**
+ * Initialize deposit cache on startup
+ */
+async function warmDepositCache() {
+    try {
+        await getDepositInfo();
+        console.log(`✅ Deposit cache warmed - On-chain: ${depositCache.onchainAddress?.substring(0, 12)}... | Lightning: ready`);
+    } catch (err) {
+        console.warn('⚠️  Failed to warm deposit cache:', err.message);
+    }
+}
+
 module.exports = {
     getNodeInfo,
     getWalletBalance,
@@ -230,5 +413,12 @@ module.exports = {
     resolveLightningAddress,
     requestInvoice,
     payLightningAddress,
-    isConfigured
+    isConfigured,
+    
+    // Deposit management
+    generateOnChainAddress,
+    createDonationInvoice,
+    getDepositInfo,
+    checkForDeposits,
+    warmDepositCache
 };

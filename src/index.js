@@ -13,6 +13,7 @@ const db = require('./services/database');
 const email = require('./services/email');
 const anthropic = require('./services/anthropic');
 const bitcoin = require('./services/bitcoin');
+const lightning = require('./services/lightning');
 
 // Import routes
 const apiRoutes = require('./routes/api');
@@ -95,6 +96,28 @@ async function startServer() {
     } catch (err) {
         console.warn('⚠️  Failed to pre-warm raffle cache:', err.message);
     }
+    
+    // Pre-warm deposit address cache from Voltage node
+    try {
+        const depositInfo = await lightning.getDepositInfo();
+        if (depositInfo.onchainAddress) {
+            console.log(`💰 On-chain deposit address: ${depositInfo.onchainAddress.substring(0, 16)}...`);
+        }
+        if (depositInfo.lightningInvoice) {
+            console.log(`⚡ Lightning invoice cached (${depositInfo.lightningInvoice.substring(0, 20)}...)`);
+        }
+    } catch (err) {
+        console.warn('⚠️  Failed to pre-warm deposit addresses:', err.message);
+    }
+    
+    // Poll for incoming payments every 5 minutes
+    setInterval(async () => {
+        try {
+            await lightning.checkForDeposits();
+        } catch (err) {
+            console.warn('Payment poll error:', err.message);
+        }
+    }, 5 * 60 * 1000);
     
     app.listen(PORT, () => {
         console.log(`✅ Server running on http://localhost:${PORT}`);

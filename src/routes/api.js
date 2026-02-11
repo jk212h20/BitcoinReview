@@ -10,6 +10,8 @@ const db = require('../services/database');
 const email = require('../services/email');
 const bitcoin = require('../services/bitcoin');
 const btcmap = require('../services/btcmap');
+const lightning = require('../services/lightning');
+const anthropic = require('../services/anthropic');
 
 /**
  * POST /api/submit
@@ -18,7 +20,7 @@ const btcmap = require('../services/btcmap');
  */
 router.post('/submit', async (req, res) => {
     try {
-        const { email: userEmail, lnurl, reviewLink } = req.body;
+        const { email: userEmail, lnurl, reviewLink, reviewText } = req.body;
         
         const hasEmail = userEmail && userEmail.trim().length > 0;
         const hasLnurl = lnurl && lnurl.trim().length > 0;
@@ -83,8 +85,16 @@ router.post('/submit', async (req, res) => {
             user = result.user;
             userCreated = result.created;
             
+            if (!user) {
+                console.error('findOrCreateUser returned null user. Result:', JSON.stringify(result));
+                return res.status(500).json({
+                    success: false,
+                    error: 'Failed to create user account. Please try again.'
+                });
+            }
+            
             // Send registration email if new user with email
-            if (userCreated && cleanEmail) {
+            if (userCreated && cleanEmail && user.opt_out_token) {
                 email.sendRegistrationEmail(cleanEmail, user.opt_out_token).catch(err => {
                     console.error('Failed to send registration email:', err);
                 });
@@ -111,17 +121,26 @@ router.post('/submit', async (req, res) => {
             // A ticket gets a raffle entry if we have a user (email or lnurl)
             hasRaffleTicket = !!user;
             
+            // Save review text if user pasted it
+            const cleanReviewText = (reviewText && reviewText.trim().length > 0) ? reviewText.trim() : null;
+            
             const ticket = db.createTicket(
                 user ? user.id : null,
                 cleanReview,
-                null, // no review text needed
-                null, // no merchant name needed
+                cleanReviewText,
+                null, // merchant name filled by admin
                 raffleBlock
             );
             
-            // Auto-validate if user has identity (email or lnurl)
-            if (hasRaffleTicket) {
-                db.validateTicket(ticket.id, true, 'Auto-validated: user identified');
+            // Check review_mode setting to determine validation behavior
+            const reviewMode = db.getSetting('review_mode') || 'manual_review';
+            
+            if (reviewMode === 'auto_approve') {
+                // Auto-approve: mark valid immediately
+                db.validateTicket(ticket.id, true, 'Auto-approved');
+            } else {
+                // Manual review (default): mark as pending for admin review
+                db.validateTicket(ticket.id, false, null);
             }
             
             ticketCreated = true;
@@ -330,6 +349,70 @@ router.get('/stats', async (req, res) => {
         res.status(500).json({
             success: false,
             error: 'Failed to fetch stats'
+        });
+    }
+});
+
+/**
+ * GET /api/deposit-info
+ * Get current deposit addresses (on-chain + lightning)
+ */
+router.get('/deposit-info', async (req, res) => {
+    try {
+        const info = await lightning.getDepositInfo();
+        const totalDonations = db.getTotalDonationsReceived();
+        
+        res.json({
+            success: true,
+            onchainAddress: info.onchainAddress,
+            lightningInvoice: info.lightningInvoice,
+            totalDonationsSats: totalDonations
+        });
+    } catch (error) {
+        console.error('Deposit info error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch deposit info'
+        });
+    }
+});
+
+/**
+ * POST /api/generate-invoice
+ * Generate a Lightning invoice with a specific amount
+ */
+router.post('/generate-invoice', async (req, res) => {
+    try {
+        const { amount } = req.body;
+        const amountSats = parseInt(amount);
+        
+        if (!amountSats || amountSats < 1) {
+            return res.status(400).json({
+                success: false,
+                error: 'Please provide a valid amount in sats (minimum 1)'
+            });
+        }
+        
+        if (amountSats > 10000000) { // 0.1 BTC max
+            return res.status(400).json({
+                success: false,
+                error: 'Amount too large (max 10,000,000 sats)'
+            });
+        }
+        
+        const result = await lightning.createDonationInvoice(amountSats, `Donation to Bitcoin Review Raffle - ${amountSats} sats`);
+        
+        res.json({
+            success: true,
+            bolt11: result.bolt11,
+            paymentHash: result.paymentHash,
+            amountSats
+        });
+    } catch (error) {
+        console.error('Generate invoice error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to generate invoice'
         });
     }
 });

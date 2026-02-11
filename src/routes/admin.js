@@ -9,6 +9,7 @@ const db = require('../services/database');
 const bitcoin = require('../services/bitcoin');
 const email = require('../services/email');
 const lightning = require('../services/lightning');
+const anthropic = require('../services/anthropic');
 
 /**
  * Simple password authentication middleware
@@ -374,6 +375,82 @@ router.get('/lightning/status', async (req, res) => {
         });
     } catch (error) {
         res.status(500).json({ error: 'Failed to check Lightning status: ' + error.message });
+    }
+});
+
+/**
+ * POST /admin/tickets/:id/ai-check
+ * AI-validate a single ticket using its review_text
+ */
+router.post('/tickets/:id/ai-check', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const ticket = db.getTicketById(parseInt(id));
+        
+        if (!ticket) {
+            return res.status(404).json({ error: 'Ticket not found' });
+        }
+        
+        if (!ticket.review_text) {
+            return res.status(400).json({ error: 'Ticket has no review text to check. Ask the user to paste their review text.' });
+        }
+        
+        // AI validate using the review text
+        const validation = await anthropic.validateReview(ticket.review_text, ticket.merchant_name);
+        db.validateTicket(parseInt(id), validation.isValid, validation.reason);
+        
+        res.json({
+            success: true,
+            validation: {
+                isValid: validation.isValid,
+                reason: validation.reason,
+                confidence: validation.confidence
+            }
+        });
+    } catch (error) {
+        console.error('AI check ticket error:', error);
+        res.status(500).json({ error: 'Failed to AI-check ticket: ' + error.message });
+    }
+});
+
+/**
+ * GET /admin/settings
+ * Get all settings
+ */
+router.get('/settings', (req, res) => {
+    try {
+        const settings = db.getAllSettings();
+        res.json({ success: true, settings });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch settings' });
+    }
+});
+
+/**
+ * POST /admin/settings
+ * Update settings (accepts key-value pairs)
+ */
+router.post('/settings', (req, res) => {
+    try {
+        const { settings } = req.body;
+        
+        if (!settings || typeof settings !== 'object') {
+            return res.status(400).json({ error: 'Settings object required' });
+        }
+        
+        const allowedKeys = ['review_mode', 'google_api_key'];
+        
+        for (const [key, value] of Object.entries(settings)) {
+            if (!allowedKeys.includes(key)) {
+                return res.status(400).json({ error: `Unknown setting: ${key}` });
+            }
+            db.setSetting(key, value);
+        }
+        
+        res.json({ success: true, message: 'Settings updated', settings: db.getAllSettings() });
+    } catch (error) {
+        console.error('Settings update error:', error);
+        res.status(500).json({ error: 'Failed to update settings' });
     }
 });
 

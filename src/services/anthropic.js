@@ -22,6 +22,10 @@ function initializeAnthropic() {
     
     if (process.env.ANTHROPIC_BASE_URL) {
         options.baseURL = process.env.ANTHROPIC_BASE_URL;
+        // PPQ proxy uses Authorization: Bearer instead of x-api-key
+        options.defaultHeaders = {
+            'Authorization': `Bearer ${process.env.ANTHROPIC_API_KEY}`
+        };
         console.log(`📡 Using custom API endpoint: ${process.env.ANTHROPIC_BASE_URL}`);
     }
     

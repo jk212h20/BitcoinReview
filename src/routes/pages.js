@@ -8,6 +8,7 @@ const router = express.Router();
 const db = require('../services/database');
 const bitcoin = require('../services/bitcoin');
 const btcmap = require('../services/btcmap');
+const lightning = require('../services/lightning');
 
 /**
  * GET /
@@ -20,19 +21,38 @@ router.get('/', async (req, res) => {
         const ticketCount = db.countValidTicketsForBlock(raffleInfo.nextRaffleBlock);
         const latestRaffle = db.getLatestRaffle();
         
+        // Get deposit addresses from Voltage node
+        let depositInfo = { onchainAddress: null, lightningInvoice: null };
+        try {
+            depositInfo = await lightning.getDepositInfo();
+        } catch (err) {
+            console.warn('Could not load deposit info:', err.message);
+        }
+        const totalDonations = db.getTotalDonationsReceived();
+        
         res.render('index', {
             title: 'Bitcoin Review Raffle - Roatan',
             raffleInfo,
             userCount,
             ticketCount,
             latestRaffle,
-            donationAddress: process.env.DONATION_ADDRESS || 'Not configured'
+            onchainAddress: depositInfo.onchainAddress,
+            lightningInvoice: depositInfo.lightningInvoice,
+            totalDonationsSats: totalDonations,
+            donationAddress: depositInfo.onchainAddress || process.env.DONATION_ADDRESS || 'Not configured'
         });
     } catch (error) {
         console.error('Landing page error:', error);
         res.render('index', {
             title: 'Bitcoin Review Raffle - Roatan',
             error: 'Failed to load raffle info',
+            raffleInfo: null,
+            userCount: 0,
+            ticketCount: 0,
+            latestRaffle: null,
+            onchainAddress: null,
+            lightningInvoice: null,
+            totalDonationsSats: 0,
             donationAddress: process.env.DONATION_ADDRESS || 'Not configured'
         });
     }
@@ -113,6 +133,28 @@ router.get('/opt-out/:token', (req, res) => {
         title: 'Opt Out - Bitcoin Review Raffle',
         message: 'You have been successfully removed from the Bitcoin Review Raffle. Sorry to see you go!'
     });
+});
+
+/**
+ * GET /reviews
+ * Public reviews page - shows all submitted reviews without personal info
+ */
+router.get('/reviews', (req, res) => {
+    try {
+        const reviews = db.getPublicTickets();
+        
+        res.render('reviews', {
+            title: 'Reviews - Bitcoin Review Raffle',
+            reviews
+        });
+    } catch (error) {
+        console.error('Reviews page error:', error);
+        res.render('reviews', {
+            title: 'Reviews - Bitcoin Review Raffle',
+            error: 'Failed to load reviews',
+            reviews: []
+        });
+    }
 });
 
 /**

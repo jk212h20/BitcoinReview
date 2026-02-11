@@ -50,6 +50,20 @@ async function initializeDatabase() {
             FOREIGN KEY (user_id) REFERENCES users(id)
         );
 
+        -- Deposit addresses (track all addresses generated for this app)
+        CREATE TABLE IF NOT EXISTS deposit_addresses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            address TEXT NOT NULL,
+            type TEXT NOT NULL,
+            is_active INTEGER DEFAULT 1,
+            amount_received_sats INTEGER DEFAULT 0,
+            payment_hash TEXT,
+            invoice TEXT,
+            memo TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            received_at TEXT
+        );
+
         -- Raffle history
         CREATE TABLE IF NOT EXISTS raffles (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -67,6 +81,24 @@ async function initializeDatabase() {
             FOREIGN KEY (winning_ticket_id) REFERENCES tickets(id)
         );
     `);
+    
+    // Settings table (key-value store for admin config)
+    db.run(`
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+    `);
+    
+    // Insert default settings if they don't exist
+    const defaultSettings = [
+        ['review_mode', 'manual_review'],  // 'auto_approve' or 'manual_review'
+        ['google_api_key', '']
+    ];
+    for (const [key, value] of defaultSettings) {
+        db.run(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`, [key, value]);
+    }
     
     // Create indexes
     db.run(`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);`);
@@ -187,7 +219,20 @@ function findOrCreateUser(email, lnurlAddress, optOutToken) {
     if (result.error) {
         return { error: result.error };
     }
-    user = queryOne(`SELECT * FROM users WHERE id = ?`, [result.id]);
+    
+    if (!result.id) {
+        console.error('createUser returned no id:', JSON.stringify(result));
+        // Try to find the user we just created by email or lnurl
+        if (email) {
+            user = queryOne(`SELECT * FROM users WHERE email = ?`, [email]);
+        }
+        if (!user && lnurlAddress) {
+            user = queryOne(`SELECT * FROM users WHERE lnurl_address = ?`, [lnurlAddress]);
+        }
+    } else {
+        user = queryOne(`SELECT * FROM users WHERE id = ?`, [result.id]);
+    }
+    
     return { user, created: true };
 }
 
@@ -224,6 +269,20 @@ function validateTicket(ticketId, isValid, reason) {
     );
 }
 
+function updateTicketReviewText(ticketId, reviewText) {
+    run(
+        `UPDATE tickets SET review_text = ? WHERE id = ?`,
+        [reviewText, ticketId]
+    );
+}
+
+function updateTicketMerchant(ticketId, merchantName) {
+    run(
+        `UPDATE tickets SET merchant_name = ? WHERE id = ?`,
+        [merchantName, ticketId]
+    );
+}
+
 function findTicketByUserAndLink(userId, reviewLink) {
     return queryOne(`SELECT * FROM tickets WHERE user_id = ? AND review_link = ?`, [userId, reviewLink]);
 }
@@ -247,6 +306,14 @@ function getAllTickets() {
     `);
 }
 
+function getPublicTickets() {
+    return query(`
+        SELECT t.id, t.review_link, t.review_text, t.merchant_name, t.is_valid, t.validation_reason, t.submitted_at
+        FROM tickets t
+        ORDER BY t.submitted_at DESC
+    `);
+}
+
 function getPendingTickets() {
     return query(`
         SELECT t.*, u.email 
@@ -254,6 +321,17 @@ function getPendingTickets() {
         JOIN users u ON t.user_id = u.id 
         WHERE t.is_valid = 0 AND t.validation_reason IS NULL
         ORDER BY t.submitted_at DESC
+    `);
+}
+
+function getUnvalidatedTickets() {
+    return query(`
+        SELECT t.id, t.review_link, t.review_text, t.merchant_name, t.is_valid, t.validation_reason
+        FROM tickets t
+        WHERE t.validation_reason IS NULL 
+           OR t.validation_reason LIKE 'Auto-validated%'
+           OR t.review_text IS NULL
+        ORDER BY t.submitted_at ASC
     `);
 }
 
@@ -329,6 +407,67 @@ function getLatestRaffle() {
     `);
 }
 
+// Deposit address functions
+function createDepositAddress(address, type, invoice = null, paymentHash = null, memo = null) {
+    const id = run(
+        `INSERT INTO deposit_addresses (address, type, invoice, payment_hash, memo) VALUES (?, ?, ?, ?, ?)`,
+        [address, type, invoice, paymentHash, memo]
+    );
+    return { id };
+}
+
+function getActiveDepositAddress(type) {
+    return queryOne(`SELECT * FROM deposit_addresses WHERE type = ? AND is_active = 1 ORDER BY created_at DESC LIMIT 1`, [type]);
+}
+
+function deactivateDepositAddress(id) {
+    run(`UPDATE deposit_addresses SET is_active = 0 WHERE id = ?`, [id]);
+}
+
+function deactivateAllDepositAddresses(type) {
+    run(`UPDATE deposit_addresses SET is_active = 0 WHERE type = ?`, [type]);
+}
+
+function markDepositReceived(id, amountSats) {
+    run(`UPDATE deposit_addresses SET amount_received_sats = ?, received_at = datetime('now'), is_active = 0 WHERE id = ?`, [amountSats, id]);
+}
+
+function getAllDepositAddresses() {
+    return query(`SELECT * FROM deposit_addresses ORDER BY created_at DESC`);
+}
+
+function getDepositAddressByAddress(address) {
+    return queryOne(`SELECT * FROM deposit_addresses WHERE address = ?`, [address]);
+}
+
+function getDepositAddressByPaymentHash(paymentHash) {
+    return queryOne(`SELECT * FROM deposit_addresses WHERE payment_hash = ?`, [paymentHash]);
+}
+
+function getTotalDonationsReceived() {
+    const result = queryOne(`SELECT SUM(amount_received_sats) as total FROM deposit_addresses WHERE amount_received_sats > 0`);
+    return result ? (result.total || 0) : 0;
+}
+
+// Settings functions
+function getSetting(key) {
+    const row = queryOne(`SELECT value FROM settings WHERE key = ?`, [key]);
+    return row ? row.value : null;
+}
+
+function setSetting(key, value) {
+    run(`INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))`, [key, value]);
+}
+
+function getAllSettings() {
+    const rows = query(`SELECT key, value FROM settings`);
+    const settings = {};
+    for (const row of rows) {
+        settings[row.key] = row.value;
+    }
+    return settings;
+}
+
 module.exports = {
     initializeDatabase,
     
@@ -345,10 +484,14 @@ module.exports = {
     // Ticket functions
     createTicket,
     validateTicket,
+    updateTicketReviewText,
+    updateTicketMerchant,
     findTicketByUserAndLink,
     getValidTicketsForBlock,
     getAllTickets,
+    getPublicTickets,
     getPendingTickets,
+    getUnvalidatedTickets,
     getTicketById,
     countValidTicketsForBlock,
     
@@ -359,5 +502,21 @@ module.exports = {
     markRafflePaymentFailed,
     getUnpaidRaffles,
     getAllRaffles,
-    getLatestRaffle
+    getLatestRaffle,
+    
+    // Deposit address functions
+    createDepositAddress,
+    getActiveDepositAddress,
+    deactivateDepositAddress,
+    deactivateAllDepositAddresses,
+    markDepositReceived,
+    getAllDepositAddresses,
+    getDepositAddressByAddress,
+    getDepositAddressByPaymentHash,
+    getTotalDonationsReceived,
+    
+    // Settings functions
+    getSetting,
+    setSetting,
+    getAllSettings
 };

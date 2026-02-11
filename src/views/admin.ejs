@@ -95,6 +95,22 @@
         </div>
         ` : ''}
         
+        <!-- Settings Panel -->
+        <div class="bg-white rounded-lg p-6 shadow-sm mb-8" x-data="settingsPanel()">
+            <h2 class="text-xl font-bold mb-4">⚙️ Settings</h2>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Review Mode</label>
+                    <select x-model="reviewMode" @change="saveSettings()" class="w-full px-4 py-2 border rounded-lg">
+                        <option value="manual_review">Manual Review (admin approves each ticket)</option>
+                        <option value="auto_approve">Auto-Approve (all submissions auto-validated)</option>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1" x-text="reviewMode === 'auto_approve' ? 'All new submissions will be auto-approved.' : 'New submissions require admin approval.'"></p>
+                </div>
+            </div>
+            <div x-show="settingsMsg" x-cloak class="mt-3 text-sm text-green-600" x-text="settingsMsg"></div>
+        </div>
+        
         <!-- Run Raffle -->
         <div class="bg-white rounded-lg p-6 shadow-sm mb-8">
             <h2 class="text-xl font-bold mb-4">Run Raffle</h2>
@@ -159,40 +175,44 @@
             <!-- Tickets Tab -->
             <div x-show="activeTab === 'tickets'" class="p-6">
                 <h3 class="font-bold mb-4">Recent Tickets</h3>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
-                        <thead>
-                            <tr class="border-b">
-                                <th class="text-left py-2">ID</th>
-                                <th class="text-left py-2">Email</th>
-                                <th class="text-left py-2">Merchant</th>
-                                <th class="text-left py-2">Valid</th>
-                                <th class="text-left py-2">Block</th>
-                                <th class="text-left py-2">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${typeof tickets !== 'undefined' && tickets.length > 0 ? 
-                                tickets.slice(0, 50).map(t => `
-                                <tr class="border-b hover:bg-gray-50">
-                                    <td class="py-2">${t.id}</td>
-                                    <td class="py-2">${t.email}</td>
-                                    <td class="py-2">${t.merchant_name || '-'}</td>
-                                    <td class="py-2">
-                                        ${t.is_valid ? 
-                                            '<span class="text-green-500">✓</span>' : 
-                                            (t.validation_reason ? '<span class="text-red-500">✗</span>' : '<span class="text-yellow-500">?</span>')}
-                                    </td>
-                                    <td class="py-2">${t.raffle_block}</td>
-                                    <td class="py-2">
-                                        <a href="${t.review_link}" target="_blank" class="text-bitcoin hover:underline">View</a>
-                                    </td>
-                                </tr>
-                                `).join('') : 
-                                '<tr><td colspan="6" class="py-4 text-center text-gray-500">No tickets yet</td></tr>'
-                            }
-                        </tbody>
-                    </table>
+                <div class="space-y-2">
+                    ${typeof tickets !== 'undefined' && tickets.length > 0 ? 
+                        tickets.slice(0, 50).map(t => `
+                        <div class="border rounded-lg" x-data="{ open: false, aiResult: null, aiLoading: false }">
+                            <div class="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-50" @click="open = !open">
+                                <div class="flex items-center gap-4 text-sm">
+                                    <span class="font-mono text-gray-400">#${t.id}</span>
+                                    <span>${t.email || 'Anonymous'}</span>
+                                    <span class="text-gray-500">${t.merchant_name || '-'}</span>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    ${t.is_valid ? 
+                                        '<span class="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs font-medium">Approved</span>' : 
+                                        (t.validation_reason ? '<span class="bg-red-100 text-red-700 px-2 py-0.5 rounded text-xs font-medium">Rejected</span>' : '<span class="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded text-xs font-medium">Pending</span>')}
+                                    <span class="text-gray-400 text-xs" x-text="open ? '▲' : '▼'"></span>
+                                </div>
+                            </div>
+                            <div x-show="open" x-cloak class="border-t px-4 py-3 bg-gray-50 text-sm space-y-3">
+                                <div class="grid md:grid-cols-2 gap-3">
+                                    <div><span class="text-gray-500">Review Link:</span> <a href="${t.review_link}" target="_blank" class="text-bitcoin hover:underline break-all">${t.review_link}</a></div>
+                                    <div><span class="text-gray-500">Raffle Block:</span> ${t.raffle_block}</div>
+                                </div>
+                                ${t.review_text ? '<div><span class="text-gray-500">Review Text:</span><div class="mt-1 p-2 bg-white rounded border text-gray-700">' + t.review_text.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div></div>' : '<div class="text-gray-400 italic">No review text submitted</div>'}
+                                ${t.validation_reason ? '<div><span class="text-gray-500">Validation Reason:</span> ' + t.validation_reason + '</div>' : ''}
+                                <div class="flex gap-2 pt-2">
+                                    ${!t.is_valid ? '<button @click.stop="approveTicket(' + t.id + ')" class="bg-green-500 text-white px-3 py-1 rounded text-xs font-medium hover:bg-green-600">✓ Approve</button>' : ''}
+                                    ${t.is_valid || !t.validation_reason ? '<button @click.stop="rejectTicket(' + t.id + ')" class="bg-red-500 text-white px-3 py-1 rounded text-xs font-medium hover:bg-red-600">✗ Reject</button>' : ''}
+                                    ${t.review_text ? '<button @click.stop="aiLoading=true; aiCheckTicket(' + t.id + ').then(r => { aiResult=r; aiLoading=false; })" :disabled="aiLoading" class="bg-purple-500 text-white px-3 py-1 rounded text-xs font-medium hover:bg-purple-600 disabled:opacity-50"><span x-text="aiLoading ? \'Checking...\' : \'🤖 AI Check\'"></span></button>' : ''}
+                                </div>
+                                <div x-show="aiResult" x-cloak class="p-2 rounded text-xs" :class="aiResult && aiResult.isValid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'">
+                                    <span class="font-bold" x-text="aiResult && aiResult.isValid ? 'AI: Valid ✓' : 'AI: Invalid ✗'"></span>
+                                    <span x-text="aiResult ? ' — ' + aiResult.reason : ''"></span>
+                                </div>
+                            </div>
+                        </div>
+                        `).join('') : 
+                        '<div class="text-center text-gray-500 py-8">No tickets yet</div>'
+                    }
                 </div>
             </div>
             
@@ -378,6 +398,73 @@ function adminDashboard() {
             } catch (error) {
                 alert('Error: ' + error.message);
             }
+        },
+        
+        async approveTicket(ticketId) {
+            try {
+                const response = await fetch('/api/admin/tickets/' + ticketId + '/validate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Admin-Password': this.password },
+                    body: JSON.stringify({ isValid: true, reason: 'Manually approved by admin' })
+                });
+                const data = await response.json();
+                if (data.success) location.reload();
+                else alert(data.error);
+            } catch (error) { alert('Error: ' + error.message); }
+        },
+        
+        async rejectTicket(ticketId) {
+            const reason = prompt('Rejection reason (optional):') || 'Manually rejected by admin';
+            try {
+                const response = await fetch('/api/admin/tickets/' + ticketId + '/validate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Admin-Password': this.password },
+                    body: JSON.stringify({ isValid: false, reason })
+                });
+                const data = await response.json();
+                if (data.success) location.reload();
+                else alert(data.error);
+            } catch (error) { alert('Error: ' + error.message); }
+        },
+        
+        async aiCheckTicket(ticketId) {
+            try {
+                const response = await fetch('/api/admin/tickets/' + ticketId + '/ai-check', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Admin-Password': this.password }
+                });
+                const data = await response.json();
+                if (data.success) return data.validation;
+                else { alert(data.error); return null; }
+            } catch (error) { alert('Error: ' + error.message); return null; }
+        }
+    }
+}
+
+function settingsPanel() {
+    const pw = document.querySelector('[x-data*="adminDashboard"]')?.__x?.$data?.password || '';
+    return {
+        reviewMode: 'manual_review',
+        settingsMsg: '',
+        init() {
+            fetch('/api/admin/settings', { headers: { 'X-Admin-Password': pw } })
+                .then(r => r.json())
+                .then(d => { if (d.success && d.settings) { this.reviewMode = d.settings.review_mode || 'manual_review'; } })
+                .catch(() => {});
+        },
+        async saveSettings() {
+            this.settingsMsg = '';
+            try {
+                const response = await fetch('/api/admin/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Admin-Password': pw },
+                    body: JSON.stringify({ settings: { review_mode: this.reviewMode } })
+                });
+                const data = await response.json();
+                if (data.success) this.settingsMsg = 'Settings saved!';
+                else this.settingsMsg = 'Error: ' + data.error;
+                setTimeout(() => this.settingsMsg = '', 3000);
+            } catch (error) { this.settingsMsg = 'Error: ' + error.message; }
         }
     }
 }
