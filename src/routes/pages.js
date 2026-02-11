@@ -66,10 +66,18 @@ router.get('/submit', async (req, res) => {
     try {
         const raffleInfo = await bitcoin.getRaffleInfo();
         
+        // Get deposit address from Voltage node
+        let depositInfo = { onchainAddress: null };
+        try {
+            depositInfo = await lightning.getDepositInfo();
+        } catch (err) {
+            console.warn('Could not load deposit info for submit page:', err.message);
+        }
+        
         res.render('submit', {
             title: 'Submit Review - Bitcoin Review Raffle',
             raffleInfo,
-            donationAddress: process.env.DONATION_ADDRESS || 'Not configured'
+            donationAddress: depositInfo.onchainAddress || process.env.DONATION_ADDRESS || 'Not configured'
         });
     } catch (error) {
         console.error('Submit page error:', error);
