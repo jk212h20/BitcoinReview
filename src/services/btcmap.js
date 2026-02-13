@@ -41,19 +41,47 @@ async function fetchMerchants(options = {}) {
 }
 
 /**
+ * Get coordinates for an element (handles both nodes and ways/relations)
+ * Nodes have direct lat/lon, ways/relations have bounds
+ */
+function getElementCoords(element) {
+    const osm = element.osm_json;
+    if (!osm) return null;
+    
+    // Nodes have direct lat/lon
+    if (osm.lat && osm.lon) {
+        return { lat: osm.lat, lon: osm.lon };
+    }
+    
+    // Ways/relations have bounds - use center point
+    if (osm.bounds) {
+        const b = osm.bounds;
+        return {
+            lat: (b.minlat + b.maxlat) / 2,
+            lon: (b.minlon + b.maxlon) / 2
+        };
+    }
+    
+    return null;
+}
+
+/**
  * Filter merchants by various criteria
  */
 function filterMerchants(merchants, options = {}) {
     let filtered = merchants;
     
+    // Exclude deleted elements
+    filtered = filtered.filter(m => !m.deleted_at || m.deleted_at === '');
+    
     // Filter by bounding box (for Roatan area)
+    // Supports both nodes (lat/lon) and ways/relations (bounds)
     if (options.bounds) {
         const { minLat, maxLat, minLon, maxLon } = options.bounds;
         filtered = filtered.filter(m => {
-            const lat = m.osm_json?.lat;
-            const lon = m.osm_json?.lon;
-            if (!lat || !lon) return false;
-            return lat >= minLat && lat <= maxLat && lon >= minLon && lon <= maxLon;
+            const coords = getElementCoords(m);
+            if (!coords) return false;
+            return coords.lat >= minLat && coords.lat <= maxLat && coords.lon >= minLon && coords.lon <= maxLon;
         });
     }
     
@@ -79,16 +107,16 @@ function filterMerchants(merchants, options = {}) {
 }
 
 /**
- * Get merchants in Roatan, Honduras area
- * Roatan approximate bounds: 16.25-16.45 lat, -86.6 to -86.2 lon
+ * Get merchants in the AmityAge community area (Roatan, Honduras)
+ * Bounding box from BTCMap API: /v2/areas/amityage
  */
 async function getRoatanMerchants() {
     return fetchMerchants({
         bounds: {
-            minLat: 16.20,
-            maxLat: 16.50,
-            minLon: -86.70,
-            maxLon: -86.10
+            minLat: 16.21599324835452,
+            maxLat: 16.509832826905846,
+            minLon: -86.6374969482422,
+            maxLon: -86.22825622558594
         }
     });
 }

@@ -18,6 +18,8 @@
    - Merchants now require `payment:lightning=yes` OR `payment:onchain=yes` (or `payment:bitcoin=yes`)
    - Merchants also require `survey:date` or `check_date:currency:XBT` within the last year
    - Merchants with no date tags or stale data (>1 year) are excluded from the listing
+   - Updated bounding box to use exact AmityAge community coordinates from BTCMap API (`/v2/areas/amityage`)
+   - **Note:** As of Feb 2026, all 57 Roatan merchants have stale dates (most recent: Aug 2024), so 0 pass the filter. The page shows a graceful "No Merchants Found" message. Merchants will reappear when BTCMap data is resurveyed.
 
 ## Previous Session Changes (Session 11)
 1. **Fixed Chrome Detection for Local Development:**
