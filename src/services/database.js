@@ -299,9 +299,9 @@ function getValidTicketsForBlock(raffleBlock) {
 
 function getAllTickets() {
     return query(`
-        SELECT t.*, u.email 
+        SELECT t.*, u.email, u.lnurl_address
         FROM tickets t 
-        JOIN users u ON t.user_id = u.id 
+        LEFT JOIN users u ON t.user_id = u.id 
         ORDER BY t.submitted_at DESC
     `);
 }
@@ -316,9 +316,9 @@ function getPublicTickets() {
 
 function getPendingTickets() {
     return query(`
-        SELECT t.*, u.email 
+        SELECT t.*, u.email, u.lnurl_address
         FROM tickets t 
-        JOIN users u ON t.user_id = u.id 
+        LEFT JOIN users u ON t.user_id = u.id 
         WHERE t.is_valid = 0 AND t.validation_reason IS NULL
         ORDER BY t.submitted_at DESC
     `);
@@ -339,7 +339,7 @@ function getTicketById(id) {
     return queryOne(`
         SELECT t.*, u.email, u.lnurl_address 
         FROM tickets t 
-        JOIN users u ON t.user_id = u.id 
+        LEFT JOIN users u ON t.user_id = u.id 
         WHERE t.id = ?
     `, [id]);
 }

@@ -185,6 +185,49 @@ router.get('/how-it-works', async (req, res) => {
 });
 
 /**
+ * GET /admin/review/:id
+ * Quick-review page for a single ticket (used by Telegram "View" link)
+ * Accepts password in query OR TELEGRAM_APPROVE_TOKEN
+ */
+router.get('/admin/review/:id', (req, res) => {
+    const { id } = req.params;
+    const password = req.query.password || req.query.token;
+    
+    // Accept either admin password or Telegram approve token
+    const isAdmin = password === process.env.ADMIN_PASSWORD;
+    const isToken = process.env.TELEGRAM_APPROVE_TOKEN && password === process.env.TELEGRAM_APPROVE_TOKEN;
+    
+    if (!isAdmin && !isToken) {
+        return res.render('admin-login', {
+            title: 'Admin Login - Bitcoin Review Raffle'
+        });
+    }
+    
+    try {
+        const ticket = db.getTicketById(parseInt(id));
+        
+        if (!ticket) {
+            return res.status(404).render('404', { title: 'Not Found' });
+        }
+        
+        // Use the token/password that was passed so approve buttons work
+        const authToken = isAdmin ? password : password;
+        
+        res.render('admin-review', {
+            title: `Review #${id} - Admin`,
+            ticket,
+            password: isAdmin ? password : null,
+            approveToken: isToken ? password : process.env.TELEGRAM_APPROVE_TOKEN,
+            isAdminAuth: isAdmin,
+            baseUrl: process.env.BASE_URL || ''
+        });
+    } catch (error) {
+        console.error('Admin review page error:', error);
+        res.status(500).render('error', { title: 'Error', error: 'Failed to load review' });
+    }
+});
+
+/**
  * GET /admin
  * Admin dashboard page (requires password in query)
  */

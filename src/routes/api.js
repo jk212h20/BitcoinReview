@@ -12,6 +12,7 @@ const bitcoin = require('../services/bitcoin');
 const btcmap = require('../services/btcmap');
 const lightning = require('../services/lightning');
 const anthropic = require('../services/anthropic');
+const telegram = require('../services/telegram');
 
 /**
  * POST /api/submit
@@ -34,6 +35,14 @@ router.post('/submit', async (req, res) => {
             });
         }
         
+        // Email is required
+        if (!hasEmail) {
+            return res.status(400).json({
+                success: false,
+                error: 'Please provide your email address'
+            });
+        }
+        
         // Lightning address is required
         if (!hasLnurl) {
             return res.status(400).json({
@@ -42,15 +51,13 @@ router.post('/submit', async (req, res) => {
             });
         }
         
-        // Validate email format if provided
-        if (hasEmail) {
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(userEmail.trim())) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'Invalid email address format'
-                });
-            }
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(userEmail.trim())) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid email address format'
+            });
         }
         
         // Validate review link if provided
@@ -152,6 +159,12 @@ router.post('/submit', async (req, res) => {
             }
             
             ticketCreated = true;
+            
+            // Send Telegram notification to admin (non-blocking)
+            const createdTicket = db.getTicketById(ticket.id);
+            telegram.notifyNewReview(createdTicket || { id: ticket.id, review_link: cleanReview, review_text: cleanReviewText, merchant_name: null }, user).catch(err => {
+                console.error('Failed to send Telegram notification:', err);
+            });
         }
         
         // --- Build response message based on what happened ---

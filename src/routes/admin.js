@@ -10,6 +10,7 @@ const bitcoin = require('../services/bitcoin');
 const email = require('../services/email');
 const lightning = require('../services/lightning');
 const anthropic = require('../services/anthropic');
+const telegram = require('../services/telegram');
 
 /**
  * Simple password authentication middleware
@@ -28,8 +29,33 @@ function adminAuth(req, res, next) {
     next();
 }
 
-// Apply auth to all admin routes
-router.use(adminAuth);
+/**
+ * Token authentication middleware for Telegram one-tap links
+ * Uses TELEGRAM_APPROVE_TOKEN env var (separate from admin password)
+ */
+function tokenAuth(req, res, next) {
+    const token = req.query.token || req.body.token || req.headers['x-approve-token'];
+    const approveToken = process.env.TELEGRAM_APPROVE_TOKEN;
+    
+    if (!approveToken) {
+        return res.status(500).send('<h2>❌ TELEGRAM_APPROVE_TOKEN not configured</h2>');
+    }
+    
+    if (token !== approveToken) {
+        return res.status(401).send('<h2>❌ Invalid token</h2>');
+    }
+    
+    next();
+}
+
+// Apply password auth to all admin routes EXCEPT quick-approve/reject (which use token auth)
+router.use((req, res, next) => {
+    // Skip adminAuth for quick-approve and quick-reject (they use tokenAuth instead)
+    if (req.path.match(/^\/tickets\/\d+\/quick-(approve|reject)$/)) {
+        return next();
+    }
+    return adminAuth(req, res, next);
+});
 
 /**
  * GET /admin/dashboard
@@ -183,6 +209,17 @@ router.post('/raffle/run', async (req, res) => {
             prizeAmountSats || null
         );
         
+        // Auto-pay via Lightning if enabled and winner has a Lightning Address
+        let paymentResult = null;
+        const autoPayEnabled = process.env.AUTO_PAY_ENABLED === 'true';
+        const prizeSats = prizeAmountSats || parseInt(process.env.DEFAULT_PRIZE_SATS) || 0;
+        
+        // Notify admin via Telegram
+        telegram.notifyRaffleResult(
+            { block_height: blockHeight, total_tickets: tickets.length, prize_amount_sats: prizeSats },
+            winningTicket
+        ).catch(err => console.error('Telegram raffle notify error:', err));
+        
         // Send winner email
         email.sendWinnerEmail(
             winningTicket.email,
@@ -192,11 +229,6 @@ router.post('/raffle/run', async (req, res) => {
         ).catch(err => {
             console.error('Failed to send winner email:', err);
         });
-        
-        // Auto-pay via Lightning if enabled and winner has a Lightning Address
-        let paymentResult = null;
-        const autoPayEnabled = process.env.AUTO_PAY_ENABLED === 'true';
-        const prizeSats = prizeAmountSats || parseInt(process.env.DEFAULT_PRIZE_SATS) || 0;
         
         if (autoPayEnabled && winningTicket.lnurl_address && prizeSats > 0) {
             try {
@@ -410,6 +442,87 @@ router.post('/tickets/:id/ai-check', async (req, res) => {
     } catch (error) {
         console.error('AI check ticket error:', error);
         res.status(500).json({ error: 'Failed to AI-check ticket: ' + error.message });
+    }
+});
+
+/**
+ * GET /admin/tickets/:id/quick-approve
+ * One-tap approve from Telegram link (token auth, no admin password needed)
+ * Returns a simple HTML response (not JSON) since it's tapped from a phone
+ */
+router.get('/tickets/:id/quick-approve', tokenAuth, (req, res) => {
+    try {
+        const { id } = req.params;
+        const ticket = db.getTicketById(parseInt(id));
+        
+        if (!ticket) {
+            return res.status(404).send('<h2>❌ Ticket not found</h2>');
+        }
+        
+        if (ticket.is_valid === 1) {
+            return res.send(`<h2>✅ Already approved</h2><p>Ticket #${id} was already approved.</p>`);
+        }
+        
+        db.validateTicket(parseInt(id), true, 'Approved via Telegram');
+        
+        const merchant = ticket.merchant_name || 'Unknown merchant';
+        res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head><meta name="viewport" content="width=device-width, initial-scale=1"><style>
+                body { font-family: sans-serif; text-align: center; padding: 40px 20px; }
+                h1 { color: #22c55e; } p { color: #666; }
+            </style></head>
+            <body>
+                <h1>✅ Approved!</h1>
+                <p>Ticket #${id} — ${merchant}</p>
+                <p style="margin-top:20px;"><a href="${process.env.BASE_URL || ''}/admin">Go to Admin Dashboard</a></p>
+            </body>
+            </html>
+        `);
+    } catch (error) {
+        console.error('Quick approve error:', error);
+        res.status(500).send('<h2>❌ Error approving ticket</h2>');
+    }
+});
+
+/**
+ * GET /admin/tickets/:id/quick-reject
+ * One-tap reject from Telegram link (token auth, no admin password needed)
+ */
+router.get('/tickets/:id/quick-reject', tokenAuth, (req, res) => {
+    try {
+        const { id } = req.params;
+        const ticket = db.getTicketById(parseInt(id));
+        
+        if (!ticket) {
+            return res.status(404).send('<h2>❌ Ticket not found</h2>');
+        }
+        
+        if (ticket.validation_reason && ticket.is_valid === 0 && ticket.validation_reason !== 'null') {
+            return res.send(`<h2>❌ Already rejected</h2><p>Ticket #${id} was already rejected: ${ticket.validation_reason}</p>`);
+        }
+        
+        db.validateTicket(parseInt(id), false, 'Rejected via Telegram');
+        
+        const merchant = ticket.merchant_name || 'Unknown merchant';
+        res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head><meta name="viewport" content="width=device-width, initial-scale=1"><style>
+                body { font-family: sans-serif; text-align: center; padding: 40px 20px; }
+                h1 { color: #ef4444; } p { color: #666; }
+            </style></head>
+            <body>
+                <h1>❌ Rejected</h1>
+                <p>Ticket #${id} — ${merchant}</p>
+                <p style="margin-top:20px;"><a href="${process.env.BASE_URL || ''}/admin">Go to Admin Dashboard</a></p>
+            </body>
+            </html>
+        `);
+    } catch (error) {
+        console.error('Quick reject error:', error);
+        res.status(500).send('<h2>❌ Error rejecting ticket</h2>');
     }
 });
 

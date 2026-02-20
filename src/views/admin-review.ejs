@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .bitcoin-orange { color: #f7931a; }
+        .bg-bitcoin { background-color: #f7931a; }
+        .bg-bitcoin:hover { background-color: #e8820a; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+    <!-- Header -->
+    <div class="bg-gray-800 text-white px-4 py-4 flex items-center justify-between">
+        <div>
+            <div class="text-xs text-gray-400 uppercase tracking-wide">Admin Review</div>
+            <div class="font-bold">Ticket #<%= ticket.id %></div>
+        </div>
+        <% if (typeof isAdminAuth !== 'undefined' && isAdminAuth && typeof password !== 'undefined' && password) { %>
+        <a href="/admin?password=<%= password %>" class="text-xs text-gray-300 hover:text-white underline">
+            Dashboard →
+        </a>
+        <% } %>
+    </div>
+
+    <div class="max-w-lg mx-auto px-4 py-6 space-y-4">
+
+        <!-- Status Banner -->
+        <% if (ticket.is_valid === 1) { %>
+        <div class="bg-green-100 border border-green-300 rounded-xl p-4 text-center">
+            <div class="text-2xl">✅</div>
+            <div class="font-bold text-green-800">Approved</div>
+            <div class="text-sm text-green-700"><%= ticket.validation_reason || '' %></div>
+        </div>
+        <% } else if (ticket.validation_reason && ticket.validation_reason !== 'null' && ticket.validation_reason !== null) { %>
+        <div class="bg-red-100 border border-red-300 rounded-xl p-4 text-center">
+            <div class="text-2xl">❌</div>
+            <div class="font-bold text-red-800">Rejected</div>
+            <div class="text-sm text-red-700"><%= ticket.validation_reason %></div>
+        </div>
+        <% } else { %>
+        <div class="bg-yellow-100 border border-yellow-300 rounded-xl p-4 text-center">
+            <div class="text-2xl">⏳</div>
+            <div class="font-bold text-yellow-800">Pending Review</div>
+            <div class="text-sm text-yellow-700">Awaiting admin approval</div>
+        </div>
+        <% } %>
+
+        <!-- Review Details Card -->
+        <div class="bg-white rounded-xl shadow-sm p-5 space-y-4">
+
+            <% if (ticket.merchant_name) { %>
+            <div>
+                <div class="text-xs text-gray-400 uppercase tracking-wide mb-1">Merchant</div>
+                <div class="font-bold text-lg"><%= ticket.merchant_name %></div>
+            </div>
+            <% } %>
+
+            <div>
+                <div class="text-xs text-gray-400 uppercase tracking-wide mb-1">Submitted By</div>
+                <div class="text-gray-700">
+                    <% if (ticket.email) { %>
+                    📧 <%= ticket.email.replace(/(.{2}).*(@.*)/, '$1***$2') %>
+                    <% } else if (ticket.lnurl_address) { %>
+                    ⚡ <%= ticket.lnurl_address %>
+                    <% } else { %>
+                    <span class="text-gray-400 italic">Anonymous</span>
+                    <% } %>
+                </div>
+            </div>
+
+            <div>
+                <div class="text-xs text-gray-400 uppercase tracking-wide mb-1">Submitted</div>
+                <div class="text-gray-700"><%= new Date(ticket.submitted_at).toLocaleString() %></div>
+            </div>
+
+            <div>
+                <div class="text-xs text-gray-400 uppercase tracking-wide mb-1">Google Review Link</div>
+                <a href="<%= ticket.review_link %>" target="_blank" 
+                   class="text-blue-600 hover:underline break-all text-sm">
+                    🔗 Open Review
+                </a>
+            </div>
+
+            <% if (ticket.review_text) { %>
+            <div>
+                <div class="text-xs text-gray-400 uppercase tracking-wide mb-1">Review Text</div>
+                <div class="bg-gray-50 rounded-lg p-3 text-sm text-gray-800 leading-relaxed border">
+                    <%= ticket.review_text %>
+                </div>
+            </div>
+            <% } else { %>
+            <div class="text-sm text-gray-400 italic">No review text submitted — check the Google link above.</div>
+            <% } %>
+
+        </div>
+
+        <!-- Action Buttons -->
+        <% if (ticket.is_valid !== 1 || (ticket.validation_reason !== null && ticket.validation_reason !== 'null')) { %>
+
+        <div id="actionArea" class="space-y-3">
+            
+            <% if (ticket.is_valid !== 1) { %>
+            <!-- Approve Button -->
+            <button onclick="doAction('approve')" 
+                    class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-6 rounded-xl text-lg transition flex items-center justify-center gap-2">
+                <span>✅ Approve</span>
+            </button>
+            <% } %>
+
+            <!-- Reject Button -->
+            <button onclick="doAction('reject')" 
+                    class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-4 px-6 rounded-xl text-lg transition flex items-center justify-center gap-2">
+                <span>❌ Reject</span>
+            </button>
+
+        </div>
+
+        <div id="resultMsg" class="hidden text-center py-4 text-lg font-bold rounded-xl"></div>
+
+        <% } %>
+
+    </div>
+
+<script>
+    const ticketId = <%= ticket.id %>;
+    const approveToken = '<%= typeof approveToken !== "undefined" ? approveToken : "" %>';
+    const adminPassword = '<%= typeof password !== "undefined" && password ? password : "" %>';
+    const baseUrl = '<%= typeof baseUrl !== "undefined" ? baseUrl : "" %>';
+
+    async function doAction(action) {
+        const btn = event.currentTarget;
+        btn.disabled = true;
+        btn.textContent = action === 'approve' ? 'Approving...' : 'Rejecting...';
+
+        let reason = null;
+        if (action === 'reject') {
+            reason = prompt('Rejection reason (optional, press OK to skip):');
+            if (reason === null) {
+                // User pressed Cancel
+                btn.disabled = false;
+                btn.textContent = action === 'approve' ? '✅ Approve' : '❌ Reject';
+                return;
+            }
+        }
+
+        try {
+            // Try quick token endpoint first (GET with token)
+            if (approveToken) {
+                const url = `${baseUrl}/api/admin/tickets/${ticketId}/quick-${action}?token=${encodeURIComponent(approveToken)}`;
+                const resp = await fetch(url, { method: 'GET' });
+                if (resp.ok) {
+                    showResult(action === 'approve', action === 'approve' ? '✅ Approved!' : '❌ Rejected');
+                    document.getElementById('actionArea').style.display = 'none';
+                    return;
+                }
+            }
+
+            // Fall back to admin password validate endpoint
+            if (adminPassword) {
+                const resp = await fetch(`${baseUrl}/api/admin/tickets/${ticketId}/validate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Admin-Password': adminPassword
+                    },
+                    body: JSON.stringify({
+                        isValid: action === 'approve',
+                        reason: reason || (action === 'approve' ? 'Approved via admin review page' : 'Rejected via admin review page')
+                    })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    showResult(action === 'approve', action === 'approve' ? '✅ Approved!' : '❌ Rejected');
+                    document.getElementById('actionArea').style.display = 'none';
+                    return;
+                }
+                alert('Error: ' + (data.error || 'Unknown error'));
+            }
+        } catch (err) {
+            alert('Network error: ' + err.message);
+        }
+
+        btn.disabled = false;
+        btn.textContent = action === 'approve' ? '✅ Approve' : '❌ Reject';
+    }
+
+    function showResult(success, msg) {
+        const el = document.getElementById('resultMsg');
+        el.textContent = msg;
+        el.className = 'text-center py-4 text-lg font-bold rounded-xl ' + 
+            (success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800');
+        el.classList.remove('hidden');
+    }
+</script>
+
+</body>
+</html>
