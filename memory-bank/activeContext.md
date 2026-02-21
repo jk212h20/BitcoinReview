@@ -2,20 +2,21 @@
 
 ## Current Focus (Updated 2026-02-21)
 
-### Session 18: Fix Telegram links broken in Safari (reload loop)
+### Session 18: Fix Safari reload loop (two causes)
 
-**Problem:** Approve/View links from Telegram opened in Safari but got stuck in a reload loop (401 auth failure → login page → loop).
+**Cause 1: Tailwind Play CDN** (commit `407a689`)
+The site used `<script src="https://cdn.tailwindcss.com">` — a 3MB JS file that scans DOM, generates CSS via MutationObserver, and injects `<style>` tags. Safari's WebKit enters infinite layout/repaint loop with this approach.
 
-**Root cause:** Telegram's Markdown parser was corrupting URLs containing the 64-char `TELEGRAM_APPROVE_TOKEN`. Underscores and other chars in the hex token were interpreted as Markdown italic/bold markers, truncating the URL. The token in the URL didn't match the env var, causing 401 → login page.
+**Fix:** Proper Tailwind CSS build pipeline:
+- `tailwindcss` as devDependency with `tailwind.config.js` (bitcoin colors)
+- `src/styles/input.css` → `public/styles.css` (22KB minified)
+- All templates (`layout.ejs`, `submit.ejs`, `admin-review.ejs`) now use `<link href="/styles.css">`
+- `npm run build` runs `tailwindcss` — Nixpacks auto-runs on Railway deploy
+- **IMPORTANT:** When adding new Tailwind classes, run `npm run build:css` to regenerate
 
-**Fix (commit `456b26d`):**
-- Switched ALL Telegram messages from `parse_mode: 'Markdown'` to `parse_mode: 'HTML'`
-  - `*bold*` → `<b>bold</b>`, `_italic_` → `<i>italic</i>`, `` `code` `` → `<code>code</code>`
-  - `[text](url)` → `<a href="url">text</a>` — HTML doesn't corrupt URLs
-- Added `escapeHtml()` helper for safe content in HTML mode
-- "View in Admin" link now uses `?token=` instead of `?password=` param
-- `pages.js` route updated to accept both `?token=` and `?password=` query params
-- `index.js` webhook messages also converted to HTML
+**Cause 2: Telegram Markdown corrupting URLs** (commit `456b26d`)
+- Switched Telegram messages from `parse_mode: 'Markdown'` → `'HTML'`
+- "View in Admin" link now uses `?token=` instead of `?password=`
 
 ### Previous sessions:
 - **Session 17:** DB persistence fix — `DATABASE_PATH` → `/data/reviews.db` (Railway volume). Commit: `a477abc`
