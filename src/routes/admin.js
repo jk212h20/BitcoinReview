@@ -38,14 +38,19 @@ function tokenAuth(req, res, next) {
     const approveToken = process.env.TELEGRAM_APPROVE_TOKEN;
     
     if (!approveToken) {
-        return res.status(500).send('<h2>❌ TELEGRAM_APPROVE_TOKEN not configured</h2>');
+        return res.status(500).send(minimalPage('❌ Error', 'TELEGRAM_APPROVE_TOKEN not configured'));
     }
     
     if (token !== approveToken) {
-        return res.status(401).send('<h2>❌ Invalid token</h2>');
+        return res.status(401).send(minimalPage('❌ Invalid Token', 'The approve token is invalid or expired.'));
     }
     
     next();
+}
+
+/** Generate a minimal but complete HTML page (fixes Safari reload loop) */
+function minimalPage(title, body, linkHtml) {
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><style>body{font-family:-apple-system,sans-serif;text-align:center;padding:40px 20px}h1{margin-bottom:12px}p{color:#666}a{color:#f7931a}</style></head><body><h1>${title}</h1><p>${body}</p>${linkHtml||''}</body></html>`;
 }
 
 // Apply password auth to all admin routes EXCEPT quick-approve/reject (which use token auth)
@@ -457,11 +462,12 @@ router.get('/tickets/:id/quick-approve', tokenAuth, (req, res) => {
         const ticket = db.getTicketById(parseInt(id));
         
         if (!ticket) {
-            return res.status(404).send('<h2>❌ Ticket not found</h2>');
+            return res.status(404).send(minimalPage('❌ Not Found', `Ticket #${id} not found.`));
         }
         
         if (ticket.is_valid === 1) {
-            return res.send(`<h2>✅ Already approved</h2><p>Ticket #${id} was already approved.</p>`);
+            const merchant = ticket.merchant_name || 'Unknown merchant';
+            return res.send(minimalPage('✅ Already Approved', `Ticket #${id} — ${merchant} was already approved.`));
         }
         
         db.validateTicket(parseInt(id), true, 'Approved via Telegram');
@@ -471,23 +477,10 @@ router.get('/tickets/:id/quick-approve', tokenAuth, (req, res) => {
         telegram.notifyTicketDecision(updatedTicket || ticket, true, null, db).catch(() => {});
         
         const merchant = ticket.merchant_name || 'Unknown merchant';
-        res.send(`
-            <!DOCTYPE html>
-            <html>
-            <head><meta name="viewport" content="width=device-width, initial-scale=1"><style>
-                body { font-family: sans-serif; text-align: center; padding: 40px 20px; }
-                h1 { color: #22c55e; } p { color: #666; }
-            </style></head>
-            <body>
-                <h1>✅ Approved!</h1>
-                <p>Ticket #${id} — ${merchant}</p>
-                <p style="margin-top:20px;"><a href="${process.env.BASE_URL || ''}/admin">Go to Admin Dashboard</a></p>
-            </body>
-            </html>
-        `);
+        res.send(minimalPage('✅ Approved!', `Ticket #${id} — ${merchant}`, `<p style="margin-top:20px"><a href="${process.env.BASE_URL || ''}/admin">Go to Admin Dashboard</a></p>`));
     } catch (error) {
         console.error('Quick approve error:', error);
-        res.status(500).send('<h2>❌ Error approving ticket</h2>');
+        res.status(500).send(minimalPage('❌ Error', 'Error approving ticket. Please try again.'));
     }
 });
 
@@ -501,11 +494,12 @@ router.get('/tickets/:id/quick-reject', tokenAuth, (req, res) => {
         const ticket = db.getTicketById(parseInt(id));
         
         if (!ticket) {
-            return res.status(404).send('<h2>❌ Ticket not found</h2>');
+            return res.status(404).send(minimalPage('❌ Not Found', `Ticket #${id} not found.`));
         }
         
         if (ticket.validation_reason && ticket.is_valid === 0 && ticket.validation_reason !== 'null') {
-            return res.send(`<h2>❌ Already rejected</h2><p>Ticket #${id} was already rejected: ${ticket.validation_reason}</p>`);
+            const merchant = ticket.merchant_name || 'Unknown merchant';
+            return res.send(minimalPage('❌ Already Rejected', `Ticket #${id} — ${merchant}: ${ticket.validation_reason}`));
         }
         
         db.validateTicket(parseInt(id), false, 'Rejected via Telegram');
@@ -515,23 +509,10 @@ router.get('/tickets/:id/quick-reject', tokenAuth, (req, res) => {
         telegram.notifyTicketDecision(updatedTicket || ticket, false, 'Rejected via Telegram', db).catch(() => {});
         
         const merchant = ticket.merchant_name || 'Unknown merchant';
-        res.send(`
-            <!DOCTYPE html>
-            <html>
-            <head><meta name="viewport" content="width=device-width, initial-scale=1"><style>
-                body { font-family: sans-serif; text-align: center; padding: 40px 20px; }
-                h1 { color: #ef4444; } p { color: #666; }
-            </style></head>
-            <body>
-                <h1>❌ Rejected</h1>
-                <p>Ticket #${id} — ${merchant}</p>
-                <p style="margin-top:20px;"><a href="${process.env.BASE_URL || ''}/admin">Go to Admin Dashboard</a></p>
-            </body>
-            </html>
-        `);
+        res.send(minimalPage('❌ Rejected', `Ticket #${id} — ${merchant}`, `<p style="margin-top:20px"><a href="${process.env.BASE_URL || ''}/admin">Go to Admin Dashboard</a></p>`));
     } catch (error) {
         console.error('Quick reject error:', error);
-        res.status(500).send('<h2>❌ Error rejecting ticket</h2>');
+        res.status(500).send(minimalPage('❌ Error', 'Error rejecting ticket. Please try again.'));
     }
 });
 
