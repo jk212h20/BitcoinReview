@@ -1,3 +1,6 @@
+<%
+const merchantsJson = JSON.stringify(typeof merchants !== 'undefined' ? merchants : []);
+%>
 <%- include('layout', { body: `
 
 <section class="max-w-2xl mx-auto px-4 py-12" x-data="submitReviewForm()">
@@ -13,7 +16,7 @@
     <div class="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-8 text-center">
         <p class="text-sm text-gray-700">
             ⏰ Next raffle at block <strong class="bitcoin-orange">${raffleInfo.nextRaffleBlock.toLocaleString()}</strong>
-            ${raffleInfo.blocksUntilNext ? `— ~${raffleInfo.timeEstimate} away` : ''}
+            ${raffleInfo.blocksUntilNext ? \`— ~\${raffleInfo.timeEstimate} away\` : ''}
         </p>
     </div>
     ` : ''}
@@ -33,46 +36,29 @@
     <!-- Form -->
     <form x-show="!success" @submit.prevent="doSubmit" class="bg-white rounded-xl shadow-md p-6 space-y-5">
 
-        <!-- Merchant (required, searchable dropdown) -->
-        <div x-data="merchantSearch(${JSON.stringify(typeof merchants !== 'undefined' ? merchants : [])})" class="relative">
+        <!-- Merchant searchable dropdown (required) -->
+        <div id="merchant-picker" class="relative">
             <label class="block text-sm font-semibold text-gray-700 mb-1">
                 🏪 Which merchant did you review? <span class="text-red-500">*</span>
             </label>
             <input
                 type="text"
-                x-model="query"
-                @input="onInput()"
-                @focus="open = true"
-                @blur="onBlur()"
-                @keydown.arrow-down.prevent="moveDown()"
-                @keydown.arrow-up.prevent="moveUp()"
-                @keydown.enter.prevent="selectHighlighted()"
-                @keydown.escape="open = false; query = selected || ''"
-                :class="selected ? 'border-green-400 bg-green-50' : 'border-gray-300'"
-                class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-bitcoin focus:border-bitcoin outline-none transition"
+                id="merchant-input"
+                oninput="merchantFilter(this.value)"
+                onfocus="merchantFilter(this.value)"
+                onblur="merchantBlur()"
+                onkeydown="merchantKeydown(event)"
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-bitcoin focus:border-bitcoin outline-none transition"
                 placeholder="Type to search merchants..."
                 autocomplete="off"
             >
-            <!-- Dropdown -->
-            <div x-show="open && filtered.length > 0" x-cloak
-                class="absolute z-20 w-full bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-56 overflow-y-auto">
-                <template x-for="(m, i) in filtered" :key="m.id">
-                    <div
-                        @mousedown.prevent="selectMerchant(m)"
-                        :class="i === highlighted ? 'bg-bitcoin text-white' : 'hover:bg-orange-50'"
-                        class="px-4 py-2 cursor-pointer text-sm flex items-center gap-2"
-                    >
-                        <span x-text="m.name"></span>
-                        <span class="ml-auto text-xs opacity-60" x-text="[m.lightning ? '⚡' : '', m.onchain ? '₿' : ''].filter(Boolean).join(' ')"></span>
-                    </div>
-                </template>
+            <div id="merchant-dropdown"
+                class="hidden absolute z-20 w-full bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-56 overflow-y-auto">
             </div>
             <p class="text-xs text-gray-500 mt-1">
                 Only merchants on the <a href="/merchants" target="_blank" class="text-bitcoin hover:underline">Roatan Bitcoin map</a> are eligible.
             </p>
-            <!-- Hidden input to sync selected merchant name back to parent Alpine scope -->
-            <input type="hidden" x-model="selected" @change="$dispatch('merchant-selected', { name: selected })">
-            <div x-show="selected" x-cloak class="mt-1 text-xs text-green-600 font-medium">✓ Selected: <span x-text="selected"></span></div>
+            <div id="merchant-selected-label" class="hidden mt-1 text-xs text-green-600 font-medium"></div>
         </div>
         
         <!-- Review Link (required) -->
@@ -148,7 +134,7 @@
         </button>
     </form>
 
-    <!-- How to get a review link -->
+    <!-- How to submit -->
     <div x-show="!success" class="mt-8 bg-gray-50 rounded-xl p-6">
         <h3 class="font-bold text-lg mb-3">📋 How to submit</h3>
         <ol class="list-decimal list-inside space-y-2 text-gray-700 text-sm">
@@ -161,61 +147,100 @@
 </section>
 
 <script>
-function merchantSearch(merchants) {
-    return {
-        merchants,
-        query: '',
-        selected: '',
-        open: false,
-        highlighted: -1,
-        get filtered() {
-            if (!this.query.trim()) return this.merchants.slice(0, 8);
-            const q = this.query.toLowerCase();
-            return this.merchants.filter(m => m.name.toLowerCase().includes(q)).slice(0, 8);
-        },
-        onInput() {
-            this.open = true;
-            this.highlighted = -1;
-            // If user typed something that doesn't match selected, clear selection
-            if (this.selected && this.query !== this.selected) {
-                this.selected = '';
-                this.$dispatch('merchant-cleared');
-            }
-        },
-        onBlur() {
-            // Delay so mousedown on option fires first
-            setTimeout(() => {
-                this.open = false;
-                // If nothing selected, restore or clear
-                if (!this.selected) this.query = '';
-            }, 150);
-        },
-        selectMerchant(m) {
-            this.selected = m.name;
-            this.query = m.name;
-            this.open = false;
-            this.highlighted = -1;
-            // Propagate to parent
-            this.$nextTick(() => {
-                this.$el.querySelector('input[type=hidden]').dispatchEvent(new Event('change'));
-            });
-        },
-        moveDown() {
-            if (this.filtered.length === 0) return;
-            this.highlighted = (this.highlighted + 1) % this.filtered.length;
-        },
-        moveUp() {
-            if (this.filtered.length === 0) return;
-            this.highlighted = this.highlighted <= 0 ? this.filtered.length - 1 : this.highlighted - 1;
-        },
-        selectHighlighted() {
-            if (this.highlighted >= 0 && this.filtered[this.highlighted]) {
-                this.selectMerchant(this.filtered[this.highlighted]);
-            }
-        }
-    };
+// ----- Merchant search (vanilla JS, no Alpine nesting issues) -----
+var _merchants = ` + merchantsJson + `;
+var _highlighted = -1;
+var _filtered = [];
+
+function merchantFilter(q) {
+    var dropdown = document.getElementById('merchant-dropdown');
+    q = (q || '').toLowerCase().trim();
+    _filtered = q
+        ? _merchants.filter(function(m) { return m.name.toLowerCase().includes(q); })
+        : _merchants.slice(0, 8);
+    _highlighted = -1;
+    renderDropdown(dropdown);
+    dropdown.classList.toggle('hidden', _filtered.length === 0);
 }
 
+function renderDropdown(dropdown) {
+    dropdown.innerHTML = '';
+    _filtered.forEach(function(m, i) {
+        var el = document.createElement('div');
+        el.className = 'px-4 py-2 cursor-pointer text-sm flex items-center gap-2 hover:bg-orange-50';
+        el.dataset.idx = i;
+        el.innerHTML = '<span>' + escHtml(m.name) + '</span>' +
+            '<span class="ml-auto text-xs opacity-60">' +
+            (m.lightning ? '⚡' : '') + (m.onchain ? ' ₿' : '') + '</span>';
+        el.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            pickMerchant(m.name);
+        });
+        dropdown.appendChild(el);
+    });
+    highlightRow();
+}
+
+function highlightRow() {
+    var dropdown = document.getElementById('merchant-dropdown');
+    Array.from(dropdown.children).forEach(function(el, i) {
+        el.className = i === _highlighted
+            ? 'px-4 py-2 cursor-pointer text-sm flex items-center gap-2 bg-bitcoin text-white'
+            : 'px-4 py-2 cursor-pointer text-sm flex items-center gap-2 hover:bg-orange-50';
+    });
+}
+
+function pickMerchant(name) {
+    document.getElementById('merchant-input').value = name;
+    document.getElementById('merchant-input').classList.add('border-green-400', 'bg-green-50');
+    document.getElementById('merchant-input').classList.remove('border-gray-300');
+    var lbl = document.getElementById('merchant-selected-label');
+    lbl.textContent = '✓ Selected: ' + name;
+    lbl.classList.remove('hidden');
+    document.getElementById('merchant-dropdown').classList.add('hidden');
+    // Pass to Alpine
+    var alpine = document.querySelector('[x-data="submitReviewForm()"]');
+    if (alpine && alpine._x_dataStack) {
+        alpine._x_dataStack[0].merchantName = name;
+    } else {
+        // Fallback: set via Alpine.$data
+        try { Alpine.$data(alpine).merchantName = name; } catch(e) {}
+    }
+}
+
+function merchantBlur() {
+    setTimeout(function() {
+        document.getElementById('merchant-dropdown').classList.add('hidden');
+    }, 150);
+}
+
+function merchantKeydown(e) {
+    var dropdown = document.getElementById('merchant-dropdown');
+    if (dropdown.classList.contains('hidden')) {
+        if (e.key === 'ArrowDown') { merchantFilter(e.target.value); return; }
+        return;
+    }
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        _highlighted = (_highlighted + 1) % _filtered.length;
+        highlightRow();
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        _highlighted = _highlighted <= 0 ? _filtered.length - 1 : _highlighted - 1;
+        highlightRow();
+    } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (_highlighted >= 0 && _filtered[_highlighted]) pickMerchant(_filtered[_highlighted].name);
+    } else if (e.key === 'Escape') {
+        dropdown.classList.add('hidden');
+    }
+}
+
+function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ----- Alpine submit form -----
 function submitReviewForm() {
     return {
         reviewLink: '',
@@ -229,54 +254,55 @@ function submitReviewForm() {
         error: '',
 
         init() {
-            // Listen for merchant selection from nested Alpine component
-            this.$el.addEventListener('merchant-selected', (e) => {
-                this.merchantName = e.detail.name || '';
+            // Expose Alpine instance so vanilla merchantSearch can write to it
+            var self = this;
+            document.getElementById('merchant-input').addEventListener('input', function() {
+                // Clear selection if user changes text
+                if (self.merchantName && this.value !== self.merchantName) {
+                    self.merchantName = '';
+                    document.getElementById('merchant-selected-label').classList.add('hidden');
+                    this.classList.remove('border-green-400', 'bg-green-50');
+                    this.classList.add('border-gray-300');
+                }
             });
-            this.$el.addEventListener('merchant-cleared', () => {
-                this.merchantName = '';
-            });
-            // Also watch the hidden input directly as fallback
-            const observer = new MutationObserver(() => {
-                const hidden = this.$el.querySelector('input[type=hidden]');
-                if (hidden) this.merchantName = hidden.value || '';
-            });
-            observer.observe(this.$el, { subtree: true, attributes: true, attributeFilter: ['value'] });
+            window._setMerchantName = function(name) { self.merchantName = name; };
         },
-        
+
         async doSubmit() {
             this.loading = true;
             this.error = '';
             this.success = false;
 
-            // Re-read merchantName from hidden input as final check
-            const hiddenInput = this.$el.querySelector('input[type=hidden]');
-            if (hiddenInput && hiddenInput.value) this.merchantName = hiddenInput.value;
-            
+            // Final check: read from input field if Alpine state empty
+            if (!this.merchantName.trim()) {
+                var inp = document.getElementById('merchant-input');
+                if (inp && inp.value.trim()) this.merchantName = inp.value.trim();
+            }
+
             if (!this.merchantName.trim()) {
                 this.error = 'Please select which merchant you reviewed from the dropdown';
                 this.loading = false;
                 return;
             }
-            
+
             if (!this.reviewLink.trim()) {
                 this.error = 'Please paste your review link';
                 this.loading = false;
                 return;
             }
-            
+
             if (!this.email.trim()) {
                 this.error = 'Please provide your email address';
                 this.loading = false;
                 return;
             }
-            
+
             if (!this.lnurl.trim()) {
                 this.error = 'Please provide your Lightning address';
                 this.loading = false;
                 return;
             }
-            
+
             try {
                 const response = await fetch('/api/submit', {
                     method: 'POST',
@@ -289,13 +315,12 @@ function submitReviewForm() {
                         lnurl: this.lnurl.trim() || null
                     })
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (data.success) {
                     this.success = true;
                     this.successMessage = data.message;
-                    
                     if (this.email.trim()) localStorage.setItem('br_email', this.email.trim());
                     if (this.lnurl.trim()) localStorage.setItem('br_lnurl', this.lnurl.trim());
                 } else {
@@ -307,7 +332,7 @@ function submitReviewForm() {
                 this.loading = false;
             }
         },
-        
+
         resetForm() {
             this.success = false;
             this.successMessage = '';
@@ -315,9 +340,22 @@ function submitReviewForm() {
             this.reviewLink = '';
             this.reviewText = '';
             this.merchantName = '';
+            document.getElementById('merchant-input').value = '';
+            document.getElementById('merchant-selected-label').classList.add('hidden');
+            document.getElementById('merchant-input').classList.remove('border-green-400', 'bg-green-50');
+            document.getElementById('merchant-input').classList.add('border-gray-300');
         }
     };
 }
+
+// Wire up pickMerchant to Alpine after page load
+document.addEventListener('DOMContentLoaded', function() {
+    var origPick = pickMerchant;
+    pickMerchant = function(name) {
+        origPick(name);
+        if (window._setMerchantName) window._setMerchantName(name);
+    };
+});
 </script>
 
 `, donationAddress: typeof donationAddress !== 'undefined' ? donationAddress : 'Coming soon' }) %>
