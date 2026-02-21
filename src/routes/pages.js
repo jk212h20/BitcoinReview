@@ -29,6 +29,9 @@ router.get('/', async (req, res) => {
             console.warn('Could not load deposit info:', err.message);
         }
         const totalDonations = db.getTotalDonationsReceived();
+
+        // Get most-recently-reviewed merchant for homepage spotlight
+        const recentlyReviewedMerchant = db.getMostRecentlyReviewedMerchant();
         
         res.render('index', {
             title: 'Bitcoin Review Raffle - Roatan',
@@ -36,6 +39,7 @@ router.get('/', async (req, res) => {
             userCount,
             ticketCount,
             latestRaffle,
+            recentlyReviewedMerchant,
             onchainAddress: depositInfo.onchainAddress,
             lightningInvoice: depositInfo.lightningInvoice,
             totalDonationsSats: totalDonations,
@@ -50,6 +54,7 @@ router.get('/', async (req, res) => {
             userCount: 0,
             ticketCount: 0,
             latestRaffle: null,
+            recentlyReviewedMerchant: null,
             onchainAddress: null,
             lightningInvoice: null,
             totalDonationsSats: 0,
@@ -73,10 +78,19 @@ router.get('/submit', async (req, res) => {
         } catch (err) {
             console.warn('Could not load deposit info for submit page:', err.message);
         }
+
+        // Load merchant list for the searchable dropdown
+        let merchants = [];
+        try {
+            merchants = await btcmap.getMerchantList();
+        } catch (err) {
+            console.warn('Could not load merchants for submit page:', err.message);
+        }
         
         res.render('submit', {
             title: 'Submit Review - Bitcoin Review Raffle',
             raffleInfo,
+            merchants,
             donationAddress: depositInfo.onchainAddress || process.env.DONATION_ADDRESS || 'Not configured'
         });
     } catch (error) {
@@ -84,6 +98,7 @@ router.get('/submit', async (req, res) => {
         res.render('submit', {
             title: 'Submit Review - Bitcoin Review Raffle',
             error: 'Failed to load page data',
+            merchants: [],
             donationAddress: process.env.DONATION_ADDRESS || 'Not configured'
         });
     }
@@ -96,10 +111,35 @@ router.get('/submit', async (req, res) => {
 router.get('/merchants', async (req, res) => {
     try {
         const merchants = await btcmap.getMerchantList();
-        
+
+        // Get approved tickets with merchant names to find recently-reviewed merchants
+        const approvedTickets = db.getApprovedPublicTickets();
+
+        // Build a map of merchantName -> most recent submitted_at
+        const lastReviewedMap = {};
+        for (const t of approvedTickets) {
+            if (!t.merchant_name) continue;
+            const name = t.merchant_name.trim();
+            if (!lastReviewedMap[name] || t.submitted_at > lastReviewedMap[name]) {
+                lastReviewedMap[name] = t.submitted_at;
+            }
+        }
+
+        // Annotate merchants and sort: reviewed first (most recent), then unreviewed
+        const annotated = merchants.map(m => ({
+            ...m,
+            lastReviewed: lastReviewedMap[m.name] || null
+        }));
+        annotated.sort((a, b) => {
+            if (a.lastReviewed && b.lastReviewed) return b.lastReviewed.localeCompare(a.lastReviewed);
+            if (a.lastReviewed) return -1;
+            if (b.lastReviewed) return 1;
+            return a.name.localeCompare(b.name);
+        });
+
         res.render('merchants', {
             title: 'Bitcoin Merchants - Roatan',
-            merchants
+            merchants: annotated
         });
     } catch (error) {
         console.error('Merchants page error:', error);

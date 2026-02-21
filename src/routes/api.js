@@ -173,7 +173,7 @@ router.post('/submit', async (req, res) => {
                 user ? user.id : null,
                 cleanReview,
                 cleanReviewText,
-                null, // merchant name filled by admin
+                (req.body.merchantName && req.body.merchantName.trim()) ? req.body.merchantName.trim() : null,
                 raffleBlock
             );
             

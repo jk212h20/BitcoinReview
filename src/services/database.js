@@ -437,6 +437,18 @@ function getAllRaffles() {
     `);
 }
 
+function getMostRecentlyReviewedMerchant() {
+    return queryOne(`
+        SELECT merchant_name, review_link, submitted_at
+        FROM tickets
+        WHERE is_valid = 1
+          AND merchant_name IS NOT NULL
+          AND merchant_name != ''
+        ORDER BY submitted_at DESC
+        LIMIT 1
+    `);
+}
+
 function getLatestRaffle() {
     return queryOne(`
         SELECT r.*, t.review_link, u.email, u.lnurl_address
@@ -545,6 +557,7 @@ module.exports = {
     markRafflePaymentFailed,
     getUnpaidRaffles,
     getAllRaffles,
+    getMostRecentlyReviewedMerchant,
     getLatestRaffle,
     
     // Deposit address functions
