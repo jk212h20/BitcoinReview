@@ -169,11 +169,12 @@ router.post('/submit', async (req, res) => {
             // Save review text if user pasted it
             const cleanReviewText = (reviewText && reviewText.trim().length > 0) ? reviewText.trim() : null;
             
+            const cleanMerchantName = (req.body.merchantName && req.body.merchantName.trim()) ? req.body.merchantName.trim() : null;
             const ticket = db.createTicket(
                 user ? user.id : null,
                 cleanReview,
                 cleanReviewText,
-                (req.body.merchantName && req.body.merchantName.trim()) ? req.body.merchantName.trim() : null,
+                cleanMerchantName,
                 raffleBlock
             );
             
