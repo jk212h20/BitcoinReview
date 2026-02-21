@@ -134,17 +134,38 @@
                 </div>
             </div>
 
-            <!-- Add chat ID -->
+            <!-- Generate invite link -->
+            <div class="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                <div class="text-sm font-medium text-gray-700 mb-2">🔗 Invite a new admin</div>
+                <p class="text-xs text-gray-500 mb-2">Generate a one-tap invite link. The new admin clicks it → Telegram opens → they're auto-registered. No chat ID needed.</p>
+                <div class="flex gap-2 items-center">
+                    <button @click="generateInvite()" :disabled="telegramLoading"
+                        class="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-600 disabled:opacity-50 whitespace-nowrap">
+                        Generate Invite Link
+                    </button>
+                    <span x-show="inviteLink" x-cloak class="text-xs text-gray-500">Expires in 24h — single use</span>
+                </div>
+                <div x-show="inviteLink" x-cloak class="mt-2 flex gap-2 items-center">
+                    <input type="text" :value="inviteLink" readonly
+                        class="flex-1 px-3 py-1.5 border rounded text-xs font-mono bg-white"
+                        @click="$el.select()">
+                    <button @click="copyInvite()"
+                        class="bg-gray-200 hover:bg-gray-300 px-3 py-1.5 rounded text-xs font-medium whitespace-nowrap"
+                        x-text="copied ? '✅ Copied!' : 'Copy'"></button>
+                </div>
+            </div>
+
+            <!-- Add chat ID manually -->
             <div class="flex gap-2">
                 <input 
                     type="text" 
                     x-model="newChatId"
-                    placeholder="Your Telegram chat ID (e.g. 123456789)"
+                    placeholder="Or enter chat ID manually (e.g. 123456789)"
                     class="flex-1 px-3 py-2 border rounded-lg text-sm"
                     @keydown.enter="addChat()"
                 >
                 <button @click="addChat()" :disabled="telegramLoading"
-                    class="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-600 disabled:opacity-50 whitespace-nowrap">
+                    class="bg-gray-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-600 disabled:opacity-50 whitespace-nowrap">
                     Add &amp; Test
                 </button>
             </div>
@@ -494,6 +515,8 @@ function telegramPanel(pw) {
         telegramLoading: false,
         telegramMsg: '',
         telegramOk: true,
+        inviteLink: '',
+        copied: false,
         init() {
             fetch('/api/admin/telegram/chats', { headers: { 'X-Admin-Password': pw } })
                 .then(r => r.json())
@@ -553,6 +576,38 @@ function telegramPanel(pw) {
             } catch(e) {
                 this.telegramOk = false;
                 this.telegramMsg = '❌ Error: ' + e.message;
+            }
+        },
+        async generateInvite() {
+            this.telegramLoading = true;
+            this.inviteLink = '';
+            this.copied = false;
+            try {
+                const r = await fetch('/api/admin/telegram/invite', {
+                    method: 'POST',
+                    headers: { 'X-Admin-Password': pw }
+                });
+                const d = await r.json();
+                if (d.success) {
+                    this.inviteLink = d.inviteLink;
+                } else {
+                    this.telegramOk = false;
+                    this.telegramMsg = '❌ ' + d.error;
+                }
+            } catch(e) {
+                this.telegramOk = false;
+                this.telegramMsg = '❌ Error: ' + e.message;
+            }
+            this.telegramLoading = false;
+        },
+        async copyInvite() {
+            try {
+                await navigator.clipboard.writeText(this.inviteLink);
+                this.copied = true;
+                setTimeout(() => this.copied = false, 2000);
+            } catch(e) {
+                // Fallback: select the input
+                this.telegramMsg = 'Copy manually from the field above';
             }
         }
     }

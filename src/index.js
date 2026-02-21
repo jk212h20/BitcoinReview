@@ -57,8 +57,7 @@ app.use('/api', apiRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/', pageRoutes);
 
-// Telegram webhook — bot replies to any message with the sender's chat ID
-// This lets new admins find their ID by simply messaging @CoraTelegramBot
+// Telegram webhook — handles bot messages and invite link flow
 app.post('/telegram/webhook', express.json(), async (req, res) => {
     res.sendStatus(200); // Always ack immediately
     try {
@@ -67,9 +66,51 @@ app.post('/telegram/webhook', express.json(), async (req, res) => {
         if (!msg) return;
         const chatId = String(msg.chat.id);
         const text = (msg.text || '').trim();
-        // Reply with their chat ID
-        const reply = `👋 Hi${msg.from?.first_name ? ' ' + msg.from.first_name : ''}!\n\nYour Telegram chat ID is:\n\`${chatId}\`\n\nShare this number with the Bitcoin Review admin to receive notifications.`;
-        await telegram.sendMessage(chatId, reply);
+        const firstName = msg.from?.first_name || '';
+
+        // Handle /start command (may include invite PIN)
+        if (text.startsWith('/start')) {
+            const pin = text.split(' ')[1] || '';
+
+            if (pin) {
+                // Validate invite PIN against stored pending invites
+                const pendingRaw = db.getSetting('telegram_invite_pins') || '{}';
+                let pending = {};
+                try { pending = JSON.parse(pendingRaw); } catch(e) {}
+
+                if (pending[pin] && pending[pin].expires > Date.now()) {
+                    // Valid PIN — auto-register this chat ID as an admin
+                    const extraRaw = db.getSetting('extra_telegram_chats') || '';
+                    const extra = extraRaw.split(',').map(s => s.trim()).filter(Boolean);
+                    if (!extra.includes(chatId) && chatId !== process.env.TELEGRAM_CHAT_ID) {
+                        extra.push(chatId);
+                        db.setSetting('extra_telegram_chats', extra.join(','));
+                    }
+                    // Remove used PIN
+                    delete pending[pin];
+                    db.setSetting('telegram_invite_pins', JSON.stringify(pending));
+
+                    await telegram.sendMessage(chatId,
+                        `✅ *Welcome${firstName ? ', ' + firstName : ''}!*\n\nYou've been added as a Bitcoin Review admin.\n\nYou'll now receive notifications for new reviews and raffle events.\n\nYour chat ID: \`${chatId}\``
+                    );
+                } else {
+                    // Invalid or expired PIN — just reply with chat ID
+                    await telegram.sendMessage(chatId,
+                        `👋 Hi${firstName ? ' ' + firstName : ''}!\n\nThis invite link is invalid or has expired.\n\nAsk the admin to generate a new one.`
+                    );
+                }
+            } else {
+                // Plain /start with no PIN — reply with chat ID
+                await telegram.sendMessage(chatId,
+                    `👋 Hi${firstName ? ' ' + firstName : ''}!\n\nYour Telegram chat ID is:\n\`${chatId}\`\n\nShare this with the Bitcoin Review admin to receive notifications.`
+                );
+            }
+        } else {
+            // Any other message — reply with chat ID
+            await telegram.sendMessage(chatId,
+                `👋 Hi${firstName ? ' ' + firstName : ''}!\n\nYour Telegram chat ID is:\n\`${chatId}\`\n\nShare this with the Bitcoin Review admin to receive notifications.`
+            );
+        }
     } catch (e) {
         console.error('Telegram webhook error:', e.message);
     }

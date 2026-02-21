@@ -611,6 +611,36 @@ router.post('/tickets/:id/feature', (req, res) => {
 });
 
 /**
+ * POST /admin/telegram/invite
+ * Generate a one-time invite link (expires in 24h)
+ */
+router.post('/telegram/invite', (req, res) => {
+    try {
+        const pin = Math.random().toString(36).substring(2, 10).toUpperCase();
+        const expires = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+
+        const pendingRaw = db.getSetting('telegram_invite_pins') || '{}';
+        let pending = {};
+        try { pending = JSON.parse(pendingRaw); } catch(e) {}
+
+        // Prune expired pins
+        for (const [k, v] of Object.entries(pending)) {
+            if (v.expires < Date.now()) delete pending[k];
+        }
+
+        pending[pin] = { expires, createdAt: Date.now() };
+        db.setSetting('telegram_invite_pins', JSON.stringify(pending));
+
+        const botUsername = 'CoraTelegramBot';
+        const inviteLink = `https://t.me/${botUsername}?start=${pin}`;
+
+        res.json({ success: true, inviteLink, pin, expiresAt: new Date(expires).toISOString() });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to generate invite link' });
+    }
+});
+
+/**
  * GET /admin/telegram/chats
  * Get all configured admin Telegram chat IDs
  */
