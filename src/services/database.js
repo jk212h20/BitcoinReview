@@ -112,6 +112,16 @@ async function initializeDatabase() {
         } else {
             console.log('✅ merchant_name column confirmed present');
         }
+
+        // Test that merchant_name is actually writable
+        db.run(`CREATE TABLE IF NOT EXISTS _merchant_test (id INTEGER PRIMARY KEY, val TEXT)`);
+        db.run(`INSERT OR REPLACE INTO _merchant_test (id, val) SELECT 1, merchant_name FROM tickets WHERE merchant_name IS NOT NULL LIMIT 1`);
+        const testResult = db.exec(`SELECT merchant_name FROM tickets WHERE merchant_name IS NOT NULL LIMIT 1`);
+        if (testResult && testResult[0] && testResult[0].values.length > 0) {
+            console.log('✅ merchant_name readable from existing rows:', testResult[0].values[0][0]);
+        } else {
+            console.log('ℹ️  No tickets with merchant_name yet (expected for fresh DB)');
+        }
     } catch (e) {
         console.error('Schema check error:', e.message);
     }
@@ -294,10 +304,17 @@ function getUserCount() {
 
 // Ticket functions
 function createTicket(userId, reviewLink, reviewText, merchantName, raffleBlock) {
+    console.log(`[createTicket] merchantName param: ${JSON.stringify(merchantName)}`);
     const id = run(
         `INSERT INTO tickets (user_id, review_link, review_text, merchant_name, raffle_block) VALUES (?, ?, ?, ?, ?)`,
         [userId, reviewLink, reviewText, merchantName, raffleBlock]
     );
+    console.log(`[createTicket] inserted id=${id}`);
+    // Verify the insert actually saved merchant_name
+    if (id) {
+        const saved = queryOne(`SELECT merchant_name FROM tickets WHERE id = ?`, [id]);
+        console.log(`[createTicket] merchant_name saved in DB: ${JSON.stringify(saved ? saved.merchant_name : 'NULL - row not found')}`);
+    }
     return { id };
 }
 
