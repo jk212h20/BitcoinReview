@@ -217,7 +217,8 @@ router.post('/raffle/run', async (req, res) => {
         // Notify admin via Telegram
         telegram.notifyRaffleResult(
             { block_height: blockHeight, total_tickets: tickets.length, prize_amount_sats: prizeSats },
-            winningTicket
+            winningTicket,
+            db
         ).catch(err => console.error('Telegram raffle notify error:', err));
         
         // Send winner email
@@ -464,6 +465,10 @@ router.get('/tickets/:id/quick-approve', tokenAuth, (req, res) => {
         }
         
         db.validateTicket(parseInt(id), true, 'Approved via Telegram');
+
+        // Notify other admins of the decision (non-blocking)
+        const updatedTicket = db.getTicketById(parseInt(id));
+        telegram.notifyTicketDecision(updatedTicket || ticket, true, null, db).catch(() => {});
         
         const merchant = ticket.merchant_name || 'Unknown merchant';
         res.send(`
@@ -504,6 +509,10 @@ router.get('/tickets/:id/quick-reject', tokenAuth, (req, res) => {
         }
         
         db.validateTicket(parseInt(id), false, 'Rejected via Telegram');
+
+        // Notify other admins of the decision (non-blocking)
+        const updatedTicket = db.getTicketById(parseInt(id));
+        telegram.notifyTicketDecision(updatedTicket || ticket, false, 'Rejected via Telegram', db).catch(() => {});
         
         const merchant = ticket.merchant_name || 'Unknown merchant';
         res.send(`

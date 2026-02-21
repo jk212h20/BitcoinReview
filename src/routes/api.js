@@ -162,7 +162,7 @@ router.post('/submit', async (req, res) => {
             
             // Send Telegram notification to admin (non-blocking)
             const createdTicket = db.getTicketById(ticket.id);
-            telegram.notifyNewReview(createdTicket || { id: ticket.id, review_link: cleanReview, review_text: cleanReviewText, merchant_name: null }, user).catch(err => {
+            telegram.notifyNewReview(createdTicket || { id: ticket.id, review_link: cleanReview, review_text: cleanReviewText, merchant_name: null }, user, db).catch(err => {
                 console.error('Failed to send Telegram notification:', err);
             });
         }
