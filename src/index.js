@@ -57,6 +57,24 @@ app.use('/api', apiRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/', pageRoutes);
 
+// Telegram webhook — bot replies to any message with the sender's chat ID
+// This lets new admins find their ID by simply messaging @CoraTelegramBot
+app.post('/telegram/webhook', express.json(), async (req, res) => {
+    res.sendStatus(200); // Always ack immediately
+    try {
+        const update = req.body;
+        const msg = update.message || update.edited_message;
+        if (!msg) return;
+        const chatId = String(msg.chat.id);
+        const text = (msg.text || '').trim();
+        // Reply with their chat ID
+        const reply = `👋 Hi${msg.from?.first_name ? ' ' + msg.from.first_name : ''}!\n\nYour Telegram chat ID is:\n\`${chatId}\`\n\nShare this number with the Bitcoin Review admin to receive notifications.`;
+        await telegram.sendMessage(chatId, reply);
+    } catch (e) {
+        console.error('Telegram webhook error:', e.message);
+    }
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
     console.error('Error:', err);
