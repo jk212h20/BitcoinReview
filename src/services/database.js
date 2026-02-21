@@ -99,7 +99,21 @@ async function initializeDatabase() {
         db.run(`ALTER TABLE tickets ADD COLUMN merchant_name TEXT`);
         console.log('✅ Added merchant_name column to tickets');
     } catch (e) {
-        // Column already exists — that's fine
+        console.log('ℹ️  merchant_name column already exists (or error):', e.message);
+    }
+
+    // Verify merchant_name column exists by checking schema
+    try {
+        const cols = db.exec(`PRAGMA table_info(tickets)`);
+        const colNames = cols[0] ? cols[0].values.map(r => r[1]) : [];
+        console.log('📋 tickets columns:', colNames.join(', '));
+        if (!colNames.includes('merchant_name')) {
+            console.error('❌ CRITICAL: merchant_name column still missing after migration!');
+        } else {
+            console.log('✅ merchant_name column confirmed present');
+        }
+    } catch (e) {
+        console.error('Schema check error:', e.message);
     }
 
     // Add is_featured column to tickets if it doesn't exist (migration for existing DBs)
