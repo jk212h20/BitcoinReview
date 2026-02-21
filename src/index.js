@@ -62,6 +62,45 @@ app.post('/telegram/webhook', express.json(), async (req, res) => {
     res.sendStatus(200); // Always ack immediately
     try {
         const update = req.body;
+
+        // Handle inline button callbacks (e.g. unsubscribe button)
+        if (update.callback_query) {
+            const cb = update.callback_query;
+            const cbChatId = String(cb.message.chat.id);
+            const data = cb.data || '';
+            const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+
+            if (data.startsWith('unsub_')) {
+                const targetId = data.replace('unsub_', '');
+                if (targetId === cbChatId) {
+                    // Remove from extra chats
+                    const extraRaw = db.getSetting('extra_telegram_chats') || '';
+                    const extra = extraRaw.split(',').map(s => s.trim()).filter(Boolean).filter(id => id !== cbChatId);
+                    db.setSetting('extra_telegram_chats', extra.join(','));
+
+                    // Answer the callback (removes loading spinner)
+                    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerCallbackQuery`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ callback_query_id: cb.id, text: 'Removed ✓' })
+                    });
+
+                    // Edit the original message to confirm
+                    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/editMessageText`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            chat_id: cbChatId,
+                            message_id: cb.message.message_id,
+                            text: `🔕 *Done* — you've been removed from Bitcoin Review admin notifications.\n\nYou can be re-added by the admin at any time.`,
+                            parse_mode: 'Markdown'
+                        })
+                    });
+                }
+            }
+            return;
+        }
+
         const msg = update.message || update.edited_message;
         if (!msg) return;
         const chatId = String(msg.chat.id);
@@ -79,13 +118,34 @@ app.post('/telegram/webhook', express.json(), async (req, res) => {
                 try { pending = JSON.parse(pendingRaw); } catch(e) {}
 
                 if (pending[pin] && pending[pin].expires > Date.now()) {
-                    // Valid PIN — auto-register this chat ID as an admin
+                    // Valid PIN — check if already registered
                     const extraRaw = db.getSetting('extra_telegram_chats') || '';
                     const extra = extraRaw.split(',').map(s => s.trim()).filter(Boolean);
-                    if (!extra.includes(chatId) && chatId !== process.env.TELEGRAM_CHAT_ID) {
-                        extra.push(chatId);
-                        db.setSetting('extra_telegram_chats', extra.join(','));
+                    const alreadyAdmin = extra.includes(chatId) || chatId === process.env.TELEGRAM_CHAT_ID;
+
+                    if (alreadyAdmin) {
+                        // Already registered — tell them and offer unsubscribe button
+                        const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+                        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                chat_id: chatId,
+                                text: `ℹ️ *You're already signed up for admin alerts${firstName ? ', ' + firstName : ''}!*\n\nYou currently receive Bitcoin Review notifications.\n\nWould you like to stop receiving them?`,
+                                parse_mode: 'Markdown',
+                                reply_markup: {
+                                    inline_keyboard: [[
+                                        { text: '🔕 Stop notifications', callback_data: `unsub_${chatId}` }
+                                    ]]
+                                }
+                            })
+                        });
+                        return;
                     }
+
+                    extra.push(chatId);
+                    db.setSetting('extra_telegram_chats', extra.join(','));
+
                     // Remove used PIN
                     delete pending[pin];
                     db.setSetting('telegram_invite_pins', JSON.stringify(pending));
