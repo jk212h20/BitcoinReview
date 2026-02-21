@@ -64,11 +64,41 @@ router.post('/submit', async (req, res) => {
         if (hasReview) {
             const link = reviewLink.trim();
             // Accept any Google Maps/review-like URL
-            const isValidLink = /google\.com\/maps|maps\.app\.goo\.gl|g\.page|goo\.gl\/maps/.test(link);
+            // Allowed major review platforms (when review_link_mode = 'all')
+            const TRUSTED_REVIEW_DOMAINS = [
+                /google\.com\/maps/,
+                /maps\.app\.goo\.gl/,
+                /g\.page/,
+                /goo\.gl\/maps/,
+                /yelp\.com\/biz/,
+                /tripadvisor\.com/,
+                /trustpilot\.com\/review/,
+                /facebook\.com\/.+\/reviews/,
+                /foursquare\.com/,
+                /opentable\.com/,
+                /zomato\.com/,
+                /yellowpages\.com/,
+                /bbb\.org/,
+                /glassdoor\.com/,
+                /indeed\.com\/cmp/,
+                /apple\.com\/maps/,
+                /maps\.apple\.com/
+            ];
+
+            const reviewLinkMode = db.getSetting('review_link_mode') || 'google';
+            let isValidLink;
+            if (reviewLinkMode === 'google') {
+                isValidLink = /google\.com\/maps|maps\.app\.goo\.gl|g\.page|goo\.gl\/maps/.test(link);
+            } else {
+                // 'all' mode — must match a trusted review domain
+                isValidLink = TRUSTED_REVIEW_DOMAINS.some(pattern => pattern.test(link));
+            }
             if (!isValidLink) {
                 return res.status(400).json({
                     success: false,
-                    error: 'Please provide a valid Google Maps or Google Reviews link'
+                    error: reviewLinkMode === 'google'
+                        ? 'Please provide a valid Google Maps or Google Reviews link'
+                        : 'Please provide a review link from a major review platform (Google, Yelp, TripAdvisor, Trustpilot, etc.)'
                 });
             }
         }

@@ -100,12 +100,20 @@
             <h2 class="text-xl font-bold mb-4">⚙️ Settings</h2>
             <div class="grid md:grid-cols-2 gap-6">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Review Mode</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Review Approval</label>
                     <select x-model="reviewMode" @change="saveSettings()" class="w-full px-4 py-2 border rounded-lg">
                         <option value="manual_review">Manual Review (admin approves each ticket)</option>
                         <option value="auto_approve">Auto-Approve (all submissions auto-validated)</option>
                     </select>
                     <p class="text-xs text-gray-500 mt-1" x-text="reviewMode === 'auto_approve' ? 'All new submissions will be auto-approved.' : 'New submissions require admin approval.'"></p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Accepted Review Links</label>
+                    <select x-model="reviewLinkMode" @change="saveSettings()" class="w-full px-4 py-2 border rounded-lg">
+                        <option value="google">Google Only (Google Maps / Google Reviews)</option>
+                        <option value="all">All Major Platforms (Google, Yelp, TripAdvisor, Trustpilot, etc.)</option>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1" x-text="reviewLinkMode === 'google' ? 'Only Google Maps links accepted.' : 'Accepts links from Google, Yelp, TripAdvisor, Trustpilot, Facebook, Apple Maps, and more. Trap/unknown sites are still blocked.'"></p>
                 </div>
             </div>
             <div x-show="settingsMsg" x-cloak class="mt-3 text-sm text-green-600" x-text="settingsMsg"></div>
@@ -605,11 +613,17 @@ function telegramPanel(pw) {
 function settingsPanel(pw) {
     return {
         reviewMode: 'manual_review',
+        reviewLinkMode: 'google',
         settingsMsg: '',
         init() {
             fetch('/api/admin/settings', { headers: { 'X-Admin-Password': pw } })
                 .then(r => r.json())
-                .then(d => { if (d.success && d.settings) { this.reviewMode = d.settings.review_mode || 'manual_review'; } })
+                .then(d => {
+                    if (d.success && d.settings) {
+                        this.reviewMode = d.settings.review_mode || 'manual_review';
+                        this.reviewLinkMode = d.settings.review_link_mode || 'google';
+                    }
+                })
                 .catch(() => {});
         },
         async saveSettings() {
@@ -618,7 +632,7 @@ function settingsPanel(pw) {
                 const response = await fetch('/api/admin/settings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-Admin-Password': pw },
-                    body: JSON.stringify({ settings: { review_mode: this.reviewMode } })
+                    body: JSON.stringify({ settings: { review_mode: this.reviewMode, review_link_mode: this.reviewLinkMode } })
                 });
                 const data = await response.json();
                 if (data.success) this.settingsMsg = 'Settings saved!';

@@ -105,6 +105,7 @@ async function initializeDatabase() {
     // Insert default settings if they don't exist
     const defaultSettings = [
         ['review_mode', 'manual_review'],       // 'auto_approve' or 'manual_review'
+        ['review_link_mode', 'google'],         // 'google' or 'all' (all = major review sites)
         ['google_api_key', ''],
         ['raffle_auto_trigger', 'false'],        // 'true' or 'false'
         ['raffle_warning_sent_block', '0'],      // block number of last sent 144-warning

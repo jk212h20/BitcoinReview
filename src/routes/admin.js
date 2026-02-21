@@ -561,7 +561,7 @@ router.post('/settings', (req, res) => {
         }
         
         const allowedKeys = [
-            'review_mode', 'google_api_key',
+            'review_mode', 'review_link_mode', 'google_api_key',
             'raffle_auto_trigger'
         ];
         
