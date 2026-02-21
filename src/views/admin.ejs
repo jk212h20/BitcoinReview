@@ -111,6 +111,49 @@
             <div x-show="settingsMsg" x-cloak class="mt-3 text-sm text-green-600" x-text="settingsMsg"></div>
         </div>
         
+        <!-- Telegram Setup -->
+        <div class="bg-white rounded-lg p-6 shadow-sm mb-8" x-data="telegramPanel()">
+            <h2 class="text-xl font-bold mb-1">📱 Telegram Notifications</h2>
+            <p class="text-sm text-gray-500 mb-4">Admin Telegram chat IDs receive new review alerts and raffle notifications.</p>
+            
+            <!-- Current chats -->
+            <div class="mb-4">
+                <div class="text-sm font-medium text-gray-700 mb-2">Active admin chats:</div>
+                <template x-if="chatsLoading"><div class="text-gray-400 text-sm">Loading...</div></template>
+                <template x-if="!chatsLoading && allChats.length === 0">
+                    <div class="text-yellow-600 text-sm">⚠️ No Telegram chat IDs configured yet.</div>
+                </template>
+                <div class="space-y-2">
+                    <template x-for="chat in allChats" :key="chat">
+                        <div class="flex items-center justify-between bg-gray-50 rounded px-3 py-2 text-sm">
+                            <span class="font-mono" x-text="chat + (chat === primaryChat ? ' (primary)' : '')"></span>
+                            <button x-show="chat !== primaryChat" @click="removeChat(chat)"
+                                class="text-red-500 hover:text-red-700 text-xs">Remove</button>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Add chat ID -->
+            <div class="flex gap-2">
+                <input 
+                    type="text" 
+                    x-model="newChatId"
+                    placeholder="Your Telegram chat ID (e.g. 123456789)"
+                    class="flex-1 px-3 py-2 border rounded-lg text-sm"
+                    @keydown.enter="addChat()"
+                >
+                <button @click="addChat()" :disabled="telegramLoading"
+                    class="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-600 disabled:opacity-50 whitespace-nowrap">
+                    Add &amp; Test
+                </button>
+            </div>
+            <p class="text-xs text-gray-400 mt-1">
+                Don't know your chat ID? Message <a href="https://t.me/userinfobot" target="_blank" class="text-blue-500 underline">@userinfobot</a> on Telegram — it replies with your numeric ID.
+            </p>
+            <div x-show="telegramMsg" x-cloak class="mt-2 text-sm" :class="telegramOk ? 'text-green-600' : 'text-red-600'" x-text="telegramMsg"></div>
+        </div>
+
         <!-- Run Raffle -->
         <div class="bg-white rounded-lg p-6 shadow-sm mb-8">
             <h2 class="text-xl font-bold mb-4">Run Raffle</h2>
@@ -437,6 +480,80 @@ function adminDashboard() {
                 if (data.success) return data.validation;
                 else { alert(data.error); return null; }
             } catch (error) { alert('Error: ' + error.message); return null; }
+        }
+    }
+}
+
+function telegramPanel() {
+    const pw = document.querySelector('[x-data*="adminDashboard"]')?.__x?.$data?.password || '';
+    return {
+        allChats: [],
+        primaryChat: '',
+        newChatId: '',
+        chatsLoading: true,
+        telegramLoading: false,
+        telegramMsg: '',
+        telegramOk: true,
+        init() {
+            fetch('/api/admin/telegram/chats', { headers: { 'X-Admin-Password': pw } })
+                .then(r => r.json())
+                .then(d => {
+                    if (d.success) {
+                        this.allChats = d.chats.all || [];
+                        this.primaryChat = d.chats.primary || '';
+                    }
+                    this.chatsLoading = false;
+                })
+                .catch(() => { this.chatsLoading = false; });
+        },
+        async addChat() {
+            const id = this.newChatId.trim();
+            if (!id) return;
+            this.telegramLoading = true;
+            this.telegramMsg = '';
+            try {
+                const r = await fetch('/api/admin/telegram/chats', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Admin-Password': pw },
+                    body: JSON.stringify({ chatId: id })
+                });
+                const d = await r.json();
+                if (d.success) {
+                    this.telegramOk = true;
+                    this.telegramMsg = '✅ Added! A test message was sent to that chat.';
+                    this.newChatId = '';
+                    if (!this.allChats.includes(id)) this.allChats.push(id);
+                } else {
+                    this.telegramOk = false;
+                    this.telegramMsg = '❌ ' + d.error;
+                }
+            } catch(e) {
+                this.telegramOk = false;
+                this.telegramMsg = '❌ Error: ' + e.message;
+            }
+            this.telegramLoading = false;
+        },
+        async removeChat(chatId) {
+            if (!confirm('Remove chat ID ' + chatId + '?')) return;
+            try {
+                const r = await fetch('/api/admin/telegram/chats/' + chatId, {
+                    method: 'DELETE',
+                    headers: { 'X-Admin-Password': pw }
+                });
+                const d = await r.json();
+                if (d.success) {
+                    this.allChats = this.allChats.filter(c => c !== chatId);
+                    this.telegramOk = true;
+                    this.telegramMsg = 'Removed.';
+                    setTimeout(() => this.telegramMsg = '', 2000);
+                } else {
+                    this.telegramOk = false;
+                    this.telegramMsg = '❌ ' + d.error;
+                }
+            } catch(e) {
+                this.telegramOk = false;
+                this.telegramMsg = '❌ Error: ' + e.message;
+            }
         }
     }
 }
