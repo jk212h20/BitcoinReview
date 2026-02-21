@@ -138,7 +138,8 @@ function getAdminChatIds(dbModule) {
 
 /**
  * Notify all admins about a new review submission.
- * No quiet hours for review submissions (admin wants to know immediately).
+ * During quiet hours (6pm–9am), reviews are queued and a single summary
+ * is sent at 9am instead of individual notifications.
  * @param {Object} ticket - ticket record
  * @param {Object} user - user record (may be null for anonymous)
  * @param {Object} [dbModule] - database module (to get extra admin chat IDs)
@@ -147,6 +148,18 @@ async function notifyNewReview(ticket, user, dbModule) {
     const chatIds = getAdminChatIds(dbModule);
     if (chatIds.length === 0) {
         console.warn('⚠️  Telegram: no admin chat IDs configured');
+        return;
+    }
+
+    // During quiet hours, just increment a counter — summary sent at 9am
+    if (isQuietHours()) {
+        if (dbModule) {
+            try {
+                const count = parseInt(dbModule.getSetting('quiet_hours_review_count') || '0', 10);
+                dbModule.setSetting('quiet_hours_review_count', String(count + 1));
+                console.log(`📵 Review notification queued (quiet hours). ${count + 1} pending.`);
+            } catch (e) {}
+        }
         return;
     }
 
@@ -335,25 +348,47 @@ async function deliverPendingNotifications(dbModule) {
     if (!dbModule) return;
     if (isQuietHours()) return; // Still in quiet hours
 
+    // 1. Deliver any held raffle/system messages
     try {
         const pending = dbModule.getSetting('pending_telegram_message');
-        if (!pending) return;
-
-        const { chatIds, message } = JSON.parse(pending);
-        console.log('📬 Delivering held Telegram notification (quiet hours ended)');
-
-        for (const chatId of chatIds) {
-            try {
-                await sendMessage(chatId, message);
-            } catch (e) {
-                console.error(`Failed to deliver held notification to ${chatId}:`, e.message);
+        if (pending) {
+            const { chatIds, message } = JSON.parse(pending);
+            console.log('📬 Delivering held Telegram notification (quiet hours ended)');
+            for (const chatId of chatIds) {
+                try { await sendMessage(chatId, message); } catch (e) {
+                    console.error(`Failed to deliver held notification to ${chatId}:`, e.message);
+                }
             }
+            dbModule.setSetting('pending_telegram_message', '');
         }
-
-        // Clear the pending message
-        dbModule.setSetting('pending_telegram_message', '');
     } catch (e) {
         console.error('Error delivering pending notifications:', e.message);
+    }
+
+    // 2. Send a summary of reviews that came in overnight
+    try {
+        const queuedCount = parseInt(dbModule.getSetting('quiet_hours_review_count') || '0', 10);
+        if (queuedCount > 0) {
+            const chatIds = getAdminChatIds(dbModule);
+            const approveToken = process.env.TELEGRAM_APPROVE_TOKEN;
+            const pendingTickets = dbModule.getPendingTickets ? dbModule.getPendingTickets() : [];
+            const pendingCount = pendingTickets.length;
+
+            let message = `☀️ *Good morning!*\n\n`;
+            message += `${queuedCount} review${queuedCount > 1 ? 's' : ''} submitted overnight.\n`;
+            message += `${pendingCount} review${pendingCount !== 1 ? 's' : ''} pending approval.\n\n`;
+            message += `[👉 Review them now](${BASE_URL}/admin?password=${approveToken || ''})`;
+
+            console.log(`📬 Sending morning review summary: ${queuedCount} overnight, ${pendingCount} pending`);
+            for (const chatId of chatIds) {
+                try { await sendMessage(chatId, message); } catch (e) {
+                    console.error(`Failed to send morning summary to ${chatId}:`, e.message);
+                }
+            }
+            dbModule.setSetting('quiet_hours_review_count', '0');
+        }
+    } catch (e) {
+        console.error('Error sending morning review summary:', e.message);
     }
 }
 
