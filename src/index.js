@@ -1,5 +1,6 @@
 /**
  * Bitcoin Review Raffle - Main Application
+ * Build: 2026-02-20b
  */
 
 require('dotenv').config();
