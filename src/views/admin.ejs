@@ -145,13 +145,14 @@
                     </button>
                     <span x-show="inviteLink" x-cloak class="text-xs text-gray-500">Expires in 24h — single use</span>
                 </div>
-                <div x-show="inviteLink" x-cloak class="mt-2 flex gap-2 items-center">
-                    <input type="text" :value="inviteLink" readonly
-                        class="flex-1 px-3 py-1.5 border rounded text-xs font-mono bg-white"
-                        @click="$el.select()">
+                <div x-show="inviteLink" x-cloak class="mt-2 flex gap-2 flex-wrap items-center">
+                    <a :href="inviteLink" target="_blank"
+                        class="inline-flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-600">
+                        📲 Open Invite in Telegram
+                    </a>
                     <button @click="copyInvite()"
-                        class="bg-gray-200 hover:bg-gray-300 px-3 py-1.5 rounded text-xs font-medium whitespace-nowrap"
-                        x-text="copied ? '✅ Copied!' : 'Copy'"></button>
+                        class="bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap"
+                        x-text="copied ? '✅ Copied!' : '🔗 Copy link'"></button>
                 </div>
             </div>
 
