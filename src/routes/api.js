@@ -480,4 +480,13 @@ router.post('/generate-invoice', async (req, res) => {
     }
 });
 
+/**
+ * GET /api/health
+ * Lightweight health check - no external dependencies
+ * Used by Railway to confirm the server is up
+ */
+router.get('/health', (req, res) => {
+    res.json({ ok: true, ts: Date.now() });
+});
+
 module.exports = router;
