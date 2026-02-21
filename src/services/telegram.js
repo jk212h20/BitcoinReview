@@ -157,8 +157,13 @@ async function notifyNewReview(ticket, user, dbModule) {
         ? escapeMarkdown(maskEmail(user.email))
         : (user && user.lnurl_address ? `⚡ ${escapeMarkdown(user.lnurl_address)}` : '_Anonymous_');
 
+    const triedBtc = ticket.tried_bitcoin === 1 ? '✅ Yes' : (ticket.tried_bitcoin === 0 ? '❌ No' : '❓ N/A');
+    const acceptedBtc = ticket.merchant_accepted === 1 ? '✅ Yes' : (ticket.merchant_accepted === 0 ? '❌ No' : '❓ N/A');
+
     let message = `🔔 *New Review Submitted*\n\n`;
     message += `Merchant: ${merchantDisplay}\n`;
+    message += `Tried Bitcoin: ${triedBtc}\n`;
+    message += `Merchant Accepted: ${acceptedBtc}\n`;
     message += `Submitted by: ${submitterDisplay}\n`;
     message += `Review Link: [Open Review](${ticket.review_link})\n`;
 

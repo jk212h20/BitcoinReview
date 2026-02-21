@@ -21,7 +21,7 @@ const telegram = require('../services/telegram');
  */
 router.post('/submit', async (req, res) => {
     try {
-        const { email: userEmail, lnurl, reviewLink, reviewText } = req.body;
+        const { email: userEmail, lnurl, reviewLink, reviewText, triedBitcoin, merchantAccepted } = req.body;
         
         const hasEmail = userEmail && userEmail.trim().length > 0;
         const hasLnurl = lnurl && lnurl.trim().length > 0;
@@ -48,6 +48,20 @@ router.post('/submit', async (req, res) => {
             return res.status(400).json({
                 success: false,
                 error: 'Please provide your Lightning address'
+            });
+        }
+        
+        // Bitcoin experience questions are required
+        if (triedBitcoin === undefined || triedBitcoin === null) {
+            return res.status(400).json({
+                success: false,
+                error: 'Please answer: Did you try to use Bitcoin?'
+            });
+        }
+        if (merchantAccepted === undefined || merchantAccepted === null) {
+            return res.status(400).json({
+                success: false,
+                error: 'Please answer: Did the merchant accept Bitcoin?'
             });
         }
         
@@ -175,7 +189,9 @@ router.post('/submit', async (req, res) => {
                 cleanReview,
                 cleanReviewText,
                 cleanMerchantName,
-                raffleBlock
+                raffleBlock,
+                !!triedBitcoin,
+                !!merchantAccepted
             );
             
             // Check review_mode setting to determine validation behavior

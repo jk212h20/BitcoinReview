@@ -102,6 +102,16 @@ async function initializeDatabase() {
         // Column already exists — that's fine
     }
 
+    // Add tried_bitcoin and merchant_accepted columns (migration for existing DBs)
+    try {
+        db.run(`ALTER TABLE tickets ADD COLUMN tried_bitcoin INTEGER`);
+        console.log('✅ Added tried_bitcoin column to tickets');
+    } catch (e) { /* already exists */ }
+    try {
+        db.run(`ALTER TABLE tickets ADD COLUMN merchant_accepted INTEGER`);
+        console.log('✅ Added merchant_accepted column to tickets');
+    } catch (e) { /* already exists */ }
+
     // Add is_featured column to tickets if it doesn't exist (migration for existing DBs)
     try {
         db.run(`ALTER TABLE tickets ADD COLUMN is_featured INTEGER DEFAULT 0`);
@@ -281,10 +291,10 @@ function getUserCount() {
 }
 
 // Ticket functions
-function createTicket(userId, reviewLink, reviewText, merchantName, raffleBlock) {
+function createTicket(userId, reviewLink, reviewText, merchantName, raffleBlock, triedBitcoin, merchantAccepted) {
     const id = run(
-        `INSERT INTO tickets (user_id, review_link, review_text, merchant_name, raffle_block) VALUES (?, ?, ?, ?, ?)`,
-        [userId, reviewLink, reviewText, merchantName, raffleBlock]
+        `INSERT INTO tickets (user_id, review_link, review_text, merchant_name, raffle_block, tried_bitcoin, merchant_accepted) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [userId, reviewLink, reviewText, merchantName, raffleBlock, triedBitcoin ? 1 : 0, merchantAccepted ? 1 : 0]
     );
     return { id };
 }
