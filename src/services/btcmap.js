@@ -182,9 +182,9 @@ function isValidBitcoinMerchant(merchant) {
     const hasOnchain = tags['payment:onchain'] === 'yes' || tags['payment:bitcoin'] === 'yes';
     if (!hasLightning && !hasOnchain) return false;
     
-    // Must have a recent survey/check date (within 1 year)
+    // Must have a recent survey/check date (within 2 years)
     const oneYearAgo = new Date();
-    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 2);
     
     const surveyDate = tags['survey:date'] ? new Date(tags['survey:date']) : null;
     const checkDate = tags['check_date:currency:XBT'] ? new Date(tags['check_date:currency:XBT']) : null;
