@@ -10,10 +10,18 @@ if (!fs.existsSync(dataDir)) {
 
 const dbPath = process.env.DATABASE_PATH || path.join(dataDir, 'reviews.db');
 
+// Ensure the directory for the database file exists
+const dbDir = path.dirname(dbPath);
+if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
+}
+
 let db = null;
 
 // Initialize database
 async function initializeDatabase() {
+    console.log(`📂 Database path: ${dbPath}`);
+    console.log(`📂 Database directory: ${dbDir} (exists: ${fs.existsSync(dbDir)})`);
     const SQL = await initSqlJs();
     
     // Load existing database or create new one
