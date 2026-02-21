@@ -4,6 +4,8 @@
   "description": "Raffle system for Bitcoin review incentives in Roatan",
   "main": "src/index.js",
   "scripts": {
+    "build:css": "tailwindcss -i src/styles/input.css -o public/styles.css --minify",
+    "build": "npm run build:css",
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "db:init": "node src/scripts/init-db.js",
@@ -32,5 +34,8 @@
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.19"
   }
 }

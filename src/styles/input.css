@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom utilities that Tailwind can't generate */
+[x-cloak] { display: none !important; }
+.bitcoin-orange { color: #f7931a; }
+.bg-bitcoin-orange { background-color: #f7931a; }
+.border-bitcoin-orange { border-color: #f7931a; }

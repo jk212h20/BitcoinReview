@@ -2,23 +2,24 @@
 
 ## Current Focus (Updated 2026-02-21)
 
-### Session 17: Database persistence fix — Railway volume
+### Session 18: Fix Telegram links broken in Safari (reload loop)
 
-**Problem:** Database was being wiped on every deploy. `DATABASE_PATH` was set to `./data/reviews.db` (ephemeral app filesystem) instead of `/data/reviews.db` (persistent Railway volume).
+**Problem:** Approve/View links from Telegram opened in Safari but got stuck in a reload loop (401 auth failure → login page → loop).
 
-**Fix:**
-- Volume `web-volume` already existed, mounted at `/data` on Railway
-- Changed `DATABASE_PATH` env var from `./data/reviews.db` → `/data/reviews.db` via `railway variables set`
-- Added startup log to `database.js` to confirm DB path on boot
-- Commit: `a477abc`
+**Root cause:** Telegram's Markdown parser was corrupting URLs containing the 64-char `TELEGRAM_APPROVE_TOKEN`. Underscores and other chars in the hex token were interpreted as Markdown italic/bold markers, truncating the URL. The token in the URL didn't match the env var, causing 401 → login page.
 
-**Confirmed working:** Deploy logs show `📂 Database path: /data/reviews.db` and `📂 Database directory: /data (exists: true)`
+**Fix (commit `456b26d`):**
+- Switched ALL Telegram messages from `parse_mode: 'Markdown'` to `parse_mode: 'HTML'`
+  - `*bold*` → `<b>bold</b>`, `_italic_` → `<i>italic</i>`, `` `code` `` → `<code>code</code>`
+  - `[text](url)` → `<a href="url">text</a>` — HTML doesn't corrupt URLs
+- Added `escapeHtml()` helper for safe content in HTML mode
+- "View in Admin" link now uses `?token=` instead of `?password=` param
+- `pages.js` route updated to accept both `?token=` and `?password=` query params
+- `index.js` webhook messages also converted to HTML
 
-**Note:** Previous review data is lost (was in ephemeral containers). Fresh DB on the volume going forward.
-
-### Previous: Session 16 — sql.js last_insert_rowid fix
-- `db.export()` resets `last_insert_rowid()` — moved ID read before `saveDatabase()` in `run()` helper
-- Commit: `a26adb3`
+### Previous sessions:
+- **Session 17:** DB persistence fix — `DATABASE_PATH` → `/data/reviews.db` (Railway volume). Commit: `a477abc`
+- **Session 16:** sql.js `last_insert_rowid` fix — read ID before `saveDatabase()`. Commit: `a26adb3`
 
 ## Telegram Review Flow (Complete)
 When a review is submitted:
@@ -27,7 +28,7 @@ When a review is submitted:
    - Merchant name + submitter (masked email/LN address)
    - Review text preview (first 200 chars)
    - `[Open Review]` → Google Maps URL
-   - `[👁 View in Admin]` → `/admin/review/:id?password=TOKEN` (mobile approve page)
+   - `[👁 View in Admin]` → `/admin/review/:id?token=TOKEN` (mobile approve page)
    - `[✅ Approve]` → one-tap GET `/api/admin/tickets/:id/quick-approve?token=TOKEN`
    - `[❌ Reject]` → one-tap GET `/api/admin/tickets/:id/quick-reject?token=TOKEN`
 3. After approve/reject: `notifyTicketDecision` confirms back to all admins
