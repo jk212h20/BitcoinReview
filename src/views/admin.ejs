@@ -96,7 +96,7 @@
         ` : ''}
         
         <!-- Settings Panel -->
-        <div class="bg-white rounded-lg p-6 shadow-sm mb-8" x-data="settingsPanel()">
+        <div class="bg-white rounded-lg p-6 shadow-sm mb-8" x-data="settingsPanel('${typeof password !== 'undefined' ? password : ''}')">
             <h2 class="text-xl font-bold mb-4">⚙️ Settings</h2>
             <div class="grid md:grid-cols-2 gap-6">
                 <div>
@@ -112,7 +112,7 @@
         </div>
         
         <!-- Telegram Setup -->
-        <div class="bg-white rounded-lg p-6 shadow-sm mb-8" x-data="telegramPanel()">
+        <div class="bg-white rounded-lg p-6 shadow-sm mb-8" x-data="telegramPanel('${typeof password !== 'undefined' ? password : ''}')">
             <h2 class="text-xl font-bold mb-1">📱 Telegram Notifications</h2>
             <p class="text-sm text-gray-500 mb-4">Admin Telegram chat IDs receive new review alerts and raffle notifications.</p>
             
@@ -484,8 +484,7 @@ function adminDashboard() {
     }
 }
 
-function telegramPanel() {
-    const pw = document.querySelector('[x-data*="adminDashboard"]')?.__x?.$data?.password || '';
+function telegramPanel(pw) {
     return {
         allChats: [],
         primaryChat: '',
@@ -558,8 +557,7 @@ function telegramPanel() {
     }
 }
 
-function settingsPanel() {
-    const pw = document.querySelector('[x-data*="adminDashboard"]')?.__x?.$data?.password || '';
+function settingsPanel(pw) {
     return {
         reviewMode: 'manual_review',
         settingsMsg: '',
