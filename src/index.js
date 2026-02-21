@@ -151,24 +151,24 @@ app.post('/telegram/webhook', express.json(), async (req, res) => {
                     db.setSetting('telegram_invite_pins', JSON.stringify(pending));
 
                     await telegram.sendMessage(chatId,
-                        `✅ *Welcome${firstName ? ', ' + firstName : ''}!*\n\nYou've been added as a Bitcoin Review admin.\n\nYou'll now receive notifications for new reviews and raffle events.\n\nYour chat ID: \`${chatId}\``
+                        `✅ <b>Welcome${firstName ? ', ' + firstName : ''}!</b>\n\nYou've been added as a Bitcoin Review admin.\n\nYou'll now receive notifications for new reviews and raffle events.\n\nYour chat ID: <code>${chatId}</code>`
                     );
                 } else {
                     // Invalid or expired PIN — just reply with chat ID
                     await telegram.sendMessage(chatId,
-                        `👋 Hi${firstName ? ' ' + firstName : ''}!\n\nThis invite link is invalid or has expired.\n\nAsk the admin to generate a new one.`
+                        `👋 Hi${firstName ? ' ' + firstName : ''}!\n\nThis invite link is invalid or has expired.\n\nAsk the admin to generate a new one.`, 'HTML'
                     );
                 }
             } else {
                 // Plain /start with no PIN — reply with chat ID
                 await telegram.sendMessage(chatId,
-                    `👋 Hi${firstName ? ' ' + firstName : ''}!\n\nYour Telegram chat ID is:\n\`${chatId}\`\n\nShare this with the Bitcoin Review admin to receive notifications.`
+                    `👋 Hi${firstName ? ' ' + firstName : ''}!\n\nYour Telegram chat ID is:\n<code>${chatId}</code>\n\nShare this with the Bitcoin Review admin to receive notifications.`
                 );
             }
         } else {
             // Any other message — reply with chat ID
             await telegram.sendMessage(chatId,
-                `👋 Hi${firstName ? ' ' + firstName : ''}!\n\nYour Telegram chat ID is:\n\`${chatId}\`\n\nShare this with the Bitcoin Review admin to receive notifications.`
+                `👋 Hi${firstName ? ' ' + firstName : ''}!\n\nYour Telegram chat ID is:\n<code>${chatId}</code>\n\nShare this with the Bitcoin Review admin to receive notifications.`
             );
         }
     } catch (e) {
@@ -329,7 +329,7 @@ async function runAutoRaffle(blockHeight) {
             console.log(`⚠️ Auto-raffle: no valid tickets for block #${blockHeight}`);
             const chatIds = telegram.getAdminChatIds(db);
             for (const chatId of chatIds) {
-                await telegram.sendMessage(chatId, `⚠️ *Auto-raffle block #${blockHeight}*\n\nNo approved tickets in the pool — raffle skipped.`);
+                await telegram.sendMessage(chatId, `⚠️ <b>Auto-raffle block #${blockHeight}</b>\n\nNo approved tickets in the pool — raffle skipped.`);
             }
             return;
         }
@@ -376,7 +376,7 @@ async function runAutoRaffle(blockHeight) {
         try {
             const chatIds = telegram.getAdminChatIds(db);
             for (const chatId of chatIds) {
-                await telegram.sendMessage(chatId, `❌ *Auto-raffle FAILED* for block #${blockHeight}\n\nError: ${err.message}\n\nPlease run manually: ${process.env.BASE_URL}/admin`);
+                await telegram.sendMessage(chatId, `❌ <b>Auto-raffle FAILED</b> for block #${blockHeight}\n\nError: ${err.message}\n\nPlease run manually: ${process.env.BASE_URL}/admin`);
             }
         } catch (e) {}
     }

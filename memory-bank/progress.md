@@ -71,6 +71,7 @@
 - DEFAULT_PRIZE_SATS set to 100 (very low) - may need adjustment
 - PPQ API key returning 401 - AI validation exists but non-functional until key is fixed
 - Merchant name from Google Maps often null (extraction unreliable)
+- ~~Database wiped on every deploy~~ **FIXED Session 17** — `DATABASE_PATH` now points to Railway volume `/data/reviews.db`
 
 ## Session Log
 

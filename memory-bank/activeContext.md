@@ -2,19 +2,23 @@
 
 ## Current Focus (Updated 2026-02-21)
 
-### Session 16: Critical bug fix — sql.js last_insert_rowid
+### Session 17: Database persistence fix — Railway volume
 
-**Root cause found & fixed:**
-- `run()` helper in `database.js` called `saveDatabase()` (which calls `db.export()`) BEFORE reading `last_insert_rowid()`
-- `db.export()` in sql.js resets `last_insert_rowid()` to 0
-- This caused `createTicket()` to always return `{id: 0}`, `getTicketById(0)` returned `undefined`
-- The fallback object hardcoded `merchant_name: null` → "Unknown merchant" in Telegram
-- **Fix:** Moved `SELECT last_insert_rowid()` before `saveDatabase()` in `run()` helper
+**Problem:** Database was being wiped on every deploy. `DATABASE_PATH` was set to `./data/reviews.db` (ephemeral app filesystem) instead of `/data/reviews.db` (persistent Railway volume).
+
+**Fix:**
+- Volume `web-volume` already existed, mounted at `/data` on Railway
+- Changed `DATABASE_PATH` env var from `./data/reviews.db` → `/data/reviews.db` via `railway variables set`
+- Added startup log to `database.js` to confirm DB path on boot
+- Commit: `a477abc`
+
+**Confirmed working:** Deploy logs show `📂 Database path: /data/reviews.db` and `📂 Database directory: /data (exists: true)`
+
+**Note:** Previous review data is lost (was in ephemeral containers). Fresh DB on the volume going forward.
+
+### Previous: Session 16 — sql.js last_insert_rowid fix
+- `db.export()` resets `last_insert_rowid()` — moved ID read before `saveDatabase()` in `run()` helper
 - Commit: `a26adb3`
-
-**Also affected:** Every INSERT in the app was returning wrong IDs — `createUser()`, `createTicket()`, `createRaffle()`, `createDepositAddress()`. The `findOrCreateUser()` had a fallback that re-queried by email/lnurl, masking the bug for users. But raffle creation, deposit tracking, etc. were all silently broken.
-
-**Railway deploy:** GitHub webhook reconnected — auto-deploys working again.
 
 ## Telegram Review Flow (Complete)
 When a review is submitted:

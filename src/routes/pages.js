@@ -237,11 +237,12 @@ router.get('/how-it-works', async (req, res) => {
  */
 router.get('/admin/review/:id', (req, res) => {
     const { id } = req.params;
-    const password = req.query.password || req.query.token;
+    const password = req.query.password;
+    const token = req.query.token;
     
     // Accept either admin password or Telegram approve token
-    const isAdmin = password === process.env.ADMIN_PASSWORD;
-    const isToken = process.env.TELEGRAM_APPROVE_TOKEN && password === process.env.TELEGRAM_APPROVE_TOKEN;
+    const isAdmin = password && password === process.env.ADMIN_PASSWORD;
+    const isToken = process.env.TELEGRAM_APPROVE_TOKEN && (token === process.env.TELEGRAM_APPROVE_TOKEN || password === process.env.TELEGRAM_APPROVE_TOKEN);
     
     if (!isAdmin && !isToken) {
         return res.render('admin-login', {
@@ -257,13 +258,11 @@ router.get('/admin/review/:id', (req, res) => {
         }
         
         // Use the token/password that was passed so approve buttons work
-        const authToken = isAdmin ? password : password;
-        
         res.render('admin-review', {
             title: `Review #${id} - Admin`,
             ticket,
             password: isAdmin ? password : null,
-            approveToken: isToken ? password : process.env.TELEGRAM_APPROVE_TOKEN,
+            approveToken: process.env.TELEGRAM_APPROVE_TOKEN || token || '',
             isAdminAuth: isAdmin,
             baseUrl: process.env.BASE_URL || ''
         });

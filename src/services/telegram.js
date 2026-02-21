@@ -40,10 +40,11 @@ function isQuietHours() {
 /**
  * Send a Telegram message to a chat ID
  * @param {string} chatId - Telegram chat ID
- * @param {string} text - Message text (supports Markdown)
+ * @param {string} text - Message text (supports HTML)
+ * @param {string} [parseMode='HTML'] - Parse mode ('HTML' or 'Markdown')
  * @returns {Promise<boolean>}
  */
-async function sendMessage(chatId, text) {
+async function sendMessage(chatId, text, parseMode = 'HTML') {
     if (!BOT_TOKEN) {
         console.warn('⚠️  Telegram: TELEGRAM_BOT_TOKEN not configured, skipping notification');
         return false;
@@ -56,7 +57,7 @@ async function sendMessage(chatId, text) {
     const payload = JSON.stringify({
         chat_id: chatId,
         text,
-        parse_mode: 'Markdown',
+        parse_mode: parseMode,
         disable_web_page_preview: true
     });
 
@@ -165,34 +166,34 @@ async function notifyNewReview(ticket, user, dbModule) {
 
     const approveToken = process.env.TELEGRAM_APPROVE_TOKEN;
     const ticketId = ticket.id;
-    const merchantDisplay = ticket.merchant_name ? `*${escapeMarkdown(ticket.merchant_name)}*` : '_Unknown merchant_';
+    const merchantDisplay = ticket.merchant_name ? `<b>${escapeHtml(ticket.merchant_name)}</b>` : '<i>Unknown merchant</i>';
     const submitterDisplay = user && user.email
-        ? escapeMarkdown(maskEmail(user.email))
-        : (user && user.lnurl_address ? `⚡ ${escapeMarkdown(user.lnurl_address)}` : '_Anonymous_');
+        ? escapeHtml(maskEmail(user.email))
+        : (user && user.lnurl_address ? `⚡ ${escapeHtml(user.lnurl_address)}` : '<i>Anonymous</i>');
 
     const triedBtc = ticket.tried_bitcoin === 1 ? '✅ Yes' : (ticket.tried_bitcoin === 0 ? '❌ No' : '❓ N/A');
     const acceptedBtc = ticket.merchant_accepted === 1 ? '✅ Yes' : (ticket.merchant_accepted === 0 ? '❌ No' : '❓ N/A');
 
-    let message = `🔔 *New Review Submitted*\n\n`;
+    let message = `🔔 <b>New Review Submitted</b>\n\n`;
     message += `Merchant: ${merchantDisplay}\n`;
     message += `Tried Bitcoin: ${triedBtc}\n`;
     message += `Merchant Accepted: ${acceptedBtc}\n`;
     message += `Submitted by: ${submitterDisplay}\n`;
-    message += `Review Link: [Open Review](${ticket.review_link})\n`;
+    message += `Review Link: <a href="${ticket.review_link}">Open Review</a>\n`;
 
     if (ticket.review_text) {
         const preview = ticket.review_text.length > 200
             ? ticket.review_text.substring(0, 200) + '…'
             : ticket.review_text;
-        message += `\n📝 _"${escapeMarkdown(preview)}"_\n`;
+        message += `\n📝 <i>"${escapeHtml(preview)}"</i>\n`;
     }
 
     message += `\n`;
-    message += `[👁 View in Admin](${BASE_URL}/admin/review/${ticketId}?password=${approveToken})\n`;
+    message += `<a href="${BASE_URL}/admin/review/${ticketId}?token=${approveToken}">👁 View in Admin</a>\n`;
 
     if (approveToken) {
-        message += `[✅ Approve](${BASE_URL}/api/admin/tickets/${ticketId}/quick-approve?token=${approveToken})\n`;
-        message += `[❌ Reject](${BASE_URL}/api/admin/tickets/${ticketId}/quick-reject?token=${approveToken})`;
+        message += `<a href="${BASE_URL}/api/admin/tickets/${ticketId}/quick-approve?token=${approveToken}">✅ Approve</a>\n`;
+        message += `<a href="${BASE_URL}/api/admin/tickets/${ticketId}/quick-reject?token=${approveToken}">❌ Reject</a>`;
     } else {
         message += `\n⚠️ Set TELEGRAM_APPROVE_TOKEN env var for one-tap approve/reject links`;
     }
@@ -217,15 +218,15 @@ async function notifyRaffleResult(raffle, winner, dbModule) {
     const chatIds = getAdminChatIds(dbModule);
     if (chatIds.length === 0) return;
 
-    let message = `🎰 *Raffle Complete!*\n\n`;
+    let message = `🎰 <b>Raffle Complete!</b>\n\n`;
     message += `Block: #${raffle.block_height.toLocaleString()}\n`;
     message += `Total Tickets: ${raffle.total_tickets}\n`;
-    message += `Winner: ${winner.email ? escapeMarkdown(maskEmail(winner.email)) : (winner.lnurl_address ? `⚡ ${escapeMarkdown(winner.lnurl_address)}` : '_Anonymous_')}\n`;
+    message += `Winner: ${winner.email ? escapeHtml(maskEmail(winner.email)) : (winner.lnurl_address ? `⚡ ${escapeHtml(winner.lnurl_address)}` : '<i>Anonymous</i>')}\n`;
     if (raffle.prize_amount_sats) {
         message += `Prize: ${raffle.prize_amount_sats.toLocaleString()} sats\n`;
     }
     if (winner.lnurl_address) {
-        message += `Lightning Address: \`${escapeMarkdown(winner.lnurl_address)}\`\n`;
+        message += `Lightning Address: <code>${escapeHtml(winner.lnurl_address)}</code>\n`;
     }
     message += `\nManage at: ${BASE_URL}/admin`;
 
@@ -263,9 +264,9 @@ async function notifyRaffleWarning(raffleBlock, approvedTickets, dbModule) {
     const autoEnabled = dbModule ? dbModule.getSetting('raffle_auto_trigger') === 'true' : false;
     const modeText = autoEnabled ? '🤖 Auto-trigger is ON' : '👋 Manual trigger required';
 
-    let message = `⏰ *Raffle in ~24 hours!*\n\n`;
+    let message = `⏰ <b>Raffle in ~24 hours!</b>\n\n`;
     message += `Block #${raffleBlock.toLocaleString()} is ~144 blocks away.\n`;
-    message += `Approved tickets in pool: *${approvedTickets}*\n`;
+    message += `Approved tickets in pool: <b>${approvedTickets}</b>\n`;
     message += `${modeText}\n\n`;
     if (!autoEnabled) {
         message += `When the block is mined, go to:\n${BASE_URL}/admin`;
@@ -308,13 +309,13 @@ async function notifyRaffleBlockMined(raffleBlock, approvedTickets, autoTriggere
 
     let message;
     if (autoTriggered) {
-        message = `🎲 *Raffle block #${raffleBlock.toLocaleString()} mined!*\n`;
+        message = `🎲 <b>Raffle block #${raffleBlock.toLocaleString()} mined!</b>\n`;
         message += `Running raffle automatically with ${approvedTickets} approved tickets...\n`;
         message += `(Winner announcement coming shortly)`;
     } else {
-        message = `🎲 *Raffle block #${raffleBlock.toLocaleString()} has been mined!*\n\n`;
+        message = `🎲 <b>Raffle block #${raffleBlock.toLocaleString()} has been mined!</b>\n\n`;
         message += `${approvedTickets} approved tickets in the pool.\n`;
-        message += `👉 [Run the raffle now](${BASE_URL}/admin)`;
+        message += `👉 <a href="${BASE_URL}/admin">Run the raffle now</a>`;
     }
 
     if (isQuietHours()) {
@@ -374,10 +375,10 @@ async function deliverPendingNotifications(dbModule) {
             const pendingTickets = dbModule.getPendingTickets ? dbModule.getPendingTickets() : [];
             const pendingCount = pendingTickets.length;
 
-            let message = `☀️ *Good morning!*\n\n`;
+            let message = `☀️ <b>Good morning!</b>\n\n`;
             message += `${queuedCount} review${queuedCount > 1 ? 's' : ''} submitted overnight.\n`;
             message += `${pendingCount} review${pendingCount !== 1 ? 's' : ''} pending approval.\n\n`;
-            message += `[👉 Review them now](${BASE_URL}/admin?password=${approveToken || ''})`;
+            message += `<a href="${BASE_URL}/admin?password=${approveToken || ''}">👉 Review them now</a>`;
 
             console.log(`📬 Sending morning review summary: ${queuedCount} overnight, ${pendingCount} pending`);
             for (const chatId of chatIds) {
@@ -403,9 +404,9 @@ async function notifyTicketDecision(ticket, isApproved, adminNote, dbModule) {
     const action = isApproved ? 'Approved' : 'Rejected';
     const merchantDisplay = ticket.merchant_name || 'Unknown merchant';
 
-    let message = `${emoji} *Review ${action}*\n`;
-    message += `Ticket #${ticket.id} — ${escapeMarkdown(merchantDisplay)}`;
-    if (adminNote) message += `\nReason: ${escapeMarkdown(adminNote)}`;
+    let message = `${emoji} <b>Review ${action}</b>\n`;
+    message += `Ticket #${ticket.id} — ${escapeHtml(merchantDisplay)}`;
+    if (adminNote) message += `\nReason: ${escapeHtml(adminNote)}`;
 
     for (const chatId of chatIds) {
         try {
@@ -422,10 +423,18 @@ function maskEmail(email) {
     return email.replace(/(.{2}).*(@.*)/, '$1***$2');
 }
 
-// Escape Markdown special chars for Telegram
+// Escape HTML special chars for Telegram HTML mode
+function escapeHtml(text) {
+    if (!text) return '';
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+// Legacy: Escape Markdown special chars for Telegram (kept for backward compat)
 function escapeMarkdown(text) {
     if (!text) return '';
-    // For Markdown mode (not MarkdownV2), only escape these
     return String(text).replace(/[_*[\]()~`>#+\-=|{}.!]/g, (c) => {
         if (['_', '*', '[', '`'].includes(c)) return '\\' + c;
         return c;
