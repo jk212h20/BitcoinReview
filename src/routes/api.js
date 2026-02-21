@@ -486,7 +486,7 @@ router.post('/generate-invoice', async (req, res) => {
  * Used by Railway to confirm the server is up
  */
 router.get('/health', (req, res) => {
-    res.json({ ok: true, ts: Date.now(), v: 'debug-merchant-1' });
+    res.json({ ok: true, ts: Date.now() });
 });
 
 module.exports = router;

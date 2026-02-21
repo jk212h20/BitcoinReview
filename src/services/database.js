@@ -99,31 +99,7 @@ async function initializeDatabase() {
         db.run(`ALTER TABLE tickets ADD COLUMN merchant_name TEXT`);
         console.log('✅ Added merchant_name column to tickets');
     } catch (e) {
-        console.log('ℹ️  merchant_name column already exists (or error):', e.message);
-    }
-
-    // Verify merchant_name column exists by checking schema
-    try {
-        const cols = db.exec(`PRAGMA table_info(tickets)`);
-        const colNames = cols[0] ? cols[0].values.map(r => r[1]) : [];
-        console.log('📋 tickets columns:', colNames.join(', '));
-        if (!colNames.includes('merchant_name')) {
-            console.error('❌ CRITICAL: merchant_name column still missing after migration!');
-        } else {
-            console.log('✅ merchant_name column confirmed present');
-        }
-
-        // Test that merchant_name is actually writable
-        db.run(`CREATE TABLE IF NOT EXISTS _merchant_test (id INTEGER PRIMARY KEY, val TEXT)`);
-        db.run(`INSERT OR REPLACE INTO _merchant_test (id, val) SELECT 1, merchant_name FROM tickets WHERE merchant_name IS NOT NULL LIMIT 1`);
-        const testResult = db.exec(`SELECT merchant_name FROM tickets WHERE merchant_name IS NOT NULL LIMIT 1`);
-        if (testResult && testResult[0] && testResult[0].values.length > 0) {
-            console.log('✅ merchant_name readable from existing rows:', testResult[0].values[0][0]);
-        } else {
-            console.log('ℹ️  No tickets with merchant_name yet (expected for fresh DB)');
-        }
-    } catch (e) {
-        console.error('Schema check error:', e.message);
+        // Column already exists — that's fine
     }
 
     // Add is_featured column to tickets if it doesn't exist (migration for existing DBs)
@@ -191,9 +167,11 @@ function queryOne(sql, params = []) {
 // Helper to run insert/update and return lastInsertRowid
 function run(sql, params = []) {
     db.run(sql, params);
-    saveDatabase();
+    // IMPORTANT: get last_insert_rowid BEFORE saveDatabase() — db.export() resets it
     const result = db.exec("SELECT last_insert_rowid() as id");
-    return result.length > 0 ? result[0].values[0][0] : null;
+    const lastId = result.length > 0 ? result[0].values[0][0] : null;
+    saveDatabase();
+    return lastId;
 }
 
 // User functions
@@ -304,17 +282,10 @@ function getUserCount() {
 
 // Ticket functions
 function createTicket(userId, reviewLink, reviewText, merchantName, raffleBlock) {
-    console.log(`[createTicket] merchantName param: ${JSON.stringify(merchantName)}`);
     const id = run(
         `INSERT INTO tickets (user_id, review_link, review_text, merchant_name, raffle_block) VALUES (?, ?, ?, ?, ?)`,
         [userId, reviewLink, reviewText, merchantName, raffleBlock]
     );
-    console.log(`[createTicket] inserted id=${id}`);
-    // Verify the insert actually saved merchant_name
-    if (id) {
-        const saved = queryOne(`SELECT merchant_name FROM tickets WHERE id = ?`, [id]);
-        console.log(`[createTicket] merchant_name saved in DB: ${JSON.stringify(saved ? saved.merchant_name : 'NULL - row not found')}`);
-    }
     return { id };
 }
 
