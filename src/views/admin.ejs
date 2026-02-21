@@ -134,26 +134,14 @@
                 </div>
             </div>
 
-            <!-- Generate invite link -->
+            <!-- Invite a new admin — one click -->
             <div class="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
                 <div class="text-sm font-medium text-gray-700 mb-2">🔗 Invite a new admin</div>
-                <p class="text-xs text-gray-500 mb-2">Generate a one-tap invite link. The new admin clicks it → Telegram opens → they're auto-registered. No chat ID needed.</p>
-                <div class="flex gap-2 items-center">
-                    <button @click="generateInvite()" :disabled="telegramLoading"
-                        class="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-600 disabled:opacity-50 whitespace-nowrap">
-                        Generate Invite Link
-                    </button>
-                    <span x-show="inviteLink" x-cloak class="text-xs text-gray-500">Expires in 24h — single use</span>
-                </div>
-                <div x-show="inviteLink" x-cloak class="mt-2 flex gap-2 flex-wrap items-center">
-                    <a :href="inviteLink" target="_blank"
-                        class="inline-flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-600">
-                        📲 Open Invite in Telegram
-                    </a>
-                    <button @click="copyInvite()"
-                        class="bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap"
-                        x-text="copied ? '✅ Copied!' : '🔗 Copy link'"></button>
-                </div>
+                <p class="text-xs text-gray-500 mb-2">One click → Telegram opens → they tap Start → auto-registered. No chat ID needed. Link expires in 24h.</p>
+                <a href="/api/admin/telegram/invite?password=${typeof password !== 'undefined' ? password : ''}" target="_blank"
+                    class="inline-flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-600">
+                    📲 Add New Admin via Telegram
+                </a>
             </div>
 
             <!-- Add chat ID manually -->
