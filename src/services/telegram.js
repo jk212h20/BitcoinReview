@@ -8,6 +8,35 @@ const https = require('https');
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const BASE_URL = process.env.BASE_URL || 'https://web-production-3a9f6.up.railway.app';
 
+// Roatan timezone (UTC-6, no DST)
+const ADMIN_TIMEZONE = process.env.ADMIN_TIMEZONE || 'America/Tegucigalpa';
+const QUIET_HOUR_START = 18; // 6pm — no notifications after this hour
+const QUIET_HOUR_END = 9;    // 9am — notifications resume at this hour
+
+/**
+ * Check if it's currently within quiet hours (6pm–9am Roatan time)
+ * Returns true if we should suppress the notification until 9am
+ */
+function isQuietHours() {
+    try {
+        const now = new Date();
+        // Get current hour in admin timezone
+        const hour = parseInt(
+            new Intl.DateTimeFormat('en-US', {
+                timeZone: ADMIN_TIMEZONE,
+                hour: 'numeric',
+                hour12: false
+            }).format(now),
+            10
+        );
+        // Quiet if hour >= 18 (6pm) OR hour < 9 (before 9am)
+        return hour >= QUIET_HOUR_START || hour < QUIET_HOUR_END;
+    } catch (e) {
+        console.warn('Quiet hours check failed:', e.message);
+        return false; // Fail open — send the message
+    }
+}
+
 /**
  * Send a Telegram message to a chat ID
  * @param {string} chatId - Telegram chat ID
@@ -78,24 +107,44 @@ async function sendMessage(chatId, text) {
 }
 
 /**
- * Get all admin chat IDs to notify
- * Returns primary chat ID from env var (and later could include DB-stored admins)
+ * Get all admin chat IDs to notify.
+ * Returns env var primary chat ID + any extra IDs stored in DB settings.
+ * Pass the db module to include DB-stored extras.
+ * @param {Object} [dbModule] - optional database module (to read extra_telegram_chats setting)
  */
-function getAdminChatIds() {
+function getAdminChatIds(dbModule) {
     const ids = [];
+
     if (process.env.TELEGRAM_CHAT_ID) {
         ids.push(process.env.TELEGRAM_CHAT_ID);
     }
+
+    // Also pull any extra chat IDs stored in DB settings
+    if (dbModule) {
+        try {
+            const extra = dbModule.getSetting('extra_telegram_chats');
+            if (extra) {
+                extra.split(',').map(s => s.trim()).filter(Boolean).forEach(id => {
+                    if (!ids.includes(id)) ids.push(id);
+                });
+            }
+        } catch (e) {
+            // DB might not be ready yet — silently ignore
+        }
+    }
+
     return ids;
 }
 
 /**
- * Notify all admins about a new review submission
+ * Notify all admins about a new review submission.
+ * No quiet hours for review submissions (admin wants to know immediately).
  * @param {Object} ticket - ticket record
  * @param {Object} user - user record (may be null for anonymous)
+ * @param {Object} [dbModule] - database module (to get extra admin chat IDs)
  */
-async function notifyNewReview(ticket, user) {
-    const chatIds = getAdminChatIds();
+async function notifyNewReview(ticket, user, dbModule) {
+    const chatIds = getAdminChatIds(dbModule);
     if (chatIds.length === 0) {
         console.warn('⚠️  Telegram: no admin chat IDs configured');
         return;
@@ -140,12 +189,14 @@ async function notifyNewReview(ticket, user) {
 }
 
 /**
- * Notify all admins about a raffle result
+ * Notify all admins about a raffle result.
+ * Respects quiet hours — held until 9am if fired during 6pm–9am.
  * @param {Object} raffle - raffle record
  * @param {Object} winner - winning ticket + user info
+ * @param {Object} [dbModule] - database module
  */
-async function notifyRaffleResult(raffle, winner) {
-    const chatIds = getAdminChatIds();
+async function notifyRaffleResult(raffle, winner, dbModule) {
+    const chatIds = getAdminChatIds(dbModule);
     if (chatIds.length === 0) return;
 
     let message = `🎰 *Raffle Complete!*\n\n`;
@@ -160,6 +211,17 @@ async function notifyRaffleResult(raffle, winner) {
     }
     message += `\nManage at: ${BASE_URL}/admin`;
 
+    if (isQuietHours()) {
+        console.log('📵 Raffle result notification suppressed (quiet hours) — will send at 9am');
+        // Store the pending message in DB for the watcher to send at 9am
+        if (dbModule) {
+            try {
+                dbModule.setSetting('pending_telegram_message', JSON.stringify({ chatIds, message, type: 'raffle_result' }));
+            } catch (e) {}
+        }
+        return;
+    }
+
     for (const chatId of chatIds) {
         try {
             await sendMessage(chatId, message);
@@ -170,10 +232,131 @@ async function notifyRaffleResult(raffle, winner) {
 }
 
 /**
+ * Notify admins about approaching raffle (144 blocks warning).
+ * Always sent regardless of auto/manual mode. Respects quiet hours.
+ * @param {number} raffleBlock - the upcoming raffle block
+ * @param {number} approvedTickets - number of approved tickets in the pool
+ * @param {Object} [dbModule] - database module
+ */
+async function notifyRaffleWarning(raffleBlock, approvedTickets, dbModule) {
+    const chatIds = getAdminChatIds(dbModule);
+    if (chatIds.length === 0) return;
+
+    const autoEnabled = dbModule ? dbModule.getSetting('raffle_auto_trigger') === 'true' : false;
+    const modeText = autoEnabled ? '🤖 Auto-trigger is ON' : '👋 Manual trigger required';
+
+    let message = `⏰ *Raffle in ~24 hours!*\n\n`;
+    message += `Block #${raffleBlock.toLocaleString()} is ~144 blocks away.\n`;
+    message += `Approved tickets in pool: *${approvedTickets}*\n`;
+    message += `${modeText}\n\n`;
+    if (!autoEnabled) {
+        message += `When the block is mined, go to:\n${BASE_URL}/admin`;
+    }
+
+    if (isQuietHours()) {
+        console.log('📵 Raffle warning suppressed (quiet hours) — storing for 9am delivery');
+        if (dbModule) {
+            try {
+                // Only store if nothing already pending (avoid clobbering raffle result)
+                const existing = dbModule.getSetting('pending_telegram_message');
+                if (!existing) {
+                    dbModule.setSetting('pending_telegram_message', JSON.stringify({ chatIds, message, type: 'raffle_warning' }));
+                }
+            } catch (e) {}
+        }
+        return;
+    }
+
+    for (const chatId of chatIds) {
+        try {
+            await sendMessage(chatId, message);
+        } catch (e) {
+            console.error(`Failed to send raffle warning to ${chatId}:`, e.message);
+        }
+    }
+}
+
+/**
+ * Notify admins that the raffle block has been mined.
+ * Always sent regardless of auto/manual mode. Respects quiet hours.
+ * @param {number} raffleBlock - the raffle block that was mined
+ * @param {number} approvedTickets - number of approved tickets in the pool
+ * @param {boolean} autoTriggered - whether the raffle was auto-run
+ * @param {Object} [dbModule] - database module
+ */
+async function notifyRaffleBlockMined(raffleBlock, approvedTickets, autoTriggered, dbModule) {
+    const chatIds = getAdminChatIds(dbModule);
+    if (chatIds.length === 0) return;
+
+    let message;
+    if (autoTriggered) {
+        message = `🎲 *Raffle block #${raffleBlock.toLocaleString()} mined!*\n`;
+        message += `Running raffle automatically with ${approvedTickets} approved tickets...\n`;
+        message += `(Winner announcement coming shortly)`;
+    } else {
+        message = `🎲 *Raffle block #${raffleBlock.toLocaleString()} has been mined!*\n\n`;
+        message += `${approvedTickets} approved tickets in the pool.\n`;
+        message += `👉 [Run the raffle now](${BASE_URL}/admin)`;
+    }
+
+    if (isQuietHours()) {
+        console.log('📵 Raffle block-mined notification suppressed (quiet hours) — storing for 9am delivery');
+        if (dbModule) {
+            try {
+                const existing = dbModule.getSetting('pending_telegram_message');
+                if (!existing) {
+                    dbModule.setSetting('pending_telegram_message', JSON.stringify({ chatIds, message, type: 'raffle_block_mined' }));
+                }
+            } catch (e) {}
+        }
+        return;
+    }
+
+    for (const chatId of chatIds) {
+        try {
+            await sendMessage(chatId, message);
+        } catch (e) {
+            console.error(`Failed to send block-mined notification to ${chatId}:`, e.message);
+        }
+    }
+}
+
+/**
+ * Check and deliver any pending quiet-hours notifications.
+ * Called by the poll loop every 5 minutes — delivers queued messages once 9am arrives.
+ * @param {Object} dbModule - database module
+ */
+async function deliverPendingNotifications(dbModule) {
+    if (!dbModule) return;
+    if (isQuietHours()) return; // Still in quiet hours
+
+    try {
+        const pending = dbModule.getSetting('pending_telegram_message');
+        if (!pending) return;
+
+        const { chatIds, message } = JSON.parse(pending);
+        console.log('📬 Delivering held Telegram notification (quiet hours ended)');
+
+        for (const chatId of chatIds) {
+            try {
+                await sendMessage(chatId, message);
+            } catch (e) {
+                console.error(`Failed to deliver held notification to ${chatId}:`, e.message);
+            }
+        }
+
+        // Clear the pending message
+        dbModule.setSetting('pending_telegram_message', '');
+    } catch (e) {
+        console.error('Error delivering pending notifications:', e.message);
+    }
+}
+
+/**
  * Notify admins that a ticket was approved or rejected
  */
-async function notifyTicketDecision(ticket, isApproved, adminNote) {
-    const chatIds = getAdminChatIds();
+async function notifyTicketDecision(ticket, isApproved, adminNote, dbModule) {
+    const chatIds = getAdminChatIds(dbModule);
     if (chatIds.length === 0) return;
 
     const emoji = isApproved ? '✅' : '❌';
@@ -204,7 +387,6 @@ function escapeMarkdown(text) {
     if (!text) return '';
     // For Markdown mode (not MarkdownV2), only escape these
     return String(text).replace(/[_*[\]()~`>#+\-=|{}.!]/g, (c) => {
-        // Only escape chars that would break Markdown in Telegram's parse_mode=Markdown
         if (['_', '*', '[', '`'].includes(c)) return '\\' + c;
         return c;
     });
@@ -213,7 +395,11 @@ function escapeMarkdown(text) {
 module.exports = {
     sendMessage,
     getAdminChatIds,
+    isQuietHours,
     notifyNewReview,
     notifyRaffleResult,
+    notifyRaffleWarning,
+    notifyRaffleBlockMined,
+    deliverPendingNotifications,
     notifyTicketDecision
 };

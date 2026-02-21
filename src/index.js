@@ -14,6 +14,7 @@ const email = require('./services/email');
 const anthropic = require('./services/anthropic');
 const bitcoin = require('./services/bitcoin');
 const lightning = require('./services/lightning');
+const telegram = require('./services/telegram');
 
 // Import routes
 const apiRoutes = require('./routes/api');
@@ -110,19 +111,155 @@ async function startServer() {
         console.warn('⚠️  Failed to pre-warm deposit addresses:', err.message);
     }
     
-    // Poll for incoming payments every 5 minutes
+    // Poll for incoming payments + raffle events every 5 minutes
     setInterval(async () => {
         try {
             await lightning.checkForDeposits();
         } catch (err) {
             console.warn('Payment poll error:', err.message);
         }
+
+        // Deliver any held Telegram notifications (quiet hours ended)
+        try {
+            await telegram.deliverPendingNotifications(db);
+        } catch (err) {
+            console.warn('Telegram delivery check error:', err.message);
+        }
+
+        // Raffle watcher: check for 144-block warning + block mined event
+        try {
+            await checkRaffleEvents();
+        } catch (err) {
+            console.warn('Raffle watcher error:', err.message);
+        }
     }, 5 * 60 * 1000);
+
+    // Run raffle watcher once on startup too (catches up if server was down)
+    setTimeout(async () => {
+        try { await checkRaffleEvents(); } catch (e) { console.warn('Startup raffle check error:', e.message); }
+    }, 15 * 1000); // 15s after startup (after cache is warm)
     
     app.listen(PORT, () => {
         console.log(`✅ Server running on http://localhost:${PORT}`);
         console.log(`📊 Admin dashboard: http://localhost:${PORT}/admin`);
     });
+}
+
+/**
+ * Raffle watcher — runs every 5 minutes.
+ * Checks for two events:
+ *   1. 144-block warning (fires once per raffle cycle)
+ *   2. Raffle block mined (fires once; auto-runs raffle if enabled)
+ */
+async function checkRaffleEvents() {
+    let info;
+    try {
+        info = await bitcoin.getRaffleInfo();
+    } catch (e) {
+        console.warn('Raffle watcher: could not fetch block info:', e.message);
+        return;
+    }
+
+    const { nextRaffleBlock, blocksUntilNext, currentHeight } = info;
+    const approvedTickets = db.countValidTicketsForBlock(nextRaffleBlock);
+
+    // ── 1. 144-block warning (send once per raffle cycle) ──────────────────
+    const warningAlreadySentBlock = parseInt(db.getSetting('raffle_warning_sent_block') || '0', 10);
+    if (
+        blocksUntilNext <= 144 &&
+        blocksUntilNext > 0 &&
+        warningAlreadySentBlock !== nextRaffleBlock
+    ) {
+        console.log(`⏰ Raffle warning: ~${blocksUntilNext} blocks until block #${nextRaffleBlock}`);
+        db.setSetting('raffle_warning_sent_block', String(nextRaffleBlock));
+        await telegram.notifyRaffleWarning(nextRaffleBlock, approvedTickets, db);
+    }
+
+    // ── 2. Raffle block mined ──────────────────────────────────────────────
+    const blockAlreadyNotified = parseInt(db.getSetting('raffle_block_notified') || '0', 10);
+    const raffleBlockMined = currentHeight >= nextRaffleBlock;
+    const raffleAlreadyRun = !!db.findRaffleByBlock(nextRaffleBlock);
+
+    if (raffleBlockMined && blockAlreadyNotified !== nextRaffleBlock && !raffleAlreadyRun) {
+        db.setSetting('raffle_block_notified', String(nextRaffleBlock));
+
+        const autoTrigger = db.getSetting('raffle_auto_trigger') === 'true';
+
+        if (autoTrigger) {
+            // Notify that it's running
+            await telegram.notifyRaffleBlockMined(nextRaffleBlock, approvedTickets, true, db);
+            await runAutoRaffle(nextRaffleBlock);
+        } else {
+            // Notify admin to run it manually
+            await telegram.notifyRaffleBlockMined(nextRaffleBlock, approvedTickets, false, db);
+        }
+    }
+}
+
+/**
+ * Auto-run the raffle for a given block height.
+ * Called by the raffle watcher when auto-trigger is enabled.
+ */
+async function runAutoRaffle(blockHeight) {
+    try {
+        const blockHash = await bitcoin.getBlockHash(blockHeight);
+        const tickets = db.getValidTicketsForBlock(blockHeight);
+
+        if (tickets.length === 0) {
+            console.log(`⚠️ Auto-raffle: no valid tickets for block #${blockHeight}`);
+            const chatIds = telegram.getAdminChatIds(db);
+            for (const chatId of chatIds) {
+                await telegram.sendMessage(chatId, `⚠️ *Auto-raffle block #${blockHeight}*\n\nNo approved tickets in the pool — raffle skipped.`);
+            }
+            return;
+        }
+
+        const winnerIndex = bitcoin.selectWinnerIndex(blockHash, tickets.length);
+        const winningTicket = tickets[winnerIndex];
+        const prizeSats = parseInt(process.env.DEFAULT_PRIZE_SATS) || 0;
+
+        const raffle = db.createRaffle(
+            blockHeight, blockHash, tickets.length, winnerIndex, winningTicket.id, prizeSats || null
+        );
+
+        console.log(`🎰 Auto-raffle run! Block #${blockHeight}, winner ticket #${winningTicket.id}`);
+
+        // Notify result
+        await telegram.notifyRaffleResult(
+            { block_height: blockHeight, total_tickets: tickets.length, prize_amount_sats: prizeSats },
+            winningTicket,
+            db
+        );
+
+        // Send winner email
+        email.sendWinnerEmail(
+            winningTicket.email, prizeSats, winningTicket.lnurl_address, blockHeight
+        ).catch(err => console.error('Winner email error:', err));
+
+        // Auto-pay if enabled
+        if (process.env.AUTO_PAY_ENABLED === 'true' && winningTicket.lnurl_address && prizeSats > 0) {
+            try {
+                const paymentResult = await lightning.payLightningAddress(
+                    winningTicket.lnurl_address, prizeSats,
+                    `Bitcoin Review Raffle winner! Block #${blockHeight}`
+                );
+                db.markRafflePaid(raffle.id, paymentResult.paymentHash);
+                console.log(`✅ Auto-payment: ${paymentResult.paymentHash}`);
+            } catch (payErr) {
+                console.error('⚠️ Auto-payment failed:', payErr.message);
+                db.markRafflePaymentFailed(raffle.id, payErr.message);
+            }
+        }
+    } catch (err) {
+        console.error('Auto-raffle error:', err.message);
+        // Notify admin of the failure
+        try {
+            const chatIds = telegram.getAdminChatIds(db);
+            for (const chatId of chatIds) {
+                await telegram.sendMessage(chatId, `❌ *Auto-raffle FAILED* for block #${blockHeight}\n\nError: ${err.message}\n\nPlease run manually: ${process.env.BASE_URL}/admin`);
+            }
+        } catch (e) {}
+    }
 }
 
 startServer().catch(err => {

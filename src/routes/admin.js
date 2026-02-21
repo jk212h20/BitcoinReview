@@ -551,7 +551,10 @@ router.post('/settings', (req, res) => {
             return res.status(400).json({ error: 'Settings object required' });
         }
         
-        const allowedKeys = ['review_mode', 'google_api_key'];
+        const allowedKeys = [
+            'review_mode', 'google_api_key',
+            'raffle_auto_trigger'
+        ];
         
         for (const [key, value] of Object.entries(settings)) {
             if (!allowedKeys.includes(key)) {
@@ -564,6 +567,125 @@ router.post('/settings', (req, res) => {
     } catch (error) {
         console.error('Settings update error:', error);
         res.status(500).json({ error: 'Failed to update settings' });
+    }
+});
+
+/**
+ * POST /admin/tickets/:id/feature
+ * Toggle the featured flag on a ticket (for public showcase)
+ */
+router.post('/tickets/:id/feature', (req, res) => {
+    try {
+        const { id } = req.params;
+        const { featured } = req.body;
+
+        const ticket = db.getTicketById(parseInt(id));
+        if (!ticket) {
+            return res.status(404).json({ error: 'Ticket not found' });
+        }
+
+        if (ticket.is_valid !== 1) {
+            return res.status(400).json({ error: 'Only approved tickets can be featured' });
+        }
+
+        db.featureTicket(parseInt(id), !!featured);
+
+        res.json({
+            success: true,
+            message: featured ? `Ticket #${id} is now featured` : `Ticket #${id} is no longer featured`,
+            is_featured: !!featured
+        });
+    } catch (error) {
+        console.error('Feature ticket error:', error);
+        res.status(500).json({ error: 'Failed to update featured status' });
+    }
+});
+
+/**
+ * GET /admin/telegram/chats
+ * Get all configured admin Telegram chat IDs
+ */
+router.get('/telegram/chats', (req, res) => {
+    try {
+        const primary = process.env.TELEGRAM_CHAT_ID || null;
+        const extraRaw = db.getSetting('extra_telegram_chats') || '';
+        const extra = extraRaw.split(',').map(s => s.trim()).filter(Boolean);
+
+        res.json({
+            success: true,
+            chats: {
+                primary,
+                extra,
+                all: telegram.getAdminChatIds(db)
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch Telegram chats' });
+    }
+});
+
+/**
+ * POST /admin/telegram/chats
+ * Add an extra admin Telegram chat ID
+ * Body: { chatId: "123456789" }
+ */
+router.post('/telegram/chats', (req, res) => {
+    try {
+        const { chatId } = req.body;
+        if (!chatId || !/^\d+$/.test(String(chatId).trim())) {
+            return res.status(400).json({ error: 'Valid numeric chat ID required' });
+        }
+
+        const extraRaw = db.getSetting('extra_telegram_chats') || '';
+        const extra = extraRaw.split(',').map(s => s.trim()).filter(Boolean);
+
+        if (extra.includes(String(chatId).trim())) {
+            return res.status(400).json({ error: 'Chat ID already added' });
+        }
+
+        if (String(chatId).trim() === process.env.TELEGRAM_CHAT_ID) {
+            return res.status(400).json({ error: 'That is already the primary admin chat ID' });
+        }
+
+        extra.push(String(chatId).trim());
+        db.setSetting('extra_telegram_chats', extra.join(','));
+
+        // Send a confirmation message to the new chat
+        telegram.sendMessage(String(chatId).trim(), `✅ You've been added as a Bitcoin Review Raffle admin. You'll receive notifications for new reviews, raffle events, and more.`).catch(() => {});
+
+        res.json({
+            success: true,
+            message: `Chat ID ${chatId} added`,
+            extra
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to add chat ID' });
+    }
+});
+
+/**
+ * DELETE /admin/telegram/chats/:chatId
+ * Remove an extra admin Telegram chat ID
+ */
+router.delete('/telegram/chats/:chatId', (req, res) => {
+    try {
+        const { chatId } = req.params;
+
+        if (String(chatId) === process.env.TELEGRAM_CHAT_ID) {
+            return res.status(400).json({ error: 'Cannot remove primary admin chat ID (change TELEGRAM_CHAT_ID env var instead)' });
+        }
+
+        const extraRaw = db.getSetting('extra_telegram_chats') || '';
+        const extra = extraRaw.split(',').map(s => s.trim()).filter(Boolean).filter(id => id !== String(chatId));
+        db.setSetting('extra_telegram_chats', extra.join(','));
+
+        res.json({
+            success: true,
+            message: `Chat ID ${chatId} removed`,
+            extra
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to remove chat ID' });
     }
 });
 

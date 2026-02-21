@@ -64,6 +64,9 @@ async function initializeDatabase() {
             received_at TEXT
         );
 
+        -- Submitted reviews (raffle tickets) - add is_featured if missing
+        -- (handled below via ALTER TABLE for existing DBs)
+
         -- Raffle history
         CREATE TABLE IF NOT EXISTS raffles (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -91,10 +94,23 @@ async function initializeDatabase() {
         );
     `);
     
+    // Add is_featured column to tickets if it doesn't exist (migration for existing DBs)
+    try {
+        db.run(`ALTER TABLE tickets ADD COLUMN is_featured INTEGER DEFAULT 0`);
+        console.log('✅ Added is_featured column to tickets');
+    } catch (e) {
+        // Column already exists — that's fine
+    }
+
     // Insert default settings if they don't exist
     const defaultSettings = [
-        ['review_mode', 'manual_review'],  // 'auto_approve' or 'manual_review'
-        ['google_api_key', '']
+        ['review_mode', 'manual_review'],       // 'auto_approve' or 'manual_review'
+        ['google_api_key', ''],
+        ['raffle_auto_trigger', 'false'],        // 'true' or 'false'
+        ['raffle_warning_sent_block', '0'],      // block number of last sent 144-warning
+        ['raffle_block_notified', '0'],          // block number of last block-mined notification
+        ['extra_telegram_chats', ''],            // comma-separated extra admin chat IDs
+        ['pending_telegram_message', '']         // queued message held during quiet hours
     ];
     for (const [key, value] of defaultSettings) {
         db.run(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`, [key, value]);
@@ -314,6 +330,30 @@ function getPublicTickets() {
     `);
 }
 
+/**
+ * Get only approved tickets for public display.
+ * Featured tickets come first, then sorted by submitted_at DESC.
+ */
+function getApprovedPublicTickets() {
+    return query(`
+        SELECT t.id, t.review_link, t.review_text, t.merchant_name, t.is_valid, t.validation_reason, t.submitted_at,
+               COALESCE(t.is_featured, 0) as is_featured
+        FROM tickets t
+        WHERE t.is_valid = 1
+        ORDER BY COALESCE(t.is_featured, 0) DESC, t.submitted_at DESC
+    `);
+}
+
+/**
+ * Set or unset the featured flag on a ticket
+ */
+function featureTicket(ticketId, isFeatured) {
+    run(
+        `UPDATE tickets SET is_featured = ? WHERE id = ?`,
+        [isFeatured ? 1 : 0, ticketId]
+    );
+}
+
 function getPendingTickets() {
     return query(`
         SELECT t.*, u.email, u.lnurl_address
@@ -490,6 +530,8 @@ module.exports = {
     getValidTicketsForBlock,
     getAllTickets,
     getPublicTickets,
+    getApprovedPublicTickets,
+    featureTicket,
     getPendingTickets,
     getUnvalidatedTickets,
     getTicketById,

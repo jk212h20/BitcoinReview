@@ -1,110 +1,108 @@
-<%- include('layout', { body: ` 
-<!-- Header -->
-<section class="bg-gradient-to-br from-orange-500 to-yellow-500 text-white py-12">
-    <div class="max-w-4xl mx-auto px-4 text-center">
-        <h1 class="text-3xl md:text-4xl font-bold mb-4">Submitted Reviews</h1>
-        <p class="text-lg opacity-90">
-            See all Bitcoin payment experiences shared by the community
-        </p>
-    </div>
-</section>
+<%- include('layout', { body: `
 
-<!-- Stats Summary -->
-<section class="py-8">
-    <div class="max-w-6xl mx-auto px-4">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div class="bg-white rounded-lg shadow-sm p-6 text-center">
-                <div class="text-3xl font-bold text-gray-800">${typeof reviews !== 'undefined' ? reviews.length : 0}</div>
-                <div class="text-gray-500 mt-1">Total Reviews</div>
+<section class="max-w-4xl mx-auto px-4 py-12">
+
+    <!-- Header -->
+    <div class="text-center mb-10">
+        <h1 class="text-3xl font-bold mb-2">Bitcoin Reviews</h1>
+        <p class="text-gray-600">Real experiences spending Bitcoin at Roatan merchants</p>
+    </div>
+
+    ${typeof error !== 'undefined' && error ? `
+    <div class="bg-red-50 border border-red-300 rounded-lg p-4 mb-6">
+        <p class="text-red-700">${error}</p>
+    </div>
+    ` : ''}
+
+    ${typeof reviews !== 'undefined' && reviews.length === 0 ? `
+    <div class="text-center py-20 text-gray-500">
+        <div class="text-5xl mb-4">🔍</div>
+        <p class="text-lg font-medium">No approved reviews yet</p>
+        <p class="mt-2">Be the first! <a href="/submit" class="text-bitcoin hover:underline">Submit your review</a></p>
+    </div>
+    ` : ''}
+
+    <!-- Featured Reviews -->
+    ${typeof featuredReviews !== 'undefined' && featuredReviews.length > 0 ? `
+    <div class="mb-12">
+        <h2 class="text-xl font-bold mb-5 flex items-center gap-2">
+            <span>⭐</span> Featured Reviews
+        </h2>
+        <div class="grid gap-6 md:grid-cols-2">
+            ${featuredReviews.map(review => `
+            <div class="bg-gradient-to-br from-orange-50 to-amber-50 border-2 border-bitcoin rounded-xl p-6 shadow-md">
+                <div class="flex items-start justify-between mb-3">
+                    <div>
+                        <span class="inline-flex items-center gap-1 bg-bitcoin text-white text-xs font-bold px-2 py-1 rounded-full mb-2">
+                            ⭐ Featured
+                        </span>
+                        <h3 class="font-bold text-gray-900">${review.merchant_name ? review.merchant_name.replace(/</g, '&lt;').replace(/>/g, '&gt;') : 'Roatan Merchant'}</h3>
+                    </div>
+                    <span class="text-xs text-gray-500 mt-1 whitespace-nowrap ml-4">
+                        ${new Date(review.submitted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </span>
+                </div>
+                ${review.review_text ? `
+                <blockquote class="text-gray-700 text-sm italic border-l-4 border-bitcoin pl-3 mb-4">
+                    "${review.review_text.length > 300 ? review.review_text.substring(0, 300).replace(/</g, '&lt;').replace(/>/g, '&gt;') + '…' : review.review_text.replace(/</g, '&lt;').replace(/>/g, '&gt;')}"
+                </blockquote>
+                ` : ''}
+                <a href="${review.review_link}" target="_blank" rel="noopener noreferrer"
+                   class="inline-flex items-center gap-1 text-sm font-semibold text-bitcoin hover:text-bitcoin-dark transition">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/><path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/></svg>
+                    Read on Google Maps
+                </a>
             </div>
-            <div class="bg-white rounded-lg shadow-sm p-6 text-center">
-                <div class="text-3xl font-bold text-green-600">${typeof reviews !== 'undefined' ? reviews.filter(r => r.is_valid === 1).length : 0}</div>
-                <div class="text-gray-500 mt-1">✅ Successful Bitcoin Use</div>
-            </div>
-            <div class="bg-white rounded-lg shadow-sm p-6 text-center">
-                <div class="text-3xl font-bold text-red-500">${typeof reviews !== 'undefined' ? reviews.filter(r => r.is_valid === 0 && r.validation_reason).length : 0}</div>
-                <div class="text-gray-500 mt-1">❌ Unsuccessful Attempt</div>
-            </div>
+            `).join('')}
         </div>
     </div>
-</section>
+    ` : ''}
 
-<!-- Reviews List -->
-<section class="pb-12">
-    <div class="max-w-6xl mx-auto px-4">
-        ${typeof error !== 'undefined' && error ? '<div class="bg-red-100 text-red-700 p-4 rounded-lg mb-8">' + error + '</div>' : ''}
-        
-        ${typeof reviews !== 'undefined' && reviews.length > 0 ? '<div class="space-y-4">' + reviews.map(function(r) {
-            var statusClass, statusIcon, statusLabel;
-            if (r.is_valid === 1) {
-                statusClass = 'bg-green-100 border-green-300 text-green-800';
-                statusIcon = '✅';
-                statusLabel = 'Successful Bitcoin Use';
-            } else if (r.validation_reason) {
-                statusClass = 'bg-red-100 border-red-300 text-red-800';
-                statusIcon = '❌';
-                statusLabel = 'Unsuccessful Attempt';
-            } else {
-                statusClass = 'bg-yellow-100 border-yellow-300 text-yellow-800';
-                statusIcon = '⏳';
-                statusLabel = 'Pending Review';
-            }
-            
-            var dateStr = r.submitted_at ? new Date(r.submitted_at + 'Z').toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'Unknown';
-            
-            return '<div class="bg-white rounded-lg shadow-sm border hover:shadow-md transition">' +
-                '<div class="p-6">' +
-                    '<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">' +
-                        '<div class="flex items-center gap-3">' +
-                            '<span class="text-2xl">' + statusIcon + '</span>' +
-                            '<div>' +
-                                (r.merchant_name ? '<h3 class="font-bold text-lg">' + r.merchant_name + '</h3>' : '<h3 class="font-bold text-lg text-gray-400">Unknown Merchant</h3>') +
-                                '<p class="text-sm text-gray-500">Submitted ' + dateStr + '</p>' +
-                            '</div>' +
-                        '</div>' +
-                        '<span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ' + statusClass + '">' +
-                            statusLabel +
-                        '</span>' +
-                    '</div>' +
-                    (r.review_text ? '<p class="text-gray-700 mb-4">' + r.review_text.substring(0, 300) + (r.review_text.length > 300 ? '...' : '') + '</p>' : '') +
-                    (r.validation_reason ? '<div class="text-sm text-gray-500 mb-4 italic">' +
-                        '<span class="font-medium">AI Assessment:</span> ' + r.validation_reason +
-                    '</div>' : '') +
-                    '<div class="flex items-center gap-4">' +
-                        '<a href="' + r.review_link + '" target="_blank" class="text-bitcoin hover:underline text-sm font-medium">View Original Review →</a>' +
-                    '</div>' +
-                '</div>' +
-            '</div>';
-        }).join('') + '</div>'
-        : '<div class="text-center py-12">' +
-            '<div class="text-6xl mb-4">📝</div>' +
-            '<h2 class="text-2xl font-bold mb-4">No Reviews Yet</h2>' +
-            '<p class="text-gray-600 mb-8">' +
-                'Be the first to submit a Bitcoin payment review!' +
-            '</p>' +
-            '<a href="/submit" class="inline-block bg-bitcoin text-white px-8 py-3 rounded-lg font-bold hover:bg-bitcoin-dark transition">' +
-                'Submit a Review' +
-            '</a>' +
-        '</div>'
-        }
-    </div>
-</section>
-
-<!-- CTA -->
-<section class="py-12 bg-gray-50">
-    <div class="max-w-4xl mx-auto px-4 text-center">
-        <h2 class="text-2xl font-bold mb-4">Paid with Bitcoin?</h2>
-        <p class="text-gray-600 mb-6">
-            Share your experience! Write a Google review mentioning your Bitcoin payment and enter our raffle.
-        </p>
-        <div class="flex flex-col sm:flex-row gap-4 justify-center">
-            <a href="/submit" class="bg-bitcoin text-white px-8 py-3 rounded-lg font-bold hover:bg-bitcoin-dark transition">
-                Submit a Review
-            </a>
-            <a href="/merchants" class="border-2 border-bitcoin text-bitcoin px-8 py-3 rounded-lg font-bold hover:bg-bitcoin hover:text-white transition">
-                Find Merchants
-            </a>
+    <!-- All Approved Reviews -->
+    ${typeof regularReviews !== 'undefined' && regularReviews.length > 0 ? `
+    <div>
+        ${typeof featuredReviews !== 'undefined' && featuredReviews.length > 0 ? '<h2 class="text-xl font-bold mb-5">All Reviews</h2>' : ''}
+        <div class="space-y-4">
+            ${regularReviews.map(review => `
+            <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
+                <div class="flex items-start justify-between mb-2">
+                    <div class="flex-1 min-w-0">
+                        <h3 class="font-semibold text-gray-900 truncate">
+                            ${review.merchant_name ? review.merchant_name.replace(/</g, '&lt;').replace(/>/g, '&gt;') : '<span class="text-gray-400 italic">Roatan merchant</span>'}
+                        </h3>
+                    </div>
+                    <span class="text-xs text-gray-400 ml-4 whitespace-nowrap mt-0.5">
+                        ${new Date(review.submitted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </span>
+                </div>
+                ${review.review_text ? `
+                <p class="text-gray-600 text-sm mb-3 line-clamp-3 italic">
+                    "${review.review_text.length > 200 ? review.review_text.substring(0, 200).replace(/</g, '&lt;').replace(/>/g, '&gt;') + '…' : review.review_text.replace(/</g, '&lt;').replace(/>/g, '&gt;')}"
+                </p>
+                ` : `
+                <p class="text-gray-400 text-sm mb-3 italic">No review text provided</p>
+                `}
+                <a href="${review.review_link}" target="_blank" rel="noopener noreferrer"
+                   class="inline-flex items-center gap-1 text-sm font-medium text-bitcoin hover:text-bitcoin-dark transition">
+                    <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/><path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/></svg>
+                    View on Google Maps
+                </a>
+            </div>
+            `).join('')}
         </div>
     </div>
+    ` : ''}
+
+    <!-- Submit CTA -->
+    ${typeof reviews !== 'undefined' && reviews.length > 0 ? `
+    <div class="mt-12 text-center bg-orange-50 rounded-xl p-8 border border-orange-100">
+        <p class="text-gray-700 font-medium mb-4">Visited a Bitcoin merchant in Roatan recently?</p>
+        <a href="/submit" class="inline-block bg-bitcoin hover:bg-bitcoin-dark text-white font-bold px-8 py-3 rounded-lg transition">
+            Submit Your Review
+        </a>
+    </div>
+    ` : ''}
+
 </section>
-` }) %>
+
+`, donationAddress: typeof donationAddress !== 'undefined' ? donationAddress : 'Coming soon' }) %>

@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "db:init": "node src/scripts/init-db.js"
+    "db:init": "node src/scripts/init-db.js",
+    "test": "node src/tests/raffle.test.js"
   },
   "keywords": [
     "bitcoin",

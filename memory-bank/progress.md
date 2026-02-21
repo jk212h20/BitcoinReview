@@ -55,7 +55,12 @@
 - [x] Set up email provider (switched from Nodemailer/SMTP to Resend API)
 - [x] Get Anthropic API key configured (using PPQ proxy)
 - [x] Configure Voltage LND node connection
-- [ ] Test full review submission flow on production
+- [x] Telegram admin notifications (CoraTelegramBot)
+- [x] One-tap approve/reject via Telegram links
+- [x] Mobile admin quick-review page (/admin/review/:id)
+- [x] Email + LN address mandatory on submit
+- [x] Fixed LEFT JOIN bug for anonymous tickets
+- [ ] Test full review submission flow on production (incl. Telegram notification)
 - [ ] Test Lightning payment flow end-to-end on production
 - [ ] Verify domain in Resend for production emails
 - [ ] Change admin password from default (admin123)
@@ -64,6 +69,8 @@
 - Email: Resend API key set, but using test sender (onboarding@resend.dev) - need to verify custom domain in Resend dashboard for production
 - Admin password is default (admin123) - should be changed for production
 - DEFAULT_PRIZE_SATS set to 100 (very low) - may need adjustment
+- PPQ API key returning 401 - AI validation exists but non-functional until key is fixed
+- Merchant name from Google Maps often null (extraction unreliable)
 
 ## Session Log
 

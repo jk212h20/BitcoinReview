@@ -145,22 +145,28 @@ router.get('/opt-out/:token', (req, res) => {
 
 /**
  * GET /reviews
- * Public reviews page - shows all submitted reviews without personal info
+ * Public reviews page - shows only approved reviews, featured first
  */
 router.get('/reviews', (req, res) => {
     try {
-        const reviews = db.getPublicTickets();
+        const reviews = db.getApprovedPublicTickets();
+        const featuredReviews = reviews.filter(r => r.is_featured);
+        const regularReviews = reviews.filter(r => !r.is_featured);
         
         res.render('reviews', {
             title: 'Reviews - Bitcoin Review Raffle',
-            reviews
+            reviews,
+            featuredReviews,
+            regularReviews
         });
     } catch (error) {
         console.error('Reviews page error:', error);
         res.render('reviews', {
             title: 'Reviews - Bitcoin Review Raffle',
             error: 'Failed to load reviews',
-            reviews: []
+            reviews: [],
+            featuredReviews: [],
+            regularReviews: []
         });
     }
 });
