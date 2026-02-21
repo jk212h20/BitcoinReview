@@ -94,6 +94,14 @@ async function initializeDatabase() {
         );
     `);
     
+    // Add merchant_name column to tickets if it doesn't exist (migration for existing DBs)
+    try {
+        db.run(`ALTER TABLE tickets ADD COLUMN merchant_name TEXT`);
+        console.log('✅ Added merchant_name column to tickets');
+    } catch (e) {
+        // Column already exists — that's fine
+    }
+
     // Add is_featured column to tickets if it doesn't exist (migration for existing DBs)
     try {
         db.run(`ALTER TABLE tickets ADD COLUMN is_featured INTEGER DEFAULT 0`);

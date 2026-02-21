@@ -170,11 +170,6 @@ router.post('/submit', async (req, res) => {
             const cleanReviewText = (reviewText && reviewText.trim().length > 0) ? reviewText.trim() : null;
             
             const cleanMerchantName = (req.body.merchantName && req.body.merchantName.trim()) ? req.body.merchantName.trim() : null;
-            console.log(`[Submit] merchantName from body: ${JSON.stringify(req.body.merchantName)} → cleanMerchantName: ${JSON.stringify(cleanMerchantName)}`);
-            // Debug: send raw body to Cline notifier so we can see what the form is sending
-            const https = require('https');
-            const debugMsg = `[BitcoinReview Debug]\nreq.body keys: ${JSON.stringify(Object.keys(req.body))}\nmerchantName: ${JSON.stringify(req.body.merchantName)}\ncleanMerchantName: ${JSON.stringify(cleanMerchantName)}`;
-            https.get(`https://api.telegram.org/bot7734419980:AAE99O5SPDV4oDm9mdgfjah1ADTLGgvfKGM/sendMessage?chat_id=1840726659&text=${encodeURIComponent(debugMsg)}`).on('error', ()=>{});
             const ticket = db.createTicket(
                 user ? user.id : null,
                 cleanReview,
