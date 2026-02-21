@@ -152,6 +152,7 @@ async function notifyNewReview(ticket, user, dbModule) {
 
     const approveToken = process.env.TELEGRAM_APPROVE_TOKEN;
     const ticketId = ticket.id;
+    console.log(`[Telegram] notifyNewReview - ticket.id=${ticketId} merchant_name=${JSON.stringify(ticket.merchant_name)}`);
     const merchantDisplay = ticket.merchant_name ? `*${escapeMarkdown(ticket.merchant_name)}*` : '_Unknown merchant_';
     const submitterDisplay = user && user.email
         ? escapeMarkdown(maskEmail(user.email))

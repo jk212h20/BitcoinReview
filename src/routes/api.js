@@ -170,6 +170,7 @@ router.post('/submit', async (req, res) => {
             const cleanReviewText = (reviewText && reviewText.trim().length > 0) ? reviewText.trim() : null;
             
             const cleanMerchantName = (req.body.merchantName && req.body.merchantName.trim()) ? req.body.merchantName.trim() : null;
+            console.log(`[Submit] merchantName from body: ${JSON.stringify(req.body.merchantName)} → cleanMerchantName: ${JSON.stringify(cleanMerchantName)}`);
             const ticket = db.createTicket(
                 user ? user.id : null,
                 cleanReview,
