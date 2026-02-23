@@ -431,12 +431,111 @@ async function checkLightningDeposits() {
 }
 
 /**
- * Poll for deposits (called on interval)
+ * Poll for deposits (called on interval — fallback for missed subscription events)
  */
 async function checkForDeposits() {
     await checkOnChainDeposits();
     await checkLightningDeposits();
     depositCache.lastChecked = Date.now();
+}
+
+/**
+ * Handle a settled invoice event (from subscription or polling).
+ * Credits the raffle fund and rotates the cached invoice if needed.
+ */
+async function handleSettledInvoice(settledInvoice) {
+    const paymentHash = Buffer.from(settledInvoice.r_hash, 'base64').toString('hex');
+    const amountSats = parseInt(settledInvoice.amt_paid_sat || settledInvoice.value || '0');
+    
+    // Check if this invoice is one we're tracking
+    const dbInvoice = db.getDepositAddressByPaymentHash(paymentHash);
+    if (!dbInvoice) return; // Not our tracked invoice
+    if (dbInvoice.received_at) return; // Already credited
+    
+    console.log(`⚡ INSTANT: Lightning deposit detected: ${amountSats} sats (invoice ${paymentHash.substring(0, 12)}...)`);
+    
+    // Mark received in DB
+    db.markDepositReceived(dbInvoice.id, amountSats);
+    
+    // Add to raffle fund
+    if (amountSats > 0) {
+        const currentFund = parseInt(db.getSetting('raffle_fund_sats') || '0');
+        db.setSetting('raffle_fund_sats', String(currentFund + amountSats));
+        console.log(`🎯 Raffle fund updated: ${currentFund} + ${amountSats} = ${currentFund + amountSats} sats`);
+    }
+    
+    // If this was the cached zero-amount invoice, rotate it
+    if (paymentHash === depositCache.lightningPaymentHash) {
+        await createDonationInvoice(0);
+    }
+}
+
+/**
+ * Subscribe to LND invoice updates via streaming REST API.
+ * This gives us instant notification when any invoice is settled.
+ * Auto-reconnects on disconnection.
+ */
+async function subscribeToInvoices() {
+    if (!LND_REST_URL || !LND_MACAROON) return;
+    
+    const url = `${LND_REST_URL}/v2/invoices/subscribe`;
+    console.log('⚡ Subscribing to LND invoice stream...');
+    
+    try {
+        const response = await fetch(url, {
+            headers: {
+                'Grpc-Metadata-macaroon': LND_MACAROON,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Subscribe failed: ${response.status}`);
+        }
+        
+        console.log('⚡ Connected to LND invoice subscription stream');
+        
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+                console.warn('⚡ Invoice subscription stream ended');
+                break;
+            }
+            
+            buffer += decoder.decode(value, { stream: true });
+            
+            // LND streams JSON objects separated by newlines
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || ''; // Keep incomplete line in buffer
+            
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed) continue;
+                
+                try {
+                    const event = JSON.parse(trimmed);
+                    // The subscription wraps invoices in a "result" field
+                    const invoice = event.result || event;
+                    
+                    if (invoice.state === 'SETTLED') {
+                        await handleSettledInvoice(invoice);
+                    }
+                } catch (parseErr) {
+                    // Partial JSON or non-JSON line — skip
+                }
+            }
+        }
+    } catch (err) {
+        console.warn('⚠️  Invoice subscription error:', err.message);
+    }
+    
+    // Auto-reconnect after 5 seconds
+    console.log('⚡ Reconnecting invoice subscription in 5s...');
+    setTimeout(() => subscribeToInvoices(), 5000);
 }
 
 /**
@@ -446,6 +545,9 @@ async function warmDepositCache() {
     try {
         await getDepositInfo();
         console.log(`✅ Deposit cache warmed - On-chain: ${depositCache.onchainAddress?.substring(0, 12)}... | Lightning: ready`);
+        
+        // Start real-time invoice subscription (non-blocking)
+        subscribeToInvoices();
     } catch (err) {
         console.warn('⚠️  Failed to warm deposit cache:', err.message);
     }
