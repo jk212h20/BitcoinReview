@@ -478,23 +478,41 @@ async function handleSettledInvoice(settledInvoice) {
 async function subscribeToInvoices() {
     if (!LND_REST_URL || !LND_MACAROON) return;
     
-    const url = `${LND_REST_URL}/v2/invoices/subscribe`;
-    console.log('⚡ Subscribing to LND invoice stream...');
+    // Try v1 endpoint first (wider compatibility), then v2
+    const endpoints = ['/v1/invoices/subscribe', '/v2/invoices/subscribe'];
+    let response = null;
+    
+    for (const endpoint of endpoints) {
+        const url = `${LND_REST_URL}${endpoint}`;
+        console.log(`⚡ Trying invoice subscription: ${endpoint}...`);
+        
+        try {
+            response = await fetch(url, {
+                headers: {
+                    'Grpc-Metadata-macaroon': LND_MACAROON,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                console.log(`⚡ Connected to LND invoice stream via ${endpoint}`);
+                break;
+            } else {
+                console.warn(`⚠️  ${endpoint} returned ${response.status}`);
+                response = null;
+            }
+        } catch (e) {
+            console.warn(`⚠️  ${endpoint} error: ${e.message}`);
+            response = null;
+        }
+    }
+    
+    if (!response) {
+        console.warn('⚠️  No working invoice subscription endpoint found. Falling back to polling only.');
+        return; // Don't retry — endpoints aren't available on this node
+    }
     
     try {
-        const response = await fetch(url, {
-            headers: {
-                'Grpc-Metadata-macaroon': LND_MACAROON,
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        if (!response.ok) {
-            throw new Error(`Subscribe failed: ${response.status}`);
-        }
-        
-        console.log('⚡ Connected to LND invoice subscription stream');
-        
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
@@ -507,35 +525,28 @@ async function subscribeToInvoices() {
             }
             
             buffer += decoder.decode(value, { stream: true });
-            
-            // LND streams JSON objects separated by newlines
             const lines = buffer.split('\n');
-            buffer = lines.pop() || ''; // Keep incomplete line in buffer
+            buffer = lines.pop() || '';
             
             for (const line of lines) {
                 const trimmed = line.trim();
                 if (!trimmed) continue;
-                
                 try {
                     const event = JSON.parse(trimmed);
-                    // The subscription wraps invoices in a "result" field
                     const invoice = event.result || event;
-                    
                     if (invoice.state === 'SETTLED') {
                         await handleSettledInvoice(invoice);
                     }
-                } catch (parseErr) {
-                    // Partial JSON or non-JSON line — skip
-                }
+                } catch (parseErr) { /* skip partial JSON */ }
             }
         }
     } catch (err) {
-        console.warn('⚠️  Invoice subscription error:', err.message);
+        console.warn('⚠️  Invoice subscription stream error:', err.message);
     }
     
-    // Auto-reconnect after 5 seconds
-    console.log('⚡ Reconnecting invoice subscription in 5s...');
-    setTimeout(() => subscribeToInvoices(), 5000);
+    // Auto-reconnect after 30 seconds
+    console.log('⚡ Reconnecting invoice subscription in 30s...');
+    setTimeout(() => subscribeToInvoices(), 30000);
 }
 
 /**
@@ -549,8 +560,9 @@ async function subscribeToTransactions() {
     const url = `${LND_REST_URL}/v1/transactions/subscribe`;
     console.log('💰 Subscribing to LND on-chain transaction stream...');
     
+    let response;
     try {
-        const response = await fetch(url, {
+        response = await fetch(url, {
             headers: {
                 'Grpc-Metadata-macaroon': LND_MACAROON,
                 'Content-Type': 'application/json'
@@ -558,11 +570,19 @@ async function subscribeToTransactions() {
         });
         
         if (!response.ok) {
-            throw new Error(`Transaction subscribe failed: ${response.status}`);
+            console.warn(`⚠️  Transaction subscribe returned ${response.status}. Falling back to polling only.`);
+            return; // Don't retry on 404/permanent errors
         }
-        
-        console.log('💰 Connected to LND on-chain transaction stream');
-        
+    } catch (err) {
+        console.warn('⚠️  Transaction subscribe connection error:', err.message);
+        // Reconnect after 30s for network errors
+        setTimeout(() => subscribeToTransactions(), 30000);
+        return;
+    }
+    
+    console.log('💰 Connected to LND on-chain transaction stream');
+    
+    try {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
