@@ -14,8 +14,12 @@ let depositCache = {
     onchainAddress: null,
     lightningInvoice: null,  // zero-amount invoice bolt11
     lightningPaymentHash: null,
-    lastChecked: 0
+    lastChecked: 0,
+    lastExpiryCheck: 0       // track when we last checked expiry
 };
+
+// How often to re-check invoice expiry (5 minutes)
+const EXPIRY_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
 /**
  * Make an authenticated request to the LND REST API
@@ -308,8 +312,22 @@ async function isInvoiceExpired() {
 }
 
 /**
+ * Get the current active deposit info from cache.
+ * This is the FAST path used by page routes — returns cached data instantly.
+ * Never makes external API calls. The cache is warmed on startup and
+ * refreshed in the background by refreshDepositInfoIfNeeded().
+ */
+function getDepositInfoCached() {
+    return {
+        onchainAddress: depositCache.onchainAddress,
+        lightningInvoice: depositCache.lightningInvoice
+    };
+}
+
+/**
  * Get the current active deposit info (from cache or DB)
  * Auto-rotates the Lightning invoice if it has expired.
+ * This is the SLOW path — only called during warmup and background refresh.
  */
 async function getDepositInfo() {
     // Try to load from DB if cache is empty
@@ -341,10 +359,27 @@ async function getDepositInfo() {
         }
     }
     
+    depositCache.lastExpiryCheck = Date.now();
+    
     return {
         onchainAddress: depositCache.onchainAddress,
         lightningInvoice: depositCache.lightningInvoice
     };
+}
+
+/**
+ * Background refresh: checks invoice expiry periodically (every 5 min).
+ * Called from the deposit polling interval — NOT from page routes.
+ */
+async function refreshDepositInfoIfNeeded() {
+    const now = Date.now();
+    if ((now - depositCache.lastExpiryCheck) >= EXPIRY_CHECK_INTERVAL_MS) {
+        try {
+            await getDepositInfo();
+        } catch (err) {
+            console.warn('⚠️  Background deposit refresh error:', err.message);
+        }
+    }
 }
 
 /**
@@ -671,6 +706,8 @@ module.exports = {
     generateOnChainAddress,
     createDonationInvoice,
     getDepositInfo,
+    getDepositInfoCached,
+    refreshDepositInfoIfNeeded,
     checkForDeposits,
     warmDepositCache
 };

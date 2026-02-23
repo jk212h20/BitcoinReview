@@ -22,13 +22,8 @@ router.get('/', async (req, res) => {
         const latestRaffle = db.getLatestRaffle();
         const allRaffles = db.getAllRaffles();
         
-        // Get deposit addresses from Voltage node
-        let depositInfo = { onchainAddress: null, lightningInvoice: null };
-        try {
-            depositInfo = await lightning.getDepositInfo();
-        } catch (err) {
-            console.warn('Could not load deposit info:', err.message);
-        }
+        // Use cached deposit info (instant, no LND API call)
+        const depositInfo = lightning.getDepositInfoCached();
         const totalDonations = db.getTotalDonationsReceived();
 
         // Get most-recently-reviewed merchant for homepage spotlight
@@ -74,13 +69,8 @@ router.get('/submit', async (req, res) => {
     try {
         const raffleInfo = await bitcoin.getRaffleInfo();
         
-        // Get deposit address from Voltage node
-        let depositInfo = { onchainAddress: null };
-        try {
-            depositInfo = await lightning.getDepositInfo();
-        } catch (err) {
-            console.warn('Could not load deposit info for submit page:', err.message);
-        }
+        // Use cached deposit info (instant, no LND API call)
+        const depositInfo = lightning.getDepositInfoCached();
 
         // Load merchant list for the searchable dropdown
         let merchants = [];
@@ -115,13 +105,8 @@ router.get('/merchants', async (req, res) => {
     try {
         const merchants = await btcmap.getMerchantList();
 
-        // Get deposit address for donation footer
-        let depositInfo = { onchainAddress: null };
-        try {
-            depositInfo = await lightning.getDepositInfo();
-        } catch (err) {
-            console.warn('Could not load deposit info for merchants page:', err.message);
-        }
+        // Use cached deposit info (instant, no LND API call)
+        const depositInfo = lightning.getDepositInfoCached();
 
         // Get approved tickets with merchant names to find recently-reviewed merchants
         const approvedTickets = db.getApprovedPublicTickets();
@@ -200,19 +185,14 @@ router.get('/opt-out/:token', (req, res) => {
  * GET /reviews
  * Public reviews page - shows only approved reviews, featured first
  */
-router.get('/reviews', async (req, res) => {
+router.get('/reviews', (req, res) => {
     try {
         const reviews = db.getApprovedPublicTickets();
         const featuredReviews = reviews.filter(r => r.is_featured);
         const regularReviews = reviews.filter(r => !r.is_featured);
 
-        // Get deposit address for donation footer
-        let depositInfo = { onchainAddress: null };
-        try {
-            depositInfo = await lightning.getDepositInfo();
-        } catch (err) {
-            console.warn('Could not load deposit info for reviews page:', err.message);
-        }
+        // Use cached deposit info (instant, no LND API call)
+        const depositInfo = lightning.getDepositInfoCached();
         
         res.render('reviews', {
             title: 'Reviews - Bitcoin Review Raffle',
@@ -238,17 +218,12 @@ router.get('/reviews', async (req, res) => {
  * GET /raffles
  * Public raffle history page — transparent, verifiable results
  */
-router.get('/raffles', async (req, res) => {
+router.get('/raffles', (req, res) => {
     try {
         const raffles = db.getAllRaffles();
 
-        // Get deposit address for donation footer
-        let depositInfo = { onchainAddress: null };
-        try {
-            depositInfo = await lightning.getDepositInfo();
-        } catch (err) {
-            console.warn('Could not load deposit info for raffles page:', err.message);
-        }
+        // Use cached deposit info (instant, no LND API call)
+        const depositInfo = lightning.getDepositInfoCached();
         
         res.render('raffles', {
             title: 'Raffle History - Bitcoin Review Raffle',
@@ -274,13 +249,8 @@ router.get('/how-it-works', async (req, res) => {
     try {
         const raffleInfo = await bitcoin.getRaffleInfo();
 
-        // Get deposit address for donation footer
-        let depositInfo = { onchainAddress: null };
-        try {
-            depositInfo = await lightning.getDepositInfo();
-        } catch (err) {
-            console.warn('Could not load deposit info for how-it-works page:', err.message);
-        }
+        // Use cached deposit info (instant, no LND API call)
+        const depositInfo = lightning.getDepositInfoCached();
         
         res.render('how-it-works', {
             title: 'How It Works - Bitcoin Review Raffle',

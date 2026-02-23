@@ -7,6 +7,7 @@ require('dotenv').config();
 
 const express = require('express');
 const path = require('path');
+const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 
 // Import services
@@ -14,6 +15,7 @@ const db = require('./services/database');
 const email = require('./services/email');
 const anthropic = require('./services/anthropic');
 const bitcoin = require('./services/bitcoin');
+const btcmap = require('./services/btcmap');
 const lightning = require('./services/lightning');
 const telegram = require('./services/telegram');
 
@@ -27,13 +29,19 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
+app.use(compression());  // gzip all responses — ~70% smaller HTML/CSS/JS
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, '../public')));
+app.use(express.static(path.join(__dirname, '../public'), {
+    maxAge: '7d',          // Cache static assets (styles.css) for 7 days
+    etag: true,            // Enable ETag for conditional requests
+    lastModified: true
+}));
 
 // View engine setup
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
+app.set('view cache', true);  // Cache compiled EJS templates in production
 
 // Rate limiting for API endpoints
 const apiLimiter = rateLimit({
@@ -225,12 +233,20 @@ async function startServer() {
         console.warn('⚠️  Failed to warm deposit cache:', err.message);
     }
     
+    // Pre-warm BTCMap merchant cache so /submit and /merchants load instantly
+    try {
+        const merchants = await btcmap.getMerchantList();
+        console.log(`🗺️  BTCMap cache warmed: ${merchants.length} merchants`);
+    } catch (err) {
+        console.warn('⚠️  Failed to warm BTCMap cache:', err.message);
+    }
+    
     // Fast poll for deposits every 60s (fallback for subscription streams)
-    // Lightning subscription handles most cases instantly, but on-chain
-    // transactions need polling as a reliable fallback
+    // Also refreshes deposit info cache (invoice expiry) every 5 min in background
     setInterval(async () => {
         try {
             await lightning.checkForDeposits();
+            await lightning.refreshDepositInfoIfNeeded();
         } catch (err) {
             console.warn('Payment poll error:', err.message);
         }
