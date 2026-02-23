@@ -366,7 +366,9 @@ function getPublicTickets() {
 function getApprovedPublicTickets() {
     return query(`
         SELECT t.id, t.review_link, t.review_text, t.merchant_name, t.is_valid, t.validation_reason, t.submitted_at,
-               COALESCE(t.is_featured, 0) as is_featured
+               COALESCE(t.is_featured, 0) as is_featured,
+               COALESCE(t.tried_bitcoin, 0) as tried_bitcoin,
+               COALESCE(t.merchant_accepted, 0) as merchant_accepted
         FROM tickets t
         WHERE t.is_valid = 1
         ORDER BY COALESCE(t.is_featured, 0) DESC, t.submitted_at DESC

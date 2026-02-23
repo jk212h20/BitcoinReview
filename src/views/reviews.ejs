@@ -47,6 +47,13 @@
                     "${review.review_text.length > 300 ? review.review_text.substring(0, 300).replace(/</g, '&lt;').replace(/>/g, '&gt;') + '…' : review.review_text.replace(/</g, '&lt;').replace(/>/g, '&gt;')}"
                 </blockquote>
                 ` : ''}
+                ${review.tried_bitcoin && review.merchant_accepted ? `
+                <div class="mb-3">
+                    <span class="inline-flex items-center gap-1 bg-green-100 text-green-700 text-xs font-semibold px-2 py-1 rounded-full">
+                        👍 Bitcoin Used
+                    </span>
+                </div>
+                ` : ''}
                 <a href="${review.review_link}" target="_blank" rel="noopener noreferrer"
                    class="inline-flex items-center gap-1 text-sm font-semibold text-bitcoin hover:text-bitcoin-dark transition">
                     <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/><path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/></svg>
@@ -79,9 +86,14 @@
                 <p class="text-gray-600 text-sm mb-3 line-clamp-3 italic">
                     "${review.review_text.length > 200 ? review.review_text.substring(0, 200).replace(/</g, '&lt;').replace(/>/g, '&gt;') + '…' : review.review_text.replace(/</g, '&lt;').replace(/>/g, '&gt;')}"
                 </p>
-                ` : `
-                <p class="text-gray-400 text-sm mb-3 italic">No review text provided</p>
-                `}
+                ` : ''}
+                ${review.tried_bitcoin && review.merchant_accepted ? `
+                <div class="mb-3">
+                    <span class="inline-flex items-center gap-1 bg-green-100 text-green-700 text-xs font-semibold px-2 py-1 rounded-full">
+                        👍 Bitcoin Used
+                    </span>
+                </div>
+                ` : ''}
                 <a href="${review.review_link}" target="_blank" rel="noopener noreferrer"
                    class="inline-flex items-center gap-1 text-sm font-medium text-bitcoin hover:text-bitcoin-dark transition">
                     <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/><path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/></svg>
