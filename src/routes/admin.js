@@ -164,6 +164,60 @@ router.post('/tickets/:id/validate', (req, res) => {
 });
 
 /**
+ * POST /admin/raffle/test
+ * Dry-run test raffle — picks a winner from ALL approved tickets using the latest block hash.
+ * Does NOT create a raffle record, does NOT send notifications/emails, does NOT pay.
+ * Safe to run repeatedly without side effects.
+ */
+router.post('/raffle/test', async (req, res) => {
+    try {
+        const prizeSats = 100;
+
+        // Get all approved tickets (regardless of raffle_block)
+        const allApproved = db.getAllTickets().filter(t => t.is_valid === 1);
+
+        if (allApproved.length === 0) {
+            return res.status(400).json({ error: 'No approved tickets to draw from' });
+        }
+
+        // Use the current block height to get a real block hash for randomness
+        const currentHeight = await bitcoin.getCurrentBlockHeight();
+        const blockHash = await bitcoin.getBlockHash(currentHeight);
+
+        // Select winner deterministically
+        const winnerIndex = bitcoin.selectWinnerIndex(blockHash, allApproved.length);
+        const winningTicket = allApproved[winnerIndex];
+
+        res.json({
+            success: true,
+            test: true,
+            message: 'DRY RUN — no records created, no payments sent, no notifications.',
+            raffle: {
+                blockHeight: currentHeight,
+                blockHash,
+                totalTickets: allApproved.length,
+                winnerIndex,
+                formula: `int("0x${blockHash.substring(0, 16)}...") mod ${allApproved.length} = ${winnerIndex}`,
+                winner: {
+                    ticketId: winningTicket.id,
+                    email: winningTicket.email || 'Anonymous',
+                    lnurl: winningTicket.lnurl_address || 'None',
+                    merchantName: winningTicket.merchant_name || '-',
+                    reviewLink: winningTicket.review_link
+                },
+                prizeAmountSats: prizeSats,
+                wouldPay: !!(winningTicket.lnurl_address && prizeSats > 0),
+                note: 'This is a test. No database records were created. Existing reviews are untouched.'
+            }
+        });
+
+    } catch (error) {
+        console.error('Test raffle error:', error);
+        res.status(500).json({ error: 'Test raffle failed: ' + error.message });
+    }
+});
+
+/**
  * POST /admin/raffle/run
  * Run the raffle for a specific block
  */

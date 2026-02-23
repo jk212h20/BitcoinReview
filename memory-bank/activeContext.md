@@ -48,7 +48,7 @@ The site used `<script src="https://cdn.tailwindcss.com">` — a 3MB JS file tha
 
 ## Telegram Review Flow (Complete)
 When a review is submitted:
-1. `notifyNewReview()` fires immediately (bypasses quiet hours)
+1. `notifyNewReview()` fires (respects quiet hours 6pm–9am Roatan — queues count, summary sent at 9am)
 2. Admin gets Telegram message with:
    - Merchant name + submitter (masked email/LN address)
    - Review text preview (first 200 chars)
@@ -67,7 +67,7 @@ When a review is submitted:
 6. **Lightning payments:** LND REST API via Voltage node
 7. **Database:** sql.js (pure JS, no native compilation)
 8. **Telegram auth:** Two auth methods — `ADMIN_PASSWORD` (browser) and `TELEGRAM_APPROVE_TOKEN` (one-tap)
-9. **Quiet hours:** 6pm–9am Roatan time; new review notifications bypass quiet hours
+9. **Quiet hours:** 6pm–9am Roatan time; all notifications (including reviews) queued during quiet hours, summary at 9am
 10. **sql.js quirk:** `db.export()` resets `last_insert_rowid()` — always read ID before save
 
 ## DB Settings Keys
