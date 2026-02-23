@@ -6,7 +6,7 @@
   "scripts": {
     "build:css": "tailwindcss -i src/styles/input.css -o public/styles.css --minify",
     "build": "npm run build:css",
-    "start": "node src/index.js",
+    "start": "node --no-deprecation src/index.js",
     "dev": "node --watch src/index.js",
     "db:init": "node src/scripts/init-db.js",
     "test": "node src/tests/raffle.test.js"
