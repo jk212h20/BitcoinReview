@@ -243,43 +243,10 @@ var timeEst = typeof raffleInfo !== 'undefined' && raffleInfo && raffleInfo.bloc
                 </div>
                 <div>
                     <h3 class="font-bold text-lg mb-4">Support the Raffle</h3>
-                    <p class="text-gray-400 text-sm mb-2">Donate to fund prizes:</p>
-                    <% const addr = typeof donationAddress !== 'undefined' ? donationAddress : ''; %>
-                    <% if (addr && addr !== 'Not configured' && addr !== 'Coming soon') { %>
-                    <div x-data="{ showQR: false }" class="relative">
-                        <a href="https://mempool.space/address/<%= addr %>"
-                           target="_blank"
-                           rel="noopener noreferrer"
-                           class="text-xs bg-gray-700 px-2 py-1 rounded break-all text-bitcoin hover:text-yellow-400 transition inline-block"
-                           @mouseenter="showQR = true"
-                           @mouseleave="showQR = false">
-                            <%= addr %>
-                        </a>
-                        <div x-show="showQR"
-                             x-transition:enter="transition ease-out duration-200"
-                             x-transition:enter-start="opacity-0 scale-95"
-                             x-transition:enter-end="opacity-100 scale-100"
-                             x-transition:leave="transition ease-in duration-150"
-                             x-transition:leave-start="opacity-100 scale-100"
-                             x-transition:leave-end="opacity-0 scale-95"
-                             class="absolute bottom-full mb-2 left-0 bg-white p-3 rounded-lg shadow-xl z-50"
-                             @mouseenter="showQR = true"
-                             @mouseleave="showQR = false">
-                            <img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=bitcoin:<%= addr %>"
-                                 alt="Bitcoin QR Code"
-                                 width="160"
-                                 height="160"
-                                 class="rounded">
-                            <p class="text-gray-600 text-xs text-center mt-1">Scan to donate</p>
-                        </div>
-                        <button @click="navigator.clipboard.writeText('<%= addr %>'); $el.textContent = '✓ Copied!'; setTimeout(() => $el.textContent = '📋 Copy', 2000)"
-                                class="text-xs text-gray-500 hover:text-gray-300 mt-1 block transition">
-                            📋 Copy
-                        </button>
-                    </div>
-                    <% } else { %>
-                    <code class="text-xs bg-gray-700 px-2 py-1 rounded break-all">Not configured</code>
-                    <% } %>
+                    <p class="text-gray-400 text-sm mb-3">Every sat donated goes directly into the prize pool.</p>
+                    <a href="/#donate" class="inline-flex items-center gap-2 bg-bitcoin hover:bg-bitcoin-dark text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+                        ⚡ Donate (On-chain or Lightning)
+                    </a>
                 </div>
             </div>
             <div class="border-t border-gray-700 mt-8 pt-8 text-center text-gray-400">
