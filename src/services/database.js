@@ -528,6 +528,10 @@ function getDepositAddressByPaymentHash(paymentHash) {
     return queryOne(`SELECT * FROM deposit_addresses WHERE payment_hash = ?`, [paymentHash]);
 }
 
+function getUnpaidLightningInvoices() {
+    return query(`SELECT * FROM deposit_addresses WHERE type = 'lightning' AND payment_hash IS NOT NULL AND received_at IS NULL`);
+}
+
 function getTotalDonationsReceived() {
     const result = queryOne(`SELECT SUM(amount_received_sats) as total FROM deposit_addresses WHERE amount_received_sats > 0`);
     return result ? (result.total || 0) : 0;
@@ -600,6 +604,7 @@ module.exports = {
     getAllDepositAddresses,
     getDepositAddressByAddress,
     getDepositAddressByPaymentHash,
+    getUnpaidLightningInvoices,
     getTotalDonationsReceived,
     
     // Settings functions

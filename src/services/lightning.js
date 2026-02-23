@@ -384,34 +384,46 @@ async function checkOnChainDeposits() {
 }
 
 /**
- * Check if the cached Lightning invoice was paid; rotate if so
+ * Check ALL unpaid Lightning invoices (cached + custom-amount from DB) for settlement.
+ * This catches both the zero-amount donation invoice AND custom-amount invoices
+ * generated via the "Generate" button on the donation page.
  */
 async function checkLightningDeposits() {
-    if (!depositCache.lightningPaymentHash) return;
-    
     try {
-        const hashBase64 = Buffer.from(depositCache.lightningPaymentHash, 'hex').toString('base64')
-            .replace(/\+/g, '-').replace(/\//g, '_');
-        const invoice = await lndRequest(`/v2/invoices/lookup?payment_hash=${hashBase64}`);
+        // Get ALL unpaid Lightning invoices from DB
+        const unpaidInvoices = db.getUnpaidLightningInvoices();
         
-        if (invoice.state === 'SETTLED') {
-            const amountSats = parseInt(invoice.amt_paid_sat || invoice.value || '0');
-            console.log(`⚡ Lightning deposit detected: ${amountSats} sats`);
+        for (const dbInvoice of unpaidInvoices) {
+            if (!dbInvoice.payment_hash) continue;
             
-            // Mark received in DB
-            const dbAddr = db.getDepositAddressByPaymentHash(depositCache.lightningPaymentHash);
-            if (dbAddr) {
-                db.markDepositReceived(dbAddr.id, amountSats);
-                // Add to raffle fund
-                if (amountSats > 0) {
-                    const currentFund = parseInt(db.getSetting('raffle_fund_sats') || '0');
-                    db.setSetting('raffle_fund_sats', String(currentFund + amountSats));
-                    console.log(`🎯 Raffle fund updated: ${currentFund} + ${amountSats} = ${currentFund + amountSats} sats`);
+            try {
+                const hashBase64 = Buffer.from(dbInvoice.payment_hash, 'hex').toString('base64')
+                    .replace(/\+/g, '-').replace(/\//g, '_');
+                const lndInvoice = await lndRequest(`/v2/invoices/lookup?payment_hash=${hashBase64}`);
+                
+                if (lndInvoice.state === 'SETTLED') {
+                    const amountSats = parseInt(lndInvoice.amt_paid_sat || lndInvoice.value || '0');
+                    console.log(`⚡ Lightning deposit detected: ${amountSats} sats (invoice ${dbInvoice.payment_hash.substring(0, 12)}...)`);
+                    
+                    // Mark received in DB
+                    db.markDepositReceived(dbInvoice.id, amountSats);
+                    
+                    // Add to raffle fund
+                    if (amountSats > 0) {
+                        const currentFund = parseInt(db.getSetting('raffle_fund_sats') || '0');
+                        db.setSetting('raffle_fund_sats', String(currentFund + amountSats));
+                        console.log(`🎯 Raffle fund updated: ${currentFund} + ${amountSats} = ${currentFund + amountSats} sats`);
+                    }
+                    
+                    // If this was the cached zero-amount invoice, rotate it
+                    if (dbInvoice.payment_hash === depositCache.lightningPaymentHash) {
+                        await createDonationInvoice(0);
+                    }
                 }
+            } catch (err) {
+                // Skip individual invoice lookup errors (e.g., invoice not found)
+                continue;
             }
-            
-            // Generate new zero-amount invoice
-            await createDonationInvoice(0);
         }
     } catch (err) {
         console.warn('⚠️  Error checking Lightning deposits:', err.message);
