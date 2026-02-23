@@ -158,8 +158,8 @@
             // Initial fetch
             fetchFund();
 
-            // Poll every 30 seconds
-            setInterval(fetchFund, 30000);
+            // Poll every 10 seconds (backend detects instantly via LND subscription)
+            setInterval(fetchFund, 10000);
         })();
     </script>
 </body>
