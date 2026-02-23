@@ -197,7 +197,7 @@ router.post('/raffle/test', async (req, res) => {
                 blockHash,
                 totalTickets: allApproved.length,
                 winnerIndex,
-                formula: `int("0x${blockHash.substring(0, 16)}...") mod ${allApproved.length} = ${winnerIndex}`,
+                formula: `int("0x0000...${blockHash.slice(-16)}") mod ${allApproved.length} = ${winnerIndex}`,
                 winner: {
                     ticketId: winningTicket.id,
                     email: winningTicket.email || 'Anonymous',
