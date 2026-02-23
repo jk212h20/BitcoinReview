@@ -259,9 +259,12 @@ async function generateOnChainAddress() {
 
 /**
  * Create a Lightning invoice (zero-amount or specified amount) and track in DB
+ * Zero-amount donation invoices get 30-day expiry (no volatility concern for donations).
+ * Custom-amount invoices get 7-day expiry.
  */
 async function createDonationInvoice(amountSats = 0, memo = 'Donation to Bitcoin Review Raffle') {
-    const body = { memo, expiry: '86400' }; // 24h expiry
+    const expiry = amountSats === 0 ? '2592000' : '604800'; // 30 days for zero-amount, 7 days for custom
+    const body = { memo, expiry };
     if (amountSats > 0) {
         body.value = String(amountSats);
     }
@@ -287,33 +290,55 @@ async function createDonationInvoice(amountSats = 0, memo = 'Donation to Bitcoin
 }
 
 /**
+ * Check if the cached Lightning invoice is expired by looking it up on LND.
+ * Returns true if expired or cancelled, false if still open.
+ */
+async function isInvoiceExpired() {
+    if (!depositCache.lightningPaymentHash) return true;
+    try {
+        const hashBase64 = Buffer.from(depositCache.lightningPaymentHash, 'hex').toString('base64')
+            .replace(/\+/g, '-').replace(/\//g, '_');
+        const invoice = await lndRequest(`/v2/invoices/lookup?payment_hash=${hashBase64}`);
+        // OPEN = still valid, SETTLED = paid, CANCELLED/EXPIRED = expired
+        return invoice.state !== 'OPEN';
+    } catch (err) {
+        // If we can't look it up, assume expired to be safe
+        return true;
+    }
+}
+
+/**
  * Get the current active deposit info (from cache or DB)
+ * Auto-rotates the Lightning invoice if it has expired.
  */
 async function getDepositInfo() {
-    // Return from cache if available
-    if (depositCache.onchainAddress && depositCache.lightningInvoice) {
-        return {
-            onchainAddress: depositCache.onchainAddress,
-            lightningInvoice: depositCache.lightningInvoice
-        };
+    // Try to load from DB if cache is empty
+    if (!depositCache.onchainAddress || !depositCache.lightningInvoice) {
+        const onchain = db.getActiveDepositAddress('onchain');
+        const lightning = db.getActiveDepositAddress('lightning');
+        
+        if (onchain) depositCache.onchainAddress = onchain.address;
+        if (lightning) {
+            depositCache.lightningInvoice = lightning.invoice;
+            depositCache.lightningPaymentHash = lightning.payment_hash;
+        }
     }
     
-    // Try to load from DB
-    const onchain = db.getActiveDepositAddress('onchain');
-    const lightning = db.getActiveDepositAddress('lightning');
-    
-    if (onchain) depositCache.onchainAddress = onchain.address;
-    if (lightning) {
-        depositCache.lightningInvoice = lightning.invoice;
-        depositCache.lightningPaymentHash = lightning.payment_hash;
-    }
-    
-    // Generate if missing
+    // Generate on-chain address if missing
     if (!depositCache.onchainAddress) {
         await generateOnChainAddress();
     }
+    
+    // Generate Lightning invoice if missing, or rotate if expired
     if (!depositCache.lightningInvoice) {
         await createDonationInvoice(0);
+    } else {
+        // Check if current invoice is expired and rotate if so
+        const expired = await isInvoiceExpired();
+        if (expired) {
+            console.log('⚡ Cached Lightning invoice expired — generating new one');
+            await createDonationInvoice(0);
+        }
     }
     
     return {
