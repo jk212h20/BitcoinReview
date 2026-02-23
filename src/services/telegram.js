@@ -139,8 +139,7 @@ function getAdminChatIds(dbModule) {
 
 /**
  * Notify all admins about a new review submission.
- * During quiet hours (6pm–9am), reviews are queued and a single summary
- * is sent at 9am instead of individual notifications.
+ * Always sent immediately — bypasses quiet hours so admin can approve/reject promptly.
  * @param {Object} ticket - ticket record
  * @param {Object} user - user record (may be null for anonymous)
  * @param {Object} [dbModule] - database module (to get extra admin chat IDs)
@@ -152,17 +151,8 @@ async function notifyNewReview(ticket, user, dbModule) {
         return;
     }
 
-    // During quiet hours, just increment a counter — summary sent at 9am
-    if (isQuietHours()) {
-        if (dbModule) {
-            try {
-                const count = parseInt(dbModule.getSetting('quiet_hours_review_count') || '0', 10);
-                dbModule.setSetting('quiet_hours_review_count', String(count + 1));
-                console.log(`📵 Review notification queued (quiet hours). ${count + 1} pending.`);
-            } catch (e) {}
-        }
-        return;
-    }
+    // New review notifications are always sent immediately (no quiet hours)
+    // so admin can approve/reject promptly via Telegram
 
     const approveToken = process.env.TELEGRAM_APPROVE_TOKEN;
     const ticketId = ticket.id;
