@@ -2,23 +2,24 @@
 
 ## Current Focus (Updated 2026-02-23)
 
-### Session 21: Dedicated raffle fund tracker + 50% prize model
+### Session 22: Instant Lightning deposit detection + fund corrections
 
 **What was done:**
-- **Raffle fund is now tracked separately from LND node balance.** The Voltage node is shared, so `raffle_fund_sats` DB setting tracks the prize pool independently.
-- **Prize = 50% of fund per raffle.** The other 50% carries over, so the pool grows with donations.
-- **DB:** Added `raffle_fund_sats` setting (default `0`) to settings table
-- **Deposit detection (`lightning.js`):** Both `checkOnChainDeposits()` and `checkLightningDeposits()` now add received amounts to `raffle_fund_sats`
-- **API:**
-  - `GET /api/raffle-fund` → returns `{totalFundSats, nextPrizeSats}` from DB setting (not node balance)
-  - `POST /api/raffle-fund/add` → admin endpoint to manually seed fund (requires `ADMIN_PASSWORD`)
-- **Raffle payout (`index.js`):** `commitRaffleResult()` calculates `prize = floor(fund / 2)`, deducts from fund after commit
-- **UI:**
-  - Nav badge shows **"Next Prize: X sats"** (the half amount) — prominent
-  - Homepage donation section: big orange "Next Prize" badge + small "Total fund: X sats · 50% awarded per raffle"
-  - Explanation text: "Half of the fund is awarded each raffle — the rest carries over, so the pool keeps growing!"
-- **Seeded initial fund:** 100,000 sats via admin endpoint → next prize shows 50,000 sats
-- **`DEFAULT_PRIZE_SATS` env var no longer used** — prize is dynamic from fund
+- **Real-time invoice subscription (`lightning.js`):** `subscribeToInvoices()` connects to LND `/v2/invoices/subscribe` streaming endpoint on startup. When any invoice settles, `handleSettledInvoice()` instantly credits the raffle fund — no more 5-minute polling delay.
+- **Auto-reconnect:** If the subscription stream disconnects, it reconnects after 5 seconds.
+- **Fixed custom-amount invoice detection:** `checkLightningDeposits()` now queries ALL unpaid Lightning invoices from DB via `getUnpaidLightningInvoices()`, not just the cached zero-amount one. Custom invoices from "Generate" button are now tracked.
+- **Fund correction endpoint:** `POST /api/raffle-fund/set` — admin can set fund to exact amount (for corrections). Requires `ADMIN_PASSWORD`.
+- **Frontend polling:** Reduced from 30s to 10s in `layout.ejs` — combined with instant backend detection, fund updates appear within ~10s of payment.
+- **Railway start command:** Changed from `npm start` to `node --no-deprecation src/index.js` to eliminate npm warnings that Railway flagged as crashes.
+- **Current fund:** 107,000 sats (100k seed + 2k + 4k + 1k donations)
+
+### Previous: Session 21: Dedicated raffle fund tracker + 50% prize model
+
+- Raffle fund tracked separately from LND node balance via `raffle_fund_sats` setting
+- Prize = 50% of fund per raffle, other 50% carries over
+- `GET /api/raffle-fund`, `POST /api/raffle-fund/add`, `POST /api/raffle-fund/set`
+- Nav badge + homepage display with live polling
+- Seeded 100k sats; `DEFAULT_PRIZE_SATS` env var no longer used
 
 ### Previous: Session 20: Donation address on all pages + QR code hover
 

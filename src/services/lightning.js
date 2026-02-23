@@ -539,6 +539,88 @@ async function subscribeToInvoices() {
 }
 
 /**
+ * Subscribe to on-chain transaction updates via LND streaming REST API.
+ * Detects on-chain deposits as soon as LND sees them (even unconfirmed).
+ * Auto-reconnects on disconnection.
+ */
+async function subscribeToTransactions() {
+    if (!LND_REST_URL || !LND_MACAROON) return;
+    
+    const url = `${LND_REST_URL}/v1/transactions/subscribe`;
+    console.log('💰 Subscribing to LND on-chain transaction stream...');
+    
+    try {
+        const response = await fetch(url, {
+            headers: {
+                'Grpc-Metadata-macaroon': LND_MACAROON,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Transaction subscribe failed: ${response.status}`);
+        }
+        
+        console.log('💰 Connected to LND on-chain transaction stream');
+        
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+                console.warn('💰 Transaction subscription stream ended');
+                break;
+            }
+            
+            buffer += decoder.decode(value, { stream: true });
+            
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+            
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed) continue;
+                
+                try {
+                    const event = JSON.parse(trimmed);
+                    const tx = event.result || event;
+                    
+                    // Check if this transaction involves our tracked deposit address
+                    if (tx.dest_addresses && depositCache.onchainAddress) {
+                        if (tx.dest_addresses.includes(depositCache.onchainAddress)) {
+                            const amountSats = Math.abs(parseInt(tx.amount || '0'));
+                            if (amountSats > 0) {
+                                // Check if we already credited this
+                                const dbAddr = db.getDepositAddressByAddress(depositCache.onchainAddress);
+                                if (dbAddr && !dbAddr.received_at) {
+                                    console.log(`💰 INSTANT: On-chain deposit detected: ${amountSats} sats to ${depositCache.onchainAddress}`);
+                                    db.markDepositReceived(dbAddr.id, amountSats);
+                                    const currentFund = parseInt(db.getSetting('raffle_fund_sats') || '0');
+                                    db.setSetting('raffle_fund_sats', String(currentFund + amountSats));
+                                    console.log(`🎯 Raffle fund updated: ${currentFund} + ${amountSats} = ${currentFund + amountSats} sats`);
+                                    // Generate new address
+                                    await generateOnChainAddress();
+                                }
+                            }
+                        }
+                    }
+                } catch (parseErr) {
+                    // Partial JSON or non-JSON line — skip
+                }
+            }
+        }
+    } catch (err) {
+        console.warn('⚠️  Transaction subscription error:', err.message);
+    }
+    
+    // Auto-reconnect after 5 seconds
+    console.log('💰 Reconnecting transaction subscription in 5s...');
+    setTimeout(() => subscribeToTransactions(), 5000);
+}
+
+/**
  * Initialize deposit cache on startup
  */
 async function warmDepositCache() {
@@ -546,8 +628,9 @@ async function warmDepositCache() {
         await getDepositInfo();
         console.log(`✅ Deposit cache warmed - On-chain: ${depositCache.onchainAddress?.substring(0, 12)}... | Lightning: ready`);
         
-        // Start real-time invoice subscription (non-blocking)
+        // Start real-time subscriptions (non-blocking)
         subscribeToInvoices();
+        subscribeToTransactions();
     } catch (err) {
         console.warn('⚠️  Failed to warm deposit cache:', err.message);
     }
