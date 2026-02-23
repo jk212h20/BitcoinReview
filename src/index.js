@@ -218,27 +218,26 @@ async function startServer() {
         console.warn('⚠️  Failed to pre-warm raffle cache:', err.message);
     }
     
-    // Pre-warm deposit address cache from Voltage node
+    // Pre-warm deposit address cache + start real-time LND subscriptions
     try {
-        const depositInfo = await lightning.getDepositInfo();
-        if (depositInfo.onchainAddress) {
-            console.log(`💰 On-chain deposit address: ${depositInfo.onchainAddress.substring(0, 16)}...`);
-        }
-        if (depositInfo.lightningInvoice) {
-            console.log(`⚡ Lightning invoice cached (${depositInfo.lightningInvoice.substring(0, 20)}...)`);
-        }
+        await lightning.warmDepositCache();
     } catch (err) {
-        console.warn('⚠️  Failed to pre-warm deposit addresses:', err.message);
+        console.warn('⚠️  Failed to warm deposit cache:', err.message);
     }
     
-    // Poll for incoming payments + raffle events every 5 minutes
+    // Fast poll for deposits every 60s (fallback for subscription streams)
+    // Lightning subscription handles most cases instantly, but on-chain
+    // transactions need polling as a reliable fallback
     setInterval(async () => {
         try {
             await lightning.checkForDeposits();
         } catch (err) {
             console.warn('Payment poll error:', err.message);
         }
+    }, 60 * 1000);
 
+    // Raffle events + Telegram delivery every 5 minutes
+    setInterval(async () => {
         // Deliver any held Telegram notifications (quiet hours ended)
         try {
             await telegram.deliverPendingNotifications(db);
