@@ -556,6 +556,41 @@ router.post('/raffle-fund/add', (req, res) => {
 });
 
 /**
+ * POST /api/raffle-fund/set
+ * Admin: set the raffle fund to an exact amount (for corrections)
+ * Requires admin password in body
+ */
+router.post('/raffle-fund/set', (req, res) => {
+    try {
+        const { password, amount } = req.body;
+        
+        if (!password || password !== process.env.ADMIN_PASSWORD) {
+            return res.status(401).json({ success: false, error: 'Unauthorized' });
+        }
+        
+        const amountSats = parseInt(amount);
+        if (isNaN(amountSats) || amountSats < 0) {
+            return res.status(400).json({ success: false, error: 'Invalid amount (must be >= 0)' });
+        }
+        
+        const previousFund = parseInt(db.getSetting('raffle_fund_sats') || '0');
+        db.setSetting('raffle_fund_sats', String(amountSats));
+        
+        console.log(`🎯 Raffle fund manually set: ${previousFund} → ${amountSats} sats`);
+        
+        res.json({
+            success: true,
+            previousFund,
+            newFund: amountSats,
+            nextPrize: Math.floor(amountSats / 2)
+        });
+    } catch (error) {
+        console.error('Set fund error:', error);
+        res.status(500).json({ success: false, error: 'Failed to set fund' });
+    }
+});
+
+/**
  * GET /api/health
  * Lightweight health check - no external dependencies
  * Used by Railway to confirm the server is up
