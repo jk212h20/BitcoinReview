@@ -497,6 +497,65 @@ router.post('/generate-invoice', async (req, res) => {
 });
 
 /**
+ * GET /api/raffle-fund
+ * Get current raffle fund balance and next prize amount
+ * The fund is tracked separately from the LND node balance.
+ * Prize = 50% of fund, awarded each raffle.
+ */
+router.get('/raffle-fund', async (req, res) => {
+    try {
+        const fundSats = parseInt(db.getSetting('raffle_fund_sats') || '0');
+        const nextPrizeSats = Math.floor(fundSats / 2);
+
+        res.json({
+            success: true,
+            totalFundSats: fundSats,
+            nextPrizeSats: nextPrizeSats
+        });
+    } catch (error) {
+        console.error('Raffle fund error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch fund info' });
+    }
+});
+
+/**
+ * POST /api/raffle-fund/add
+ * Admin: add sats to the raffle fund (e.g. manual seed deposit)
+ * Requires admin password in body
+ */
+router.post('/raffle-fund/add', (req, res) => {
+    try {
+        const { password, amount } = req.body;
+        
+        if (!password || password !== process.env.ADMIN_PASSWORD) {
+            return res.status(401).json({ success: false, error: 'Unauthorized' });
+        }
+        
+        const amountSats = parseInt(amount);
+        if (!amountSats || amountSats < 1) {
+            return res.status(400).json({ success: false, error: 'Invalid amount' });
+        }
+        
+        const currentFund = parseInt(db.getSetting('raffle_fund_sats') || '0');
+        const newFund = currentFund + amountSats;
+        db.setSetting('raffle_fund_sats', String(newFund));
+        
+        console.log(`🎯 Raffle fund manually increased: ${currentFund} + ${amountSats} = ${newFund} sats`);
+        
+        res.json({
+            success: true,
+            previousFund: currentFund,
+            added: amountSats,
+            newFund: newFund,
+            nextPrize: Math.floor(newFund / 2)
+        });
+    } catch (error) {
+        console.error('Add to fund error:', error);
+        res.status(500).json({ success: false, error: 'Failed to add to fund' });
+    }
+});
+
+/**
  * GET /api/health
  * Lightweight health check - no external dependencies
  * Used by Railway to confirm the server is up

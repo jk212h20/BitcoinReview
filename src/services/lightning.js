@@ -343,6 +343,10 @@ async function checkOnChainDeposits() {
                 const dbAddr = db.getDepositAddressByAddress(depositCache.onchainAddress);
                 if (dbAddr && dbAddr.is_active) {
                     db.markDepositReceived(dbAddr.id, amountSats);
+                    // Add to raffle fund
+                    const currentFund = parseInt(db.getSetting('raffle_fund_sats') || '0');
+                    db.setSetting('raffle_fund_sats', String(currentFund + amountSats));
+                    console.log(`🎯 Raffle fund updated: ${currentFund} + ${amountSats} = ${currentFund + amountSats} sats`);
                     // Generate new address
                     await generateOnChainAddress();
                 }
@@ -373,6 +377,12 @@ async function checkLightningDeposits() {
             const dbAddr = db.getDepositAddressByPaymentHash(depositCache.lightningPaymentHash);
             if (dbAddr) {
                 db.markDepositReceived(dbAddr.id, amountSats);
+                // Add to raffle fund
+                if (amountSats > 0) {
+                    const currentFund = parseInt(db.getSetting('raffle_fund_sats') || '0');
+                    db.setSetting('raffle_fund_sats', String(currentFund + amountSats));
+                    console.log(`🎯 Raffle fund updated: ${currentFund} + ${amountSats} = ${currentFund + amountSats} sats`);
+                }
             }
             
             // Generate new zero-amount invoice

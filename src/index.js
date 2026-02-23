@@ -332,7 +332,16 @@ async function commitRaffleResult(blockHeight, autoPay) {
 
         const winnerIndex = bitcoin.selectWinnerIndex(blockHash, tickets.length);
         const winningTicket = tickets[winnerIndex];
-        const prizeSats = parseInt(process.env.DEFAULT_PRIZE_SATS) || 0;
+        
+        // Prize = 50% of the raffle fund (the other 50% carries over to the next raffle)
+        const currentFund = parseInt(db.getSetting('raffle_fund_sats') || '0');
+        const prizeSats = Math.floor(currentFund / 2);
+        
+        // Deduct prize from fund
+        if (prizeSats > 0) {
+            db.setSetting('raffle_fund_sats', String(currentFund - prizeSats));
+            console.log(`🎯 Raffle fund: ${currentFund} - ${prizeSats} (prize) = ${currentFund - prizeSats} sats remaining`);
+        }
 
         const raffle = db.createRaffle(
             blockHeight, blockHash, tickets.length, winnerIndex, winningTicket.id, prizeSats || null

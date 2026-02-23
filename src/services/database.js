@@ -137,7 +137,8 @@ async function initializeDatabase() {
         ['raffle_warning_sent_block', '0'],      // block number of last sent 144-warning
         ['raffle_block_notified', '0'],          // block number of last block-mined notification
         ['extra_telegram_chats', ''],            // comma-separated extra admin chat IDs
-        ['pending_telegram_message', '']         // queued message held during quiet hours
+        ['pending_telegram_message', ''],        // queued message held during quiet hours
+        ['raffle_fund_sats', '0']               // dedicated raffle prize pool balance (sats)
     ];
     for (const [key, value] of defaultSettings) {
         db.run(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`, [key, value]);

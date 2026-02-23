@@ -16,13 +16,19 @@
                     <span class="text-2xl">₿</span>
                     <span class="font-bold text-xl">Bitcoin Review Raffle</span>
                 </a>
-                <div class="hidden md:flex space-x-6">
+                <div class="hidden md:flex items-center space-x-6">
                     <a href="/" class="text-gray-600 hover:text-bitcoin">Home</a>
                     <a href="/submit" class="text-gray-600 hover:text-bitcoin">Submit Review</a>
                     <a href="/reviews" class="text-gray-600 hover:text-bitcoin">Reviews</a>
                     <a href="/raffles" class="text-gray-600 hover:text-bitcoin">Raffles</a>
                     <a href="/merchants" class="text-gray-600 hover:text-bitcoin">Merchants</a>
                     <a href="/how-it-works" class="text-gray-600 hover:text-bitcoin">How It Works</a>
+                    <a href="/#donate" id="raffle-fund-badge" class="hidden items-center gap-1.5 bg-gradient-to-r from-orange-500 to-yellow-500 text-white px-3 py-1.5 rounded-full text-sm font-bold shadow-sm hover:shadow-md transition-all" title="Next raffle prize">
+                        <span>⚡</span>
+                        <span>Next Prize:</span>
+                        <span id="raffle-fund-amount">0</span>
+                        <span class="text-xs opacity-80">sats</span>
+                    </a>
                 </div>
                 <div class="md:hidden">
                     <button id="mobile-menu-btn" class="text-gray-600">
@@ -40,6 +46,9 @@
                 <a href="/raffles" class="block py-2 text-gray-600 hover:text-bitcoin">Raffles</a>
                 <a href="/merchants" class="block py-2 text-gray-600 hover:text-bitcoin">Merchants</a>
                 <a href="/how-it-works" class="block py-2 text-gray-600 hover:text-bitcoin">How It Works</a>
+                <a href="/#donate" id="raffle-fund-badge-mobile" class="hidden py-2 text-bitcoin font-bold">
+                    ⚡ Next Prize: <span id="raffle-fund-amount-mobile">0</span> sats
+                </a>
             </div>
         </div>
     </nav>
@@ -84,6 +93,74 @@
         document.getElementById('mobile-menu-btn')?.addEventListener('click', function() {
             document.getElementById('mobile-menu').classList.toggle('hidden');
         });
+
+        // ── Live Raffle Fund Display ──────────────────────────────────
+        (function() {
+            var fundBadge = document.getElementById('raffle-fund-badge');
+            var fundAmount = document.getElementById('raffle-fund-amount');
+            var fundBadgeMobile = document.getElementById('raffle-fund-badge-mobile');
+            var fundAmountMobile = document.getElementById('raffle-fund-amount-mobile');
+            var homepageFund = document.getElementById('homepage-fund-amount');
+            var lastAmount = -1;
+
+            function formatSats(n) {
+                return Number(n).toLocaleString();
+            }
+
+            function updateFundDisplay(sats) {
+                if (sats === lastAmount) return;
+                lastAmount = sats;
+
+                // Desktop nav badge
+                if (fundBadge && fundAmount) {
+                    fundAmount.textContent = formatSats(sats);
+                    if (sats > 0) {
+                        fundBadge.classList.remove('hidden');
+                        fundBadge.classList.add('inline-flex');
+                    }
+                }
+
+                // Mobile nav badge
+                if (fundBadgeMobile && fundAmountMobile) {
+                    fundAmountMobile.textContent = formatSats(sats);
+                    if (sats > 0) {
+                        fundBadgeMobile.classList.remove('hidden');
+                        fundBadgeMobile.classList.add('block');
+                    }
+                }
+
+                // Homepage donation section (if present)
+                if (homepageFund) {
+                    homepageFund.textContent = formatSats(sats);
+                    var wrapper = document.getElementById('homepage-fund-wrapper');
+                    if (wrapper && sats > 0) {
+                        wrapper.classList.remove('hidden');
+                    }
+                }
+            }
+
+            function fetchFund() {
+                fetch('/api/raffle-fund')
+                    .then(function(res) { return res.json(); })
+                    .then(function(data) {
+                        if (data.success && typeof data.nextPrizeSats === 'number') {
+                            updateFundDisplay(data.nextPrizeSats);
+                            // Also update the full fund display on homepage if present
+                            var totalEl = document.getElementById('homepage-total-fund');
+                            if (totalEl && typeof data.totalFundSats === 'number') {
+                                totalEl.textContent = formatSats(data.totalFundSats);
+                            }
+                        }
+                    })
+                    .catch(function() { /* silent fail */ });
+            }
+
+            // Initial fetch
+            fetchFund();
+
+            // Poll every 30 seconds
+            setInterval(fetchFund, 30000);
+        })();
     </script>
 </body>
 </html>

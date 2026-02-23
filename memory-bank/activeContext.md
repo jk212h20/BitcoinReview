@@ -1,8 +1,26 @@
 # Active Context
 
-## Current Focus (Updated 2026-02-22)
+## Current Focus (Updated 2026-02-23)
 
-### Session 20: Donation address on all pages + QR code hover
+### Session 21: Dedicated raffle fund tracker + 50% prize model
+
+**What was done:**
+- **Raffle fund is now tracked separately from LND node balance.** The Voltage node is shared, so `raffle_fund_sats` DB setting tracks the prize pool independently.
+- **Prize = 50% of fund per raffle.** The other 50% carries over, so the pool grows with donations.
+- **DB:** Added `raffle_fund_sats` setting (default `0`) to settings table
+- **Deposit detection (`lightning.js`):** Both `checkOnChainDeposits()` and `checkLightningDeposits()` now add received amounts to `raffle_fund_sats`
+- **API:**
+  - `GET /api/raffle-fund` → returns `{totalFundSats, nextPrizeSats}` from DB setting (not node balance)
+  - `POST /api/raffle-fund/add` → admin endpoint to manually seed fund (requires `ADMIN_PASSWORD`)
+- **Raffle payout (`index.js`):** `commitRaffleResult()` calculates `prize = floor(fund / 2)`, deducts from fund after commit
+- **UI:**
+  - Nav badge shows **"Next Prize: X sats"** (the half amount) — prominent
+  - Homepage donation section: big orange "Next Prize" badge + small "Total fund: X sats · 50% awarded per raffle"
+  - Explanation text: "Half of the fund is awarded each raffle — the rest carries over, so the pool keeps growing!"
+- **Seeded initial fund:** 100,000 sats via admin endpoint → next prize shows 50,000 sats
+- **`DEFAULT_PRIZE_SATS` env var no longer used** — prize is dynamic from fund
+
+### Previous: Session 20: Donation address on all pages + QR code hover
 
 **What was done:**
 - **Routes (`pages.js`):** Added `donationAddress` (from Voltage node via `lightning.getDepositInfo()`) to reviews, merchants, how-it-works, and raffles routes — previously only index and submit had it
@@ -77,14 +95,15 @@ When a review is submitted:
 | `raffle_auto_trigger` | `false` | Auto-**pay** winner when block mined (raffle result always auto-commits) |
 | `extra_telegram_chats` | `` | Comma-separated extra admin Telegram chat IDs |
 | `pending_telegram_message` | `` | JSON-encoded notification held during quiet hours |
+| `raffle_fund_sats` | `0` | Dedicated raffle prize pool (sats). Prize = 50% of this per raffle. |
 
 ## Pre-Launch Checklist
 - [x] Fix Railway GitHub webhook (reconnected — auto-deploys working)
 - [x] Fix merchant name in Telegram notifications (last_insert_rowid bug)
+- [x] Seed raffle fund (100k sats via `POST /api/raffle-fund/add`)
 - [ ] Test full flow end-to-end: submit → Telegram → Approve → verify
 - [ ] Change `ADMIN_PASSWORD` from default
 - [ ] Verify Resend custom domain for production emails
-- [ ] Set `DEFAULT_PRIZE_SATS` to a real prize amount
 - [ ] Turn on `raffle_auto_trigger` when ready
 
 ## Important Notes

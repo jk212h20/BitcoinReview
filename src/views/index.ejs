@@ -139,11 +139,19 @@ ${typeof latestRaffle !== 'undefined' && latestRaffle ? `
 <section class="py-16 bg-gray-50" id="donate">
     <div class="max-w-5xl mx-auto px-4">
         <h2 class="text-3xl font-bold text-center mb-4">⚡ Fund the Raffle</h2>
-        <p class="text-gray-600 text-center mb-10 max-w-2xl mx-auto">
-            This raffle is 100% community funded. Every sat donated goes directly into the prize pool. Send on-chain or via Lightning!
+        <p class="text-gray-600 text-center mb-6 max-w-2xl mx-auto">
+            This raffle is 100% community funded. Every sat donated goes directly into the prize pool.
+            Half of the fund is awarded each raffle — the rest carries over, so the pool keeps growing!
         </p>
 
-        ${typeof totalDonationsSats !== 'undefined' && totalDonationsSats > 0 ? '<div class="text-center mb-8"><span class="inline-block bg-green-100 text-green-800 px-4 py-2 rounded-full font-semibold">🎯 Total donated: ' + Number(totalDonationsSats).toLocaleString() + ' sats</span></div>' : ''}
+        <div class="text-center mb-8 hidden" id="homepage-fund-wrapper">
+            <div class="inline-block bg-gradient-to-r from-orange-500 to-yellow-500 text-white px-6 py-3 rounded-xl font-bold text-xl shadow-md">
+                ⚡ Next Prize: <span id="homepage-fund-amount">0</span> sats
+            </div>
+            <div class="text-sm text-gray-500 mt-2">
+                Total fund: <span id="homepage-total-fund">0</span> sats · 50% awarded per raffle
+            </div>
+        </div>
 
         <div class="grid md:grid-cols-2 gap-8">
 
