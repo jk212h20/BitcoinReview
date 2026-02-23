@@ -20,6 +20,7 @@ router.get('/', async (req, res) => {
         const userCount = db.getUserCount();
         const ticketCount = db.countValidTicketsForBlock(raffleInfo.nextRaffleBlock);
         const latestRaffle = db.getLatestRaffle();
+        const allRaffles = db.getAllRaffles();
         
         // Get deposit addresses from Voltage node
         let depositInfo = { onchainAddress: null, lightningInvoice: null };
@@ -39,6 +40,7 @@ router.get('/', async (req, res) => {
             userCount,
             ticketCount,
             latestRaffle,
+            totalRaffles: allRaffles.length,
             recentlyReviewedMerchant,
             onchainAddress: depositInfo.onchainAddress,
             lightningInvoice: depositInfo.lightningInvoice,
@@ -54,6 +56,7 @@ router.get('/', async (req, res) => {
             userCount: 0,
             ticketCount: 0,
             latestRaffle: null,
+            totalRaffles: 0,
             recentlyReviewedMerchant: null,
             onchainAddress: null,
             lightningInvoice: null,
@@ -112,6 +115,14 @@ router.get('/merchants', async (req, res) => {
     try {
         const merchants = await btcmap.getMerchantList();
 
+        // Get deposit address for donation footer
+        let depositInfo = { onchainAddress: null };
+        try {
+            depositInfo = await lightning.getDepositInfo();
+        } catch (err) {
+            console.warn('Could not load deposit info for merchants page:', err.message);
+        }
+
         // Get approved tickets with merchant names to find recently-reviewed merchants
         const approvedTickets = db.getApprovedPublicTickets();
 
@@ -139,14 +150,16 @@ router.get('/merchants', async (req, res) => {
 
         res.render('merchants', {
             title: 'Bitcoin Merchants - Roatan',
-            merchants: annotated
+            merchants: annotated,
+            donationAddress: depositInfo.onchainAddress || process.env.DONATION_ADDRESS || 'Not configured'
         });
     } catch (error) {
         console.error('Merchants page error:', error);
         res.render('merchants', {
             title: 'Bitcoin Merchants - Roatan',
             error: 'Failed to load merchants',
-            merchants: []
+            merchants: [],
+            donationAddress: process.env.DONATION_ADDRESS || 'Not configured'
         });
     }
 });
@@ -187,17 +200,26 @@ router.get('/opt-out/:token', (req, res) => {
  * GET /reviews
  * Public reviews page - shows only approved reviews, featured first
  */
-router.get('/reviews', (req, res) => {
+router.get('/reviews', async (req, res) => {
     try {
         const reviews = db.getApprovedPublicTickets();
         const featuredReviews = reviews.filter(r => r.is_featured);
         const regularReviews = reviews.filter(r => !r.is_featured);
+
+        // Get deposit address for donation footer
+        let depositInfo = { onchainAddress: null };
+        try {
+            depositInfo = await lightning.getDepositInfo();
+        } catch (err) {
+            console.warn('Could not load deposit info for reviews page:', err.message);
+        }
         
         res.render('reviews', {
             title: 'Reviews - Bitcoin Review Raffle',
             reviews,
             featuredReviews,
-            regularReviews
+            regularReviews,
+            donationAddress: depositInfo.onchainAddress || process.env.DONATION_ADDRESS || 'Not configured'
         });
     } catch (error) {
         console.error('Reviews page error:', error);
@@ -206,7 +228,40 @@ router.get('/reviews', (req, res) => {
             error: 'Failed to load reviews',
             reviews: [],
             featuredReviews: [],
-            regularReviews: []
+            regularReviews: [],
+            donationAddress: process.env.DONATION_ADDRESS || 'Not configured'
+        });
+    }
+});
+
+/**
+ * GET /raffles
+ * Public raffle history page — transparent, verifiable results
+ */
+router.get('/raffles', async (req, res) => {
+    try {
+        const raffles = db.getAllRaffles();
+
+        // Get deposit address for donation footer
+        let depositInfo = { onchainAddress: null };
+        try {
+            depositInfo = await lightning.getDepositInfo();
+        } catch (err) {
+            console.warn('Could not load deposit info for raffles page:', err.message);
+        }
+        
+        res.render('raffles', {
+            title: 'Raffle History - Bitcoin Review Raffle',
+            raffles,
+            donationAddress: depositInfo.onchainAddress || process.env.DONATION_ADDRESS || 'Not configured'
+        });
+    } catch (error) {
+        console.error('Raffles page error:', error);
+        res.render('raffles', {
+            title: 'Raffle History - Bitcoin Review Raffle',
+            error: 'Failed to load raffle history',
+            raffles: [],
+            donationAddress: process.env.DONATION_ADDRESS || 'Not configured'
         });
     }
 });
@@ -218,14 +273,24 @@ router.get('/reviews', (req, res) => {
 router.get('/how-it-works', async (req, res) => {
     try {
         const raffleInfo = await bitcoin.getRaffleInfo();
+
+        // Get deposit address for donation footer
+        let depositInfo = { onchainAddress: null };
+        try {
+            depositInfo = await lightning.getDepositInfo();
+        } catch (err) {
+            console.warn('Could not load deposit info for how-it-works page:', err.message);
+        }
         
         res.render('how-it-works', {
             title: 'How It Works - Bitcoin Review Raffle',
-            raffleInfo
+            raffleInfo,
+            donationAddress: depositInfo.onchainAddress || process.env.DONATION_ADDRESS || 'Not configured'
         });
     } catch (error) {
         res.render('how-it-works', {
-            title: 'How It Works - Bitcoin Review Raffle'
+            title: 'How It Works - Bitcoin Review Raffle',
+            donationAddress: process.env.DONATION_ADDRESS || 'Not configured'
         });
     }
 });

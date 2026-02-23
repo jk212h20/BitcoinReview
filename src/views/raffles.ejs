@@ -1,0 +1,73 @@
+<%- include('layout', { body: `
+<!-- Header -->
+<section class="bg-gradient-to-br from-orange-500 to-yellow-500 text-white py-12">
+    <div class="max-w-4xl mx-auto px-4 text-center">
+        <h1 class="text-3xl md:text-4xl font-bold mb-3">🎰 Raffle History</h1>
+        <p class="text-lg opacity-90">Every raffle is transparent and verifiable. The winner is determined by Bitcoin&rsquo;s own randomness.</p>
+    </div>
+</section>
+
+<!-- How Verification Works -->
+<section class="py-8 bg-white border-b">
+    <div class="max-w-4xl mx-auto px-4">
+        <div class="bg-orange-50 border border-orange-200 rounded-xl p-5">
+            <h2 class="font-bold text-lg mb-2">🔍 How Winner Selection Works</h2>
+            <p class="text-gray-700 text-sm mb-3">
+                Every ~2 weeks, Bitcoin&rsquo;s difficulty adjusts at a specific block height. When that block is mined, its hash — a number no one can predict or manipulate — automatically determines the winner:
+            </p>
+            <div class="bg-white rounded-lg p-3 font-mono text-sm text-gray-700 mb-3">
+                winner_index = int(block_hash, 16) % number_of_valid_entries
+            </div>
+            <p class="text-gray-600 text-xs">
+                This is computed automatically the moment the trigger block is mined. No human intervention is needed or possible. You can verify any result by looking up the block hash on <a href="https://mempool.space" target="_blank" class="text-bitcoin underline">mempool.space</a> and running the formula yourself.
+            </p>
+        </div>
+    </div>
+</section>
+
+<!-- Raffle List -->
+<section class="py-10">
+    <div class="max-w-4xl mx-auto px-4">
+        ${typeof raffles !== 'undefined' && raffles.length > 0 ?
+            raffles.map(function(r) {
+                var maskedEmail = r.email ? r.email.replace(/(.{2}).*(@.*)/, '$1***$2') : 'Anonymous';
+                return '<div class="bg-white rounded-xl shadow-sm mb-6 overflow-hidden">' +
+                    '<div class="p-6">' +
+                        '<div class="flex flex-wrap items-center justify-between mb-4">' +
+                            '<h3 class="text-xl font-bold text-gray-800">Block #' + r.block_height.toLocaleString() + '</h3>' +
+                            (r.paid_at ? '<span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">✅ Paid</span>' : '<span class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-xs font-medium">⏳ Payment Pending</span>') +
+                        '</div>' +
+                        '<div class="grid md:grid-cols-3 gap-4 mb-4">' +
+                            '<div>' +
+                                '<div class="text-xs text-gray-500 uppercase tracking-wide">Winner</div>' +
+                                '<div class="font-bold text-gray-800">' + maskedEmail + '</div>' +
+                            '</div>' +
+                            '<div>' +
+                                '<div class="text-xs text-gray-500 uppercase tracking-wide">Entries</div>' +
+                                '<div class="font-bold text-gray-800">' + r.total_tickets + '</div>' +
+                            '</div>' +
+                            '<div>' +
+                                '<div class="text-xs text-gray-500 uppercase tracking-wide">Prize</div>' +
+                                '<div class="font-bold text-gray-800">' + (r.prize_amount_sats ? r.prize_amount_sats.toLocaleString() + ' sats' : 'TBD') + '</div>' +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="bg-gray-50 rounded-lg p-3">' +
+                            '<div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Verification</div>' +
+                            '<div class="font-mono text-xs text-gray-600 break-all mb-1">' +
+                                '<span class="text-gray-400">Hash:</span> ' + r.block_hash +
+                            '</div>' +
+                            '<div class="font-mono text-xs text-gray-600">' +
+                                '<span class="text-gray-400">Result:</span> int(hash) mod ' + r.total_tickets + ' = <strong class="text-gray-800">' + r.winning_index + '</strong> &rarr; Entry #' + r.winning_index +
+                            '</div>' +
+                            '<div class="mt-2">' +
+                                '<a href="https://mempool.space/block/' + r.block_hash + '" target="_blank" class="text-bitcoin text-xs hover:underline">Verify on mempool.space &rarr;</a>' +
+                            '</div>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>';
+            }).join('')
+            : '<div class="text-center py-16"><div class="text-5xl mb-4">🎰</div><h3 class="text-xl font-bold text-gray-600 mb-2">No Raffles Yet</h3><p class="text-gray-500">The first raffle will happen at the next Bitcoin difficulty adjustment. <a href="/submit" class="text-bitcoin underline">Submit a review</a> to enter!</p></div>'
+        }
+    </div>
+</section>
+` }) %>

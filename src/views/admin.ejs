@@ -95,6 +95,33 @@
         </div>
         ` : ''}
         
+        <!-- Unpaid Raffle Alert -->
+        ${typeof raffles !== 'undefined' && raffles.length > 0 && raffles.find(function(r) { return !r.paid_at; }) ? (function() {
+            var unpaid = raffles.find(function(r) { return !r.paid_at; });
+            return '<div class="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-6 mb-8">' +
+                '<div class="flex flex-wrap items-start justify-between gap-4">' +
+                    '<div>' +
+                        '<h2 class="text-xl font-bold text-yellow-800 mb-1">⚡ Raffle Winner — Payment Needed</h2>' +
+                        '<p class="text-yellow-700 text-sm mb-3">Block #' + unpaid.block_height.toLocaleString() + ' raffle has been committed. The winner is determined — payment is pending.</p>' +
+                        '<div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">' +
+                            '<div><span class="text-yellow-600">Winner:</span> <strong>' + (unpaid.email || 'Anonymous') + '</strong></div>' +
+                            '<div><span class="text-yellow-600">LN Address:</span> <strong>' + (unpaid.lnurl_address || 'None') + '</strong></div>' +
+                            '<div><span class="text-yellow-600">Entries:</span> <strong>' + unpaid.total_tickets + '</strong></div>' +
+                            '<div><span class="text-yellow-600">Prize:</span> <strong>' + (unpaid.prize_amount_sats ? unpaid.prize_amount_sats.toLocaleString() + ' sats' : 'Not set') + '</strong></div>' +
+                        '</div>' +
+                        '<div class="mt-3 bg-yellow-100 rounded-lg p-2 text-xs font-mono text-yellow-800 break-all">' +
+                            'Hash: ' + unpaid.block_hash + '<br>' +
+                            'int(hash) mod ' + unpaid.total_tickets + ' = ' + unpaid.winning_index +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="flex flex-col gap-2">' +
+                        (unpaid.lnurl_address ? '<button onclick="payUnpaidRaffle(' + unpaid.id + ', ' + (unpaid.prize_amount_sats || 0) + ')" class="bg-yellow-500 text-white px-6 py-3 rounded-lg font-bold hover:bg-yellow-600 transition whitespace-nowrap">⚡ Pay Winner Now</button>' : '') +
+                        '<button onclick="markUnpaidRafflePaid(' + unpaid.id + ')" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-300 transition whitespace-nowrap">Mark as Paid Manually</button>' +
+                    '</div>' +
+                '</div>' +
+            '</div>';
+        })() : ''}
+
         <!-- Settings Panel -->
         <div class="bg-white rounded-lg p-6 shadow-sm mb-8" x-data="settingsPanel('${typeof password !== 'undefined' ? password : ''}')">
             <h2 class="text-xl font-bold mb-4">⚙️ Settings</h2>
@@ -114,6 +141,15 @@
                         <option value="all">All Major Platforms (Google, Yelp, TripAdvisor, Trustpilot, etc.)</option>
                     </select>
                     <p class="text-xs text-gray-500 mt-1" x-text="reviewLinkMode === 'google' ? 'Only Google Maps links accepted.' : 'Accepts links from Google, Yelp, TripAdvisor, Trustpilot, Facebook, Apple Maps, and more. Trap/unknown sites are still blocked.'"></p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Auto-Pay Winner</label>
+                    <select x-model="autoPayMode" @change="saveSettings()" class="w-full px-4 py-2 border rounded-lg">
+                        <option value="false">Manual Payment (admin pays via dashboard)</option>
+                        <option value="true">Auto-Pay (Lightning payment sent automatically)</option>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1" x-text="autoPayMode === 'true' ? 'Winner will be paid automatically via Lightning when the raffle block is mined.' : 'Raffle result is committed automatically, but you must pay the winner manually.'"></p>
+                    <p class="text-xs text-gray-400 mt-1">Note: The raffle result is <strong>always</strong> determined automatically by the trigger block hash. This setting only controls whether payment is also automatic.</p>
                 </div>
             </div>
             <div x-show="settingsMsg" x-cloak class="mt-3 text-sm text-green-600" x-text="settingsMsg"></div>
@@ -614,6 +650,7 @@ function settingsPanel(pw) {
     return {
         reviewMode: 'manual_review',
         reviewLinkMode: 'google',
+        autoPayMode: 'false',
         settingsMsg: '',
         init() {
             fetch('/api/admin/settings', { headers: { 'X-Admin-Password': pw } })
@@ -622,6 +659,7 @@ function settingsPanel(pw) {
                     if (d.success && d.settings) {
                         this.reviewMode = d.settings.review_mode || 'manual_review';
                         this.reviewLinkMode = d.settings.review_link_mode || 'google';
+                        this.autoPayMode = d.settings.raffle_auto_trigger || 'false';
                     }
                 })
                 .catch(() => {});
@@ -632,7 +670,7 @@ function settingsPanel(pw) {
                 const response = await fetch('/api/admin/settings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-Admin-Password': pw },
-                    body: JSON.stringify({ settings: { review_mode: this.reviewMode, review_link_mode: this.reviewLinkMode } })
+                    body: JSON.stringify({ settings: { review_mode: this.reviewMode, review_link_mode: this.reviewLinkMode, raffle_auto_trigger: this.autoPayMode } })
                 });
                 const data = await response.json();
                 if (data.success) this.settingsMsg = 'Settings saved!';
@@ -641,6 +679,46 @@ function settingsPanel(pw) {
             } catch (error) { this.settingsMsg = 'Error: ' + error.message; }
         }
     }
+}
+
+// Global functions for the unpaid raffle alert buttons
+function payUnpaidRaffle(raffleId, amountSats) {
+    var pw = '${typeof password !== "undefined" ? password : ""}';
+    var amount = amountSats || prompt('Enter amount in sats:');
+    if (!amount) return;
+    if (!confirm('Pay ' + amount + ' sats via Lightning?')) return;
+    
+    fetch('/api/admin/raffle/' + raffleId + '/pay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Password': pw },
+        body: JSON.stringify({ amountSats: parseInt(amount) })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) {
+            alert('Payment sent! Hash: ' + data.payment.paymentHash);
+            location.reload();
+        } else {
+            alert('Payment failed: ' + data.error);
+        }
+    })
+    .catch(function(err) { alert('Error: ' + err.message); });
+}
+
+function markUnpaidRafflePaid(raffleId) {
+    var pw = '${typeof password !== "undefined" ? password : ""}';
+    if (!confirm('Mark this raffle as paid?')) return;
+    
+    fetch('/api/admin/raffle/' + raffleId + '/mark-paid', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Password': pw }
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) location.reload();
+        else alert(data.error);
+    })
+    .catch(function(err) { alert('Error: ' + err.message); });
 }
 </script>
 ` }) %>

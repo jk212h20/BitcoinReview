@@ -1,8 +1,32 @@
 # Active Context
 
-## Current Focus (Updated 2026-02-21)
+## Current Focus (Updated 2026-02-22)
 
-### Session 18: Fix Safari reload loop (two causes)
+### Session 20: Donation address on all pages + QR code hover
+
+**What was done:**
+- **Routes (`pages.js`):** Added `donationAddress` (from Voltage node via `lightning.getDepositInfo()`) to reviews, merchants, how-it-works, and raffles routes — previously only index and submit had it
+- **Layout footer (`layout.ejs`):** Upgraded donation display from plain `<code>` block to:
+  - Clickable link → mempool.space address page
+  - QR code popup on hover (using `api.qrserver.com` with `bitcoin:` URI)
+  - 📋 Copy button with "✓ Copied!" feedback
+  - AlpineJS-powered hover with smooth transitions
+- **Submit page (`submit.ejs`):** Has its own duplicate footer (doesn't use layout.ejs) — updated with same QR/link treatment
+- No more "Coming soon" text — shows actual Voltage node on-chain address or "Not configured" fallback
+
+### Previous: Session 19: Transparent raffle commitment + public history
+
+**Core change:** Raffle result is now **always** committed automatically when the trigger block is mined — using `block_hash mod ticket_count`. The `raffle_auto_trigger` setting now only controls whether **payment** is also automatic (renamed to "Auto-Pay Winner" in UI).
+
+**What was done:**
+- `checkRaffleEvents()` in `src/index.js` — always calls `commitRaffleResult()` when trigger block mined
+- `commitRaffleResult()` — new function that deterministically selects winner, creates raffle record, sends notifications/emails; `autoPay` flag only controls Lightning payment
+- **Homepage (`index.ejs`):** Shows latest raffle result with full verification data (block hash, formula, mempool.space link) — stays visible until next raffle
+- **New `/raffles` page (`raffles.ejs`):** Public raffle history with verification for every past raffle + explanation of the algorithm
+- **Admin panel (`admin.ejs`):** Yellow "Payment Needed" banner with ⚡ Pay button when unpaid raffle exists; Settings renamed "Auto-Pay Winner" with clarifying note
+- **Navigation:** "Raffles" link added to desktop + mobile nav in `layout.ejs`
+
+### Previous: Session 18: Fix Safari reload loop (two causes)
 
 **Cause 1: Tailwind Play CDN** (commit `407a689`)
 The site used `<script src="https://cdn.tailwindcss.com">` — a 3MB JS file that scans DOM, generates CSS via MutationObserver, and injects `<style>` tags. Safari's WebKit enters infinite layout/repaint loop with this approach.
@@ -50,7 +74,7 @@ When a review is submitted:
 | Key | Default | Purpose |
 |-----|---------|---------|
 | `review_mode` | `manual_review` | auto_approve or manual_review |
-| `raffle_auto_trigger` | `false` | Auto-run raffle when block mined |
+| `raffle_auto_trigger` | `false` | Auto-**pay** winner when block mined (raffle result always auto-commits) |
 | `extra_telegram_chats` | `` | Comma-separated extra admin Telegram chat IDs |
 | `pending_telegram_message` | `` | JSON-encoded notification held during quiet hours |
 

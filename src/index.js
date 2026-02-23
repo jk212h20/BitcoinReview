@@ -1,6 +1,6 @@
 /**
  * Bitcoin Review Raffle - Main Application
- * Build: 2026-02-20b
+ * Build: 2026-02-22a
  */
 
 require('dotenv').config();
@@ -295,7 +295,7 @@ async function checkRaffleEvents() {
         await telegram.notifyRaffleWarning(nextRaffleBlock, approvedTickets, db);
     }
 
-    // ── 2. Raffle block mined ──────────────────────────────────────────────
+    // ── 2. Raffle block mined — ALWAYS commit result (transparent & deterministic) ─
     const blockAlreadyNotified = parseInt(db.getSetting('raffle_block_notified') || '0', 10);
     const raffleBlockMined = currentHeight >= nextRaffleBlock;
     const raffleAlreadyRun = !!db.findRaffleByBlock(nextRaffleBlock);
@@ -303,33 +303,29 @@ async function checkRaffleEvents() {
     if (raffleBlockMined && blockAlreadyNotified !== nextRaffleBlock && !raffleAlreadyRun) {
         db.setSetting('raffle_block_notified', String(nextRaffleBlock));
 
-        const autoTrigger = db.getSetting('raffle_auto_trigger') === 'true';
+        // Raffle commitment is ALWAYS automatic — only payment is manual vs auto
+        const autoPay = db.getSetting('raffle_auto_trigger') === 'true';
 
-        if (autoTrigger) {
-            // Notify that it's running
-            await telegram.notifyRaffleBlockMined(nextRaffleBlock, approvedTickets, true, db);
-            await runAutoRaffle(nextRaffleBlock);
-        } else {
-            // Notify admin to run it manually
-            await telegram.notifyRaffleBlockMined(nextRaffleBlock, approvedTickets, false, db);
-        }
+        // Always commit the raffle result
+        await commitRaffleResult(nextRaffleBlock, autoPay);
     }
 }
 
 /**
- * Auto-run the raffle for a given block height.
- * Called by the raffle watcher when auto-trigger is enabled.
+ * Commit raffle result for a given block height.
+ * ALWAYS called when the raffle block is mined — the result is deterministic.
+ * The `autoPay` flag controls whether payment is also sent automatically.
  */
-async function runAutoRaffle(blockHeight) {
+async function commitRaffleResult(blockHeight, autoPay) {
     try {
         const blockHash = await bitcoin.getBlockHash(blockHeight);
         const tickets = db.getValidTicketsForBlock(blockHeight);
 
         if (tickets.length === 0) {
-            console.log(`⚠️ Auto-raffle: no valid tickets for block #${blockHeight}`);
+            console.log(`⚠️ Raffle block #${blockHeight}: no valid tickets — raffle skipped.`);
             const chatIds = telegram.getAdminChatIds(db);
             for (const chatId of chatIds) {
-                await telegram.sendMessage(chatId, `⚠️ <b>Auto-raffle block #${blockHeight}</b>\n\nNo approved tickets in the pool — raffle skipped.`);
+                await telegram.sendMessage(chatId, `⚠️ <b>Raffle block #${blockHeight} mined</b>\n\nNo approved tickets in the pool — raffle skipped.`);
             }
             return;
         }
@@ -342,23 +338,24 @@ async function runAutoRaffle(blockHeight) {
             blockHeight, blockHash, tickets.length, winnerIndex, winningTicket.id, prizeSats || null
         );
 
-        console.log(`🎰 Auto-raffle run! Block #${blockHeight}, winner ticket #${winningTicket.id}`);
+        console.log(`🎰 Raffle committed! Block #${blockHeight}, hash: ${blockHash.substring(0, 16)}..., winner index: ${winnerIndex}/${tickets.length}, ticket #${winningTicket.id}`);
 
-        // Notify result
+        // Notify via Telegram (always)
         await telegram.notifyRaffleResult(
             { block_height: blockHeight, total_tickets: tickets.length, prize_amount_sats: prizeSats },
             winningTicket,
             db
         );
 
-        // Send winner email
+        // Send winner email (always)
         email.sendWinnerEmail(
             winningTicket.email, prizeSats, winningTicket.lnurl_address, blockHeight
         ).catch(err => console.error('Winner email error:', err));
 
-        // Auto-pay if enabled
-        if (process.env.AUTO_PAY_ENABLED === 'true' && winningTicket.lnurl_address && prizeSats > 0) {
+        // Auto-pay only if enabled (raffle_auto_trigger=true AND AUTO_PAY_ENABLED=true)
+        if (autoPay && process.env.AUTO_PAY_ENABLED === 'true' && winningTicket.lnurl_address && prizeSats > 0) {
             try {
+                console.log(`⚡ Auto-paying ${prizeSats} sats to ${winningTicket.lnurl_address}...`);
                 const paymentResult = await lightning.payLightningAddress(
                     winningTicket.lnurl_address, prizeSats,
                     `Bitcoin Review Raffle winner! Block #${blockHeight}`
@@ -369,14 +366,16 @@ async function runAutoRaffle(blockHeight) {
                 console.error('⚠️ Auto-payment failed:', payErr.message);
                 db.markRafflePaymentFailed(raffle.id, payErr.message);
             }
+        } else if (!autoPay) {
+            console.log(`💤 Auto-pay disabled — admin must pay manually via dashboard.`);
         }
     } catch (err) {
-        console.error('Auto-raffle error:', err.message);
+        console.error('Raffle commit error:', err.message);
         // Notify admin of the failure
         try {
             const chatIds = telegram.getAdminChatIds(db);
             for (const chatId of chatIds) {
-                await telegram.sendMessage(chatId, `❌ <b>Auto-raffle FAILED</b> for block #${blockHeight}\n\nError: ${err.message}\n\nPlease run manually: ${process.env.BASE_URL}/admin`);
+                await telegram.sendMessage(chatId, `❌ <b>Raffle commit FAILED</b> for block #${blockHeight}\n\nError: ${err.message}\n\nPlease run manually: ${process.env.BASE_URL}/admin`);
             }
         } catch (e) {}
     }

@@ -94,8 +94,46 @@ ${typeof recentlyReviewedMerchant !== 'undefined' && recentlyReviewedMerchant ? 
     </div>
 </section>
 
-<!-- Latest Winner -->
-${typeof latestRaffle !== 'undefined' && latestRaffle ? '<section class="py-16 bg-gradient-to-r from-yellow-400 to-orange-500 text-white"><div class="max-w-4xl mx-auto px-4 text-center"><h2 class="text-3xl font-bold mb-6">🎉 Latest Winner</h2><div class="bg-white/20 backdrop-blur rounded-lg p-6"><div class="text-2xl font-bold mb-2">Block #' + latestRaffle.block_height.toLocaleString() + '</div><div class="text-lg mb-2">' + (latestRaffle.email ? latestRaffle.email.replace(/(.{2}).*(@.*)/, "$1***$2") : "Anonymous") + '</div>' + (latestRaffle.prize_amount_sats ? '<div class="text-xl font-bold">' + latestRaffle.prize_amount_sats.toLocaleString() + ' sats</div>' : '') + '</div></div></section>' : ''}
+<!-- Latest Raffle Result (stays visible until next raffle) -->
+${typeof latestRaffle !== 'undefined' && latestRaffle ? `
+<section class="py-12 bg-gradient-to-r from-yellow-400 to-orange-500 text-white">
+    <div class="max-w-4xl mx-auto px-4">
+        <h2 class="text-3xl font-bold text-center mb-6">🎉 Latest Raffle Result</h2>
+        <div class="bg-white/20 backdrop-blur rounded-xl p-6 md:p-8">
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <div class="text-sm font-semibold uppercase tracking-wide opacity-80 mb-1">Trigger Block</div>
+                    <div class="text-2xl font-bold">#${latestRaffle.block_height.toLocaleString()}</div>
+                </div>
+                <div>
+                    <div class="text-sm font-semibold uppercase tracking-wide opacity-80 mb-1">Winner</div>
+                    <div class="text-2xl font-bold">${latestRaffle.email ? latestRaffle.email.replace(/(.{2}).*(@.*)/, "$1***$2") : 'Anonymous'}</div>
+                </div>
+                <div>
+                    <div class="text-sm font-semibold uppercase tracking-wide opacity-80 mb-1">Total Entries</div>
+                    <div class="text-xl font-bold">${latestRaffle.total_tickets}</div>
+                </div>
+                <div>
+                    <div class="text-sm font-semibold uppercase tracking-wide opacity-80 mb-1">Prize</div>
+                    <div class="text-xl font-bold">${latestRaffle.prize_amount_sats ? latestRaffle.prize_amount_sats.toLocaleString() + ' sats' : 'TBD'}</div>
+                    ${latestRaffle.paid_at ? '<span class="inline-block bg-green-500/30 text-white text-xs px-2 py-0.5 rounded mt-1">✅ Paid</span>' : '<span class="inline-block bg-yellow-500/30 text-white text-xs px-2 py-0.5 rounded mt-1">⏳ Payment pending</span>'}
+                </div>
+            </div>
+            <!-- Verification Info -->
+            <div class="mt-6 pt-4 border-t border-white/20">
+                <div class="text-sm font-semibold uppercase tracking-wide opacity-80 mb-2">🔍 Transparent Verification</div>
+                <div class="bg-black/20 rounded-lg p-3 text-sm font-mono break-all">
+                    <div class="mb-1"><span class="opacity-70">Block Hash:</span> ${latestRaffle.block_hash}</div>
+                    <div class="mb-1"><span class="opacity-70">Formula:</span> hash_to_int(block_hash) mod ${latestRaffle.total_tickets} = <strong>${latestRaffle.winning_index}</strong></div>
+                    <div><span class="opacity-70">Winner:</span> Entry #${latestRaffle.winning_index} (of ${latestRaffle.total_tickets} valid entries, zero-indexed)</div>
+                </div>
+                <p class="text-xs opacity-70 mt-2">The winner is determined automatically when the difficulty-adjustment block is mined. The block hash — which no one can predict or control — selects the winner. <a href="https://mempool.space/block/${latestRaffle.block_hash}" target="_blank" class="underline">Verify on mempool.space →</a></p>
+            </div>
+        </div>
+        ${typeof totalRaffles !== 'undefined' && totalRaffles > 1 ? '<div class="text-center mt-4"><a href="/raffles" class="text-white/80 hover:text-white text-sm underline">View all ' + totalRaffles + ' past raffles →</a></div>' : (typeof totalRaffles !== 'undefined' && totalRaffles === 1 ? '<div class="text-center mt-4"><a href="/raffles" class="text-white/80 hover:text-white text-sm underline">View raffle history →</a></div>' : '')}
+    </div>
+</section>
+` : ''}
 
 <!-- Donation / Deposit Section -->
 <section class="py-16 bg-gray-50" id="donate">

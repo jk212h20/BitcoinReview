@@ -30,6 +30,11 @@
 - **✅ Deposit address display on homepage** - On-chain Bitcoin address + Lightning invoice from Voltage node with QR codes, copy buttons, and custom invoice generator
 - **✅ Public reviews page** (`/reviews`) - Shows all submitted reviews with stats, without exposing submitter email or lightning addresses
 - **✅ HTML scraping + AI validation pipeline** - Puppeteer scrapes Google review pages, Claude AI validates Bitcoin mention, async non-blocking
+- **✅ Transparent raffle commitment** - Raffle result always auto-commits from trigger block hash; `raffle_auto_trigger` only controls auto-payment
+- **✅ Public raffle history page** (`/raffles`) - Verification data, block hashes, formula, mempool.space links
+- **✅ Homepage raffle result** - Latest raffle stays visible with full verification until next raffle
+- **✅ Admin unpaid-raffle banner** - Yellow alert with ⚡ Pay button when payment is pending
+- **✅ Donation address on all pages** - Every page footer shows Voltage node on-chain address with clickable mempool.space link, QR code on hover, and copy button
 
 ## What's Left to Build
 - [x] Node.js project setup (package.json, dependencies)
