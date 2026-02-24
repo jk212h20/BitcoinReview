@@ -747,6 +747,83 @@ router.get('/claim/:token/status', (req, res) => {
     }
 });
 
+// ============================================================
+// Telegram notification linking for players
+// ============================================================
+
+/**
+ * POST /api/telegram/link
+ * Generate a PIN tied to an email address and return a Telegram deep link.
+ * The user opens the link, messages the bot, and the bot links their chat ID to their email.
+ * Body: { email: "user@example.com" }
+ */
+router.post('/telegram/link', (req, res) => {
+    try {
+        const { email: userEmail } = req.body;
+        
+        if (!userEmail || !userEmail.trim()) {
+            return res.status(400).json({ success: false, error: 'Email is required' });
+        }
+        
+        const cleanEmail = userEmail.trim().toLowerCase();
+        
+        // Generate a short PIN
+        const pin = Math.random().toString(36).substring(2, 10).toUpperCase();
+        const expires = Date.now() + 30 * 60 * 1000; // 30 minutes
+        
+        // Store PIN → email mapping in settings (similar to admin invite PINs)
+        const pendingRaw = db.getSetting('telegram_link_pins') || '{}';
+        let pending = {};
+        try { pending = JSON.parse(pendingRaw); } catch(e) {}
+        
+        // Prune expired PINs
+        for (const [k, v] of Object.entries(pending)) {
+            if (v.expires < Date.now()) delete pending[k];
+        }
+        
+        pending[pin] = { email: cleanEmail, expires, createdAt: Date.now() };
+        db.setSetting('telegram_link_pins', JSON.stringify(pending));
+        
+        const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'CoraTelegramBot';
+        const deepLink = `https://t.me/${botUsername}?start=notify_${pin}`;
+        
+        res.json({
+            success: true,
+            deepLink,
+            pin,
+            expiresIn: '30 minutes'
+        });
+    } catch (error) {
+        console.error('Telegram link error:', error);
+        res.status(500).json({ success: false, error: 'Failed to generate Telegram link' });
+    }
+});
+
+/**
+ * GET /api/telegram/link-status?email=user@example.com
+ * Check if a user's email has Telegram linked.
+ * Used by the submit form to poll for connection status.
+ */
+router.get('/telegram/link-status', (req, res) => {
+    try {
+        const { email: userEmail } = req.query;
+        
+        if (!userEmail || !userEmail.trim()) {
+            return res.json({ success: true, linked: false });
+        }
+        
+        const chatId = db.getUserTelegramStatus(userEmail.trim().toLowerCase());
+        
+        res.json({
+            success: true,
+            linked: !!chatId
+        });
+    } catch (error) {
+        console.error('Telegram link status error:', error);
+        res.json({ success: true, linked: false });
+    }
+});
+
 /**
  * GET /api/health
  * Lightweight health check - no external dependencies

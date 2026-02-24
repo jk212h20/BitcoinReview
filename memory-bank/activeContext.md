@@ -1,8 +1,20 @@
 # Active Context
 
-## Current Focus (Updated 2026-02-23)
+## Current Focus (Updated 2026-02-24)
 
-### Session 25: LNURL-withdraw claim-based raffle prizes
+### Session 26: Telegram Win Notifications for Players
+- Players can optionally link their Telegram on the submit form to receive win notifications via DM
+- Deep-link flow: "Connect Telegram" button → `t.me/Bot?start=notify_<PIN>` → bot links chat ID to user email
+- PIN stored in `telegram_link_pins` setting (similar to admin invite PINs, 30min expiry)
+- `telegram_chat_id` column added to `users` table
+- Submit form auto-detects linked status on email blur (via `GET /api/telegram/link-status`)
+- Returning users with pre-filled email see "✅ Telegram connected" automatically
+- When a raffle winner has Telegram linked, `telegram.notifyWinner()` sends claim link via DM
+- New API endpoints: `POST /api/telegram/link`, `GET /api/telegram/link-status`
+- Bot webhook handles `/start notify_<PIN>` payload in `index.js`
+- Files changed: `database.js`, `api.js`, `index.js`, `telegram.js`, `submit.ejs`
+
+### Previous: Session 25: LNURL-withdraw claim-based raffle prizes
 
 **What was done:**
 - **Email-only submission:** Lightning address is now optional on the submit form. Only email is required upfront.

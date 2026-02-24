@@ -417,6 +417,39 @@ async function notifyTicketDecision(ticket, isApproved, adminNote, dbModule) {
     }
 }
 
+/**
+ * Notify a raffle winner via Telegram DM (if they have a linked chat ID).
+ * Sends the claim link directly to the player's Telegram.
+ * @param {string} chatId - The winner's Telegram chat ID
+ * @param {number} prizeSats - Prize amount in sats
+ * @param {string} claimToken - The claim token for LNURL-withdraw
+ * @param {number} blockHeight - The raffle block height
+ */
+async function notifyWinner(chatId, prizeSats, claimToken, blockHeight) {
+    if (!chatId) return false;
+
+    const baseUrl = BASE_URL;
+    const claimLink = `${baseUrl}/claim/${claimToken}`;
+
+    let message = `🎉 <b>You won the Bitcoin Review Raffle!</b>\n\n`;
+    message += `Block #${blockHeight.toLocaleString()}\n`;
+    message += `Prize: <b>${prizeSats.toLocaleString()} sats</b>\n\n`;
+    message += `👉 <a href="${claimLink}">Claim Your Prize</a>\n\n`;
+    message += `Open the link above, then scan the QR code with any Lightning wallet to receive your sats. ⚡\n\n`;
+    message += `<i>This claim link expires in 30 days.</i>`;
+
+    try {
+        const sent = await sendMessage(chatId, message);
+        if (sent) {
+            console.log(`📱 Winner notification sent via Telegram to chat ${chatId}`);
+        }
+        return sent;
+    } catch (e) {
+        console.error(`Failed to send winner Telegram notification to ${chatId}:`, e.message);
+        return false;
+    }
+}
+
 // Mask email like ni***@gmail.com
 function maskEmail(email) {
     if (!email) return '';
@@ -450,5 +483,6 @@ module.exports = {
     notifyRaffleWarning,
     notifyRaffleBlockMined,
     deliverPendingNotifications,
-    notifyTicketDecision
+    notifyTicketDecision,
+    notifyWinner
 };

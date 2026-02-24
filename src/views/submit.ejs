@@ -187,11 +187,60 @@ var timeEst = typeof raffleInfo !== 'undefined' && raffleInfo && raffleInfo.bloc
                     type="email"
                     id="email"
                     x-model="email"
+                    @blur="checkTelegramStatus()"
                     required
                     placeholder="you@example.com"
                     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-bitcoin focus:border-bitcoin outline-none transition"
                 >
                 <p class="text-xs text-gray-500 mt-1">So we can notify you if you win the raffle</p>
+            </div>
+
+            <!-- Telegram Notifications (optional) -->
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div class="flex items-center justify-between mb-1">
+                    <div class="text-sm font-semibold text-gray-700">📱 Telegram Notifications <span class="text-gray-400 font-normal">(optional)</span></div>
+                </div>
+
+                <!-- Already linked -->
+                <div x-show="telegramLinked" x-cloak class="flex items-center gap-2 text-green-700 text-sm mt-1">
+                    <span class="text-lg">✅</span>
+                    <span>Telegram connected — you'll get win notifications there too!</span>
+                </div>
+
+                <!-- Not linked yet -->
+                <div x-show="!telegramLinked">
+                    <p class="text-xs text-gray-600 mb-3">Get notified instantly on Telegram if you win. Connect your account in seconds.</p>
+                    
+                    <!-- Need email first -->
+                    <div x-show="!email.trim()" class="text-xs text-gray-500 italic">
+                        Enter your email above first, then connect Telegram.
+                    </div>
+
+                    <!-- Connect button -->
+                    <div x-show="email.trim() && !telegramConnecting">
+                        <button
+                            type="button"
+                            @click="connectTelegram()"
+                            class="inline-flex items-center gap-2 bg-[#2AABEE] hover:bg-[#229ED9] text-white text-sm font-medium px-4 py-2 rounded-lg transition"
+                        >
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+                            Connect Telegram
+                        </button>
+                    </div>
+
+                    <!-- Waiting for connection -->
+                    <div x-show="telegramConnecting" x-cloak class="text-sm text-blue-700">
+                        <div class="flex items-center gap-2 mb-2">
+                            <svg class="animate-spin h-4 w-4 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span>Waiting for you to message the bot...</span>
+                        </div>
+                        <p class="text-xs text-gray-500">Opened Telegram? Tap <strong>Start</strong> in the bot chat, then come back here.</p>
+                        <button type="button" @click="cancelTelegramConnect()" class="text-xs text-gray-400 hover:text-gray-600 mt-1 underline">Cancel</button>
+                    </div>
+                </div>
             </div>
 
             <!-- Submit Button -->
@@ -356,6 +405,11 @@ var timeEst = typeof raffleInfo !== 'undefined' && raffleInfo && raffleInfo.bloc
             successMessage: '',
             error: '',
 
+            // Telegram linking state
+            telegramLinked: false,
+            telegramConnecting: false,
+            _telegramPollInterval: null,
+
             init() {
                 var self = this;
                 window._setMerchantName = function(name) { self.merchantName = name; };
@@ -368,6 +422,73 @@ var timeEst = typeof raffleInfo !== 'undefined' && raffleInfo && raffleInfo.bloc
                         this.classList.add('border-gray-300');
                     }
                 });
+
+                // Check Telegram status on load if email is pre-filled
+                if (this.email.trim()) {
+                    this.checkTelegramStatus();
+                }
+            },
+
+            /** Check if this email already has Telegram linked */
+            async checkTelegramStatus() {
+                if (!this.email.trim()) return;
+                try {
+                    const resp = await fetch('/api/telegram/link-status?email=' + encodeURIComponent(this.email.trim()));
+                    const data = await resp.json();
+                    if (data.success && data.linked) {
+                        this.telegramLinked = true;
+                        this.telegramConnecting = false;
+                        this.cancelTelegramConnect();
+                    }
+                } catch (e) { /* silently fail */ }
+            },
+
+            /** Generate a deep link PIN and open Telegram */
+            async connectTelegram() {
+                if (!this.email.trim()) return;
+                try {
+                    const resp = await fetch('/api/telegram/link', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: this.email.trim() })
+                    });
+                    const data = await resp.json();
+                    if (data.success && data.deepLink) {
+                        // Open Telegram deep link
+                        window.open(data.deepLink, '_blank');
+                        this.telegramConnecting = true;
+
+                        // Start polling for connection status
+                        var self = this;
+                        this._telegramPollInterval = setInterval(async function() {
+                            try {
+                                const checkResp = await fetch('/api/telegram/link-status?email=' + encodeURIComponent(self.email.trim()));
+                                const checkData = await checkResp.json();
+                                if (checkData.success && checkData.linked) {
+                                    self.telegramLinked = true;
+                                    self.telegramConnecting = false;
+                                    self.cancelTelegramConnect();
+                                }
+                            } catch (e) { /* ignore */ }
+                        }, 3000); // Poll every 3 seconds
+
+                        // Auto-cancel after 5 minutes
+                        setTimeout(function() { self.cancelTelegramConnect(); }, 5 * 60 * 1000);
+                    }
+                } catch (e) {
+                    console.error('Telegram connect error:', e);
+                }
+            },
+
+            /** Stop polling for Telegram connection */
+            cancelTelegramConnect() {
+                if (this._telegramPollInterval) {
+                    clearInterval(this._telegramPollInterval);
+                    this._telegramPollInterval = null;
+                }
+                if (!this.telegramLinked) {
+                    this.telegramConnecting = false;
+                }
             },
 
             async doSubmit() {

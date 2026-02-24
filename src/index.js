@@ -115,9 +115,60 @@ app.post('/telegram/webhook', express.json(), async (req, res) => {
         const text = (msg.text || '').trim();
         const firstName = msg.from?.first_name || '';
 
-        // Handle /start command (may include invite PIN)
+        // Handle /start command (may include invite PIN or notify link PIN)
         if (text.startsWith('/start')) {
-            const pin = text.split(' ')[1] || '';
+            const payload = text.split(' ')[1] || '';
+
+            // ── Player notification linking: /start notify_<PIN> ──
+            if (payload.startsWith('notify_')) {
+                const pin = payload.replace('notify_', '');
+                const pendingRaw = db.getSetting('telegram_link_pins') || '{}';
+                let pending = {};
+                try { pending = JSON.parse(pendingRaw); } catch(e) {}
+
+                if (pending[pin] && pending[pin].expires > Date.now()) {
+                    const linkEmail = pending[pin].email;
+                    
+                    // Find user by email
+                    const user = db.findUserByEmail(linkEmail);
+                    if (user) {
+                        // Check if already linked
+                        if (user.telegram_chat_id === chatId) {
+                            await telegram.sendMessage(chatId,
+                                `✅ <b>Already connected${firstName ? ', ' + firstName : ''}!</b>\n\nYour Telegram is linked to <code>${linkEmail}</code>.\n\nYou'll receive raffle win notifications here. 🎉`
+                            );
+                        } else {
+                            // Save the chat ID to the user record
+                            db.setUserTelegramChatId(user.id, chatId);
+                            
+                            // Remove used PIN
+                            delete pending[pin];
+                            db.setSetting('telegram_link_pins', JSON.stringify(pending));
+                            
+                            await telegram.sendMessage(chatId,
+                                `✅ <b>Telegram connected${firstName ? ', ' + firstName : ''}!</b>\n\n📧 Linked to: <code>${linkEmail}</code>\n\nIf you win a raffle, you'll get a notification right here with your claim link! 🎰⚡\n\nYou can close this chat and go back to the review form.`
+                            );
+                            
+                            console.log(`📱 Telegram linked: ${linkEmail} → chat ${chatId}`);
+                        }
+                    } else {
+                        // User doesn't exist yet — they need to submit a review first
+                        // But we can still store the link for when they do
+                        // For now, just tell them to submit first
+                        await telegram.sendMessage(chatId,
+                            `⚠️ No account found for <code>${linkEmail}</code>.\n\nPlease submit your review first, then connect Telegram.`
+                        );
+                    }
+                } else {
+                    await telegram.sendMessage(chatId,
+                        `👋 Hi${firstName ? ' ' + firstName : ''}!\n\nThis link has expired. Go back to the review form and click "Connect Telegram" again to get a fresh link.`
+                    );
+                }
+                return;
+            }
+
+            // ── Admin invite: /start <PIN> (no prefix) ──
+            const pin = payload;
 
             if (pin) {
                 // Validate invite PIN against stored pending invites
@@ -385,7 +436,16 @@ async function commitRaffleResult(blockHeight, autoPay) {
             ).catch(err => console.error('Winner claim email error:', err));
         }
 
-        console.log(`📧 Claim link emailed to winner. Prize will be paid when they scan the QR code.`);
+        // Send winner Telegram notification (if they linked their Telegram)
+        if (winningTicket.email) {
+            const winnerUser = db.findUserByEmail(winningTicket.email);
+            if (winnerUser && winnerUser.telegram_chat_id) {
+                telegram.notifyWinner(winnerUser.telegram_chat_id, prizeSats, claimToken, blockHeight)
+                    .catch(err => console.error('Winner Telegram notification error:', err));
+            }
+        }
+
+        console.log(`📧 Claim link sent to winner. Prize will be paid when they scan the QR code.`);
     } catch (err) {
         console.error('Raffle commit error:', err.message);
         // Notify admin of the failure

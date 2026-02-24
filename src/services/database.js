@@ -128,6 +128,12 @@ async function initializeDatabase() {
         // Column already exists — that's fine
     }
 
+    // Add telegram_chat_id column to users table (for player win notifications via Telegram)
+    try {
+        db.run(`ALTER TABLE users ADD COLUMN telegram_chat_id TEXT`);
+        console.log('✅ Added telegram_chat_id column to users');
+    } catch (e) { /* already exists */ }
+
     // LNURL-withdraw claim columns on raffles table (migration for existing DBs)
     try {
         db.run(`ALTER TABLE raffles ADD COLUMN claim_token TEXT`);
@@ -319,6 +325,22 @@ function getAllUsers() {
 function getUserCount() {
     const result = queryOne(`SELECT COUNT(*) as count FROM users WHERE is_active = 1`);
     return result ? result.count : 0;
+}
+
+/**
+ * Set telegram_chat_id on a user record (for win notifications via Telegram)
+ */
+function setUserTelegramChatId(userId, chatId) {
+    run(`UPDATE users SET telegram_chat_id = ? WHERE id = ?`, [chatId, userId]);
+}
+
+/**
+ * Check if an email has Telegram linked (returns chat ID or null)
+ */
+function getUserTelegramStatus(email) {
+    if (!email) return null;
+    const user = queryOne(`SELECT telegram_chat_id FROM users WHERE email = ? AND is_active = 1`, [email]);
+    return user ? user.telegram_chat_id : null;
 }
 
 // Ticket functions
@@ -625,6 +647,8 @@ module.exports = {
     findOrCreateUser,
     findUserByOptOutToken,
     deactivateUser,
+    setUserTelegramChatId,
+    getUserTelegramStatus,
     getAllUsers,
     getUserCount,
     
