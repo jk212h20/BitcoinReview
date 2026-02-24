@@ -480,6 +480,10 @@ function getMostRecentlyReviewedMerchant() {
     `);
 }
 
+function deleteRaffle(raffleId) {
+    run(`DELETE FROM raffles WHERE id = ?`, [raffleId]);
+}
+
 function getLatestRaffle() {
     return queryOne(`
         SELECT r.*, t.review_link, u.email, u.lnurl_address
@@ -592,6 +596,7 @@ module.exports = {
     markRafflePaymentFailed,
     getUnpaidRaffles,
     getAllRaffles,
+    deleteRaffle,
     getMostRecentlyReviewedMerchant,
     getLatestRaffle,
     

@@ -2,7 +2,15 @@
 
 ## Current Focus (Updated 2026-02-23)
 
-### Session 23: Page load performance optimization
+### Session 24: Test Raffle now sends 100 sats + admin delete raffle
+
+**What was done:**
+- **Test Raffle button** now sends a real 100 sats Lightning payment, creates a raffle record in DB, winner shows in public raffle history
+- **Delete raffle endpoint:** `DELETE /api/admin/raffle/:id` — admin can delete raffle records with optional refund to raffle fund
+- **Delete button (🗑️)** added to every row in admin Raffles tab for easy cleanup
+- Files changed: `src/routes/admin.js`, `src/services/database.js` (`deleteRaffle`), `src/views/admin.ejs`
+
+### Previous: Session 23: Page load performance optimization
 
 **What was done:**
 - **Eliminated LND API calls from page routes:** Every page was calling `await lightning.getDepositInfo()` which hit the Voltage LND node to check invoice expiry — adding 500ms-2s per page load. Replaced with `lightning.getDepositInfoCached()` (synchronous, returns in-memory cache).

@@ -165,9 +165,10 @@ router.post('/tickets/:id/validate', (req, res) => {
 
 /**
  * POST /admin/raffle/test
- * Dry-run test raffle — picks a winner from ALL approved tickets using the latest block hash.
- * Does NOT create a raffle record, does NOT send notifications/emails, does NOT pay.
- * Safe to run repeatedly without side effects.
+ * LIVE test raffle — picks a winner from ALL approved tickets using the latest block hash.
+ * Creates a real raffle record (100 sats prize), sends 100 sats via Lightning,
+ * and the winner shows up in the public raffle history.
+ * Use DELETE /admin/raffle/:id to clean up test entries afterwards.
  */
 router.post('/raffle/test', async (req, res) => {
     try {
@@ -188,11 +189,45 @@ router.post('/raffle/test', async (req, res) => {
         const winnerIndex = bitcoin.selectWinnerIndex(blockHash, allApproved.length);
         const winningTicket = allApproved[winnerIndex];
 
+        // Deduct prize from raffle fund
+        const currentFund = parseInt(db.getSetting('raffle_fund_sats') || '0');
+        if (currentFund >= prizeSats) {
+            db.setSetting('raffle_fund_sats', String(currentFund - prizeSats));
+            console.log(`🧪 Test raffle: fund ${currentFund} - ${prizeSats} = ${currentFund - prizeSats} sats`);
+        }
+
+        // Create a real raffle record
+        const raffle = db.createRaffle(
+            currentHeight, blockHash, allApproved.length, winnerIndex, winningTicket.id, prizeSats
+        );
+
+        console.log(`🧪 Test raffle committed! Block #${currentHeight}, winner index: ${winnerIndex}/${allApproved.length}, ticket #${winningTicket.id}, prize: ${prizeSats} sats`);
+
+        // Attempt Lightning payment if winner has a Lightning Address
+        let paymentResult = null;
+        if (winningTicket.lnurl_address && prizeSats > 0) {
+            try {
+                console.log(`⚡ Test raffle: paying ${prizeSats} sats to ${winningTicket.lnurl_address}...`);
+                paymentResult = await lightning.payLightningAddress(
+                    winningTicket.lnurl_address,
+                    prizeSats,
+                    `Bitcoin Review Test Raffle! Block #${currentHeight}`
+                );
+                db.markRafflePaid(raffle.id, paymentResult.paymentHash);
+                console.log(`✅ Test raffle payment sent: ${paymentResult.paymentHash}`);
+            } catch (payErr) {
+                console.error('⚠️ Test raffle payment failed:', payErr.message);
+                db.markRafflePaymentFailed(raffle.id, payErr.message);
+                paymentResult = { error: payErr.message };
+            }
+        }
+
         res.json({
             success: true,
             test: true,
-            message: 'DRY RUN — no records created, no payments sent, no notifications.',
+            message: 'LIVE TEST — raffle record created, ' + (paymentResult && !paymentResult.error ? '100 sats sent!' : 'payment ' + (paymentResult ? 'failed: ' + paymentResult.error : 'skipped (no LN address)')) + ' Delete from Raffles tab to clean up.',
             raffle: {
+                id: raffle.id,
                 blockHeight: currentHeight,
                 blockHash,
                 totalTickets: allApproved.length,
@@ -206,14 +241,54 @@ router.post('/raffle/test', async (req, res) => {
                     reviewLink: winningTicket.review_link
                 },
                 prizeAmountSats: prizeSats,
-                wouldPay: !!(winningTicket.lnurl_address && prizeSats > 0),
-                note: 'This is a test. No database records were created. Existing reviews are untouched.'
+                payment: paymentResult,
+                note: 'This raffle record is real and visible in the public raffle history. Use the 🗑️ Delete button in the Raffles tab to remove it.'
             }
         });
 
     } catch (error) {
         console.error('Test raffle error:', error);
         res.status(500).json({ error: 'Test raffle failed: ' + error.message });
+    }
+});
+
+/**
+ * DELETE /admin/raffle/:id
+ * Delete a raffle record (for cleaning up test raffles)
+ * Optionally refunds the prize amount back to the raffle fund
+ */
+router.delete('/raffle/:id', (req, res) => {
+    try {
+        const { id } = req.params;
+        const { refund } = req.body || {};
+        
+        // Find the raffle first
+        const raffles = db.getAllRaffles();
+        const raffle = raffles.find(r => r.id === parseInt(id));
+        
+        if (!raffle) {
+            return res.status(404).json({ error: 'Raffle not found' });
+        }
+        
+        // Optionally refund the prize to the raffle fund
+        if (refund && raffle.prize_amount_sats) {
+            const currentFund = parseInt(db.getSetting('raffle_fund_sats') || '0');
+            db.setSetting('raffle_fund_sats', String(currentFund + raffle.prize_amount_sats));
+            console.log(`🗑️ Raffle #${id} deleted — refunded ${raffle.prize_amount_sats} sats to fund (${currentFund} + ${raffle.prize_amount_sats} = ${currentFund + raffle.prize_amount_sats})`);
+        } else {
+            console.log(`🗑️ Raffle #${id} deleted (no refund)`);
+        }
+        
+        db.deleteRaffle(parseInt(id));
+        
+        res.json({
+            success: true,
+            message: `Raffle #${id} deleted` + (refund && raffle.prize_amount_sats ? ` (${raffle.prize_amount_sats} sats refunded to fund)` : ''),
+            refunded: refund ? (raffle.prize_amount_sats || 0) : 0
+        });
+    } catch (error) {
+        console.error('Delete raffle error:', error);
+        res.status(500).json({ error: 'Failed to delete raffle: ' + error.message });
     }
 });
 
