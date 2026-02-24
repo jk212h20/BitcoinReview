@@ -108,9 +108,37 @@ async function payInvoice(payReq, amountSats = null) {
 }
 
 /**
+ * Check if a Lightning Address uses BIP-353 (DNS TXT records with Bolt12 offers)
+ * instead of traditional LNURL. Returns the Bolt12 offer if found, null otherwise.
+ */
+async function checkBip353(user, domain) {
+    try {
+        const dnsName = `${user}.user._bitcoin-payment.${domain}`;
+        const url = `https://dns.google/resolve?name=${encodeURIComponent(dnsName)}&type=TXT`;
+        const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+        if (!response.ok) return null;
+        const data = await response.json();
+        if (data.Answer) {
+            for (const answer of data.Answer) {
+                const txt = (answer.data || '').replace(/^"|"$/g, '');
+                if (txt.includes('lno=')) {
+                    return txt; // BIP-353 record found with Bolt12 offer
+                }
+            }
+        }
+        return null;
+    } catch {
+        return null;
+    }
+}
+
+/**
  * Resolve a Lightning Address to LNURL-pay metadata
  * Lightning Address format: user@domain.com
  * Resolves to: https://domain.com/.well-known/lnurlp/user
+ * 
+ * Falls back to BIP-353 check if LNURL resolution fails, to provide
+ * a helpful error message for Bolt12-only addresses (e.g., @phoenixwallet.me)
  */
 async function resolveLightningAddress(address) {
     if (!address || !address.includes('@')) {
@@ -126,6 +154,16 @@ async function resolveLightningAddress(address) {
     try {
         response = await fetch(url, { signal: AbortSignal.timeout(10000) });
     } catch (fetchErr) {
+        // LNURL resolution failed — check if this is a BIP-353/Bolt12 address
+        const bip353 = await checkBip353(user, domain);
+        if (bip353) {
+            throw new Error(
+                `${address} uses BIP-353/Bolt12 (not LNURL). ` +
+                `This address only works with Bolt12-compatible wallets (e.g., Phoenix-to-Phoenix). ` +
+                `Our LND node cannot pay Bolt12 offers. ` +
+                `The reviewer needs a standard LNURL Lightning Address (e.g., Wallet of Satoshi, Alby, Coinos, etc.)`
+            );
+        }
         throw new Error(`Failed to connect to ${domain} for Lightning Address resolution: ${fetchErr.message}`);
     }
     if (!response.ok) {
