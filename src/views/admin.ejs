@@ -214,14 +214,14 @@
             <div class="flex flex-wrap items-center justify-between gap-4 mb-3">
                 <div>
                     <h2 class="text-xl font-bold text-blue-800">🧪 Test Raffle</h2>
-                    <p class="text-blue-600 text-sm mt-1">Picks a winner from all approved tickets, <strong>sends 100 sats via Lightning</strong>, and creates a real raffle record visible in the public history. Use 🗑️ Delete in the Raffles tab to clean up afterwards.</p>
+                    <p class="text-blue-600 text-sm mt-1">Picks a winner from all approved tickets, <strong>generates a claim link (100 sats)</strong>, and emails it to the winner. Creates a real raffle record visible in the public history. Winner scans QR with any Lightning wallet to claim. Use 🗑️ Delete in the Raffles tab to clean up afterwards.</p>
                 </div>
                 <button 
-                    @click="if(!confirm('This will send 100 sats to the winner and create a raffle record. Continue?')) return; testLoading = true; testResult = null; fetch('/api/admin/raffle/test', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Password': password } }).then(r => r.json()).then(d => { testResult = d; testSuccess = d.success; testLoading = false; if(d.success) setTimeout(() => location.reload(), 3000); }).catch(e => { testResult = { error: e.message }; testSuccess = false; testLoading = false; })"
+                    @click="if(!confirm('This will create a 100-sat raffle with a claim link and email the winner. Continue?')) return; testLoading = true; testResult = null; fetch('/api/admin/raffle/test', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Password': password } }).then(r => r.json()).then(d => { testResult = d; testSuccess = d.success; testLoading = false; if(d.success) setTimeout(() => location.reload(), 3000); }).catch(e => { testResult = { error: e.message }; testSuccess = false; testLoading = false; })"
                     :disabled="testLoading"
                     class="bg-blue-500 text-white px-6 py-3 rounded-lg font-bold hover:bg-blue-600 disabled:opacity-50 transition whitespace-nowrap"
                 >
-                    <span x-text="testLoading ? '⏳ Sending 100 sats...' : '⚡ Test Raffle — Send 100 sats'"></span>
+                    <span x-text="testLoading ? '⏳ Creating claim...' : '⚡ Test Raffle — 100 sats'"></span>
                 </button>
             </div>
             <div x-show="testResult" x-cloak class="mt-4 p-4 rounded-lg" :class="testSuccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-700'">

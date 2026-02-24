@@ -166,12 +166,13 @@ router.post('/tickets/:id/validate', (req, res) => {
 /**
  * POST /admin/raffle/test
  * LIVE test raffle — picks a winner from ALL approved tickets using the latest block hash.
- * Creates a real raffle record (100 sats prize), sends 100 sats via Lightning,
- * and the winner shows up in the public raffle history.
+ * Creates a real raffle record (100 sats prize), generates a claim link,
+ * and emails the winner. The winner scans the QR code with any Lightning wallet.
  * Use DELETE /admin/raffle/:id to clean up test entries afterwards.
  */
 router.post('/raffle/test', async (req, res) => {
     try {
+        const crypto = require('crypto');
         const prizeSats = 100;
 
         // Get all approved tickets (regardless of raffle_block)
@@ -203,29 +204,33 @@ router.post('/raffle/test', async (req, res) => {
 
         console.log(`🧪 Test raffle committed! Block #${currentHeight}, winner index: ${winnerIndex}/${allApproved.length}, ticket #${winningTicket.id}, prize: ${prizeSats} sats`);
 
-        // Attempt Lightning payment if winner has a Lightning Address
-        let paymentResult = null;
-        if (winningTicket.lnurl_address && prizeSats > 0) {
+        // Generate claim token (LNURL-withdraw) — winner scans QR to claim
+        const claimToken = crypto.randomUUID();
+        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+        db.setRaffleClaimToken(raffle.id, claimToken, expiresAt);
+        const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+        const claimLink = `${baseUrl}/claim/${claimToken}`;
+
+        console.log(`🧪 Test raffle claim link: ${claimLink}`);
+
+        // Email winner with claim link (if they have email)
+        let emailResult = null;
+        if (winningTicket.email) {
             try {
-                console.log(`⚡ Test raffle: paying ${prizeSats} sats to ${winningTicket.lnurl_address}...`);
-                paymentResult = await lightning.payLightningAddress(
-                    winningTicket.lnurl_address,
-                    prizeSats,
-                    `Bitcoin Review Test Raffle! Block #${currentHeight}`
+                emailResult = await email.sendWinnerEmail(
+                    winningTicket.email, prizeSats, claimToken, currentHeight
                 );
-                db.markRafflePaid(raffle.id, paymentResult.paymentHash);
-                console.log(`✅ Test raffle payment sent: ${paymentResult.paymentHash}`);
-            } catch (payErr) {
-                console.error('⚠️ Test raffle payment failed:', payErr.message);
-                db.markRafflePaymentFailed(raffle.id, payErr.message);
-                paymentResult = { error: payErr.message };
+                console.log(`📧 Test raffle winner email sent to ${winningTicket.email}`);
+            } catch (emailErr) {
+                console.error('⚠️ Test raffle email failed:', emailErr.message);
+                emailResult = { error: emailErr.message };
             }
         }
 
         res.json({
             success: true,
             test: true,
-            message: 'LIVE TEST — raffle record created, ' + (paymentResult && !paymentResult.error ? '100 sats sent!' : 'payment ' + (paymentResult ? 'failed: ' + paymentResult.error : 'skipped (no LN address)')) + ' Delete from Raffles tab to clean up.',
+            message: 'LIVE TEST — raffle record created, claim link generated' + (emailResult && !emailResult.error ? ', email sent!' : emailResult ? ' (email failed: ' + emailResult.error + ')' : ' (no email on file)') + ' Delete from Raffles tab to clean up.',
             raffle: {
                 id: raffle.id,
                 blockHeight: currentHeight,
@@ -241,8 +246,9 @@ router.post('/raffle/test', async (req, res) => {
                     reviewLink: winningTicket.review_link
                 },
                 prizeAmountSats: prizeSats,
-                payment: paymentResult,
-                note: 'This raffle record is real and visible in the public raffle history. Use the 🗑️ Delete button in the Raffles tab to remove it.'
+                claimLink,
+                email: emailResult,
+                note: 'Winner must scan the claim QR code with any Lightning wallet to receive sats. Use the 🗑️ Delete button in the Raffles tab to remove this test.'
             }
         });
 
@@ -343,10 +349,17 @@ router.post('/raffle/run', async (req, res) => {
             prizeAmountSats || null
         );
         
-        // Auto-pay via Lightning if enabled and winner has a Lightning Address
-        let paymentResult = null;
-        const autoPayEnabled = process.env.AUTO_PAY_ENABLED === 'true';
+        const crypto = require('crypto');
         const prizeSats = prizeAmountSats || parseInt(process.env.DEFAULT_PRIZE_SATS) || 0;
+        
+        // Generate claim token (LNURL-withdraw)
+        const claimToken = crypto.randomUUID();
+        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+        db.setRaffleClaimToken(raffle.id, claimToken, expiresAt);
+        const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+        const claimLink = `${baseUrl}/claim/${claimToken}`;
+        
+        console.log(`🎰 Manual raffle committed! Block #${blockHeight}, claim link: ${claimLink}`);
         
         // Notify admin via Telegram
         telegram.notifyRaffleResult(
@@ -355,31 +368,16 @@ router.post('/raffle/run', async (req, res) => {
             db
         ).catch(err => console.error('Telegram raffle notify error:', err));
         
-        // Send winner email
-        email.sendWinnerEmail(
-            winningTicket.email,
-            prizeAmountSats,
-            winningTicket.lnurl_address,
-            blockHeight
-        ).catch(err => {
-            console.error('Failed to send winner email:', err);
-        });
-        
-        if (autoPayEnabled && winningTicket.lnurl_address && prizeSats > 0) {
-            try {
-                console.log(`⚡ Auto-paying ${prizeSats} sats to ${winningTicket.lnurl_address}...`);
-                paymentResult = await lightning.payLightningAddress(
-                    winningTicket.lnurl_address,
-                    prizeSats,
-                    `Bitcoin Review Raffle winner! Block #${blockHeight}`
-                );
-                db.markRafflePaid(raffle.id, paymentResult.paymentHash);
-                console.log(`✅ Auto-payment successful: ${paymentResult.paymentHash}`);
-            } catch (payErr) {
-                console.error('⚠️ Auto-payment failed:', payErr.message);
-                db.markRafflePaymentFailed(raffle.id, payErr.message);
-                paymentResult = { error: payErr.message };
-            }
+        // Send winner email with claim link
+        if (winningTicket.email) {
+            email.sendWinnerEmail(
+                winningTicket.email,
+                prizeSats,
+                claimToken,
+                blockHeight
+            ).catch(err => {
+                console.error('Failed to send winner email:', err);
+            });
         }
         
         res.json({
@@ -397,7 +395,7 @@ router.post('/raffle/run', async (req, res) => {
                     reviewLink: winningTicket.review_link
                 },
                 prizeAmountSats: prizeSats,
-                payment: paymentResult
+                claimLink
             }
         });
         
