@@ -2,13 +2,17 @@
 
 ## Current Focus (Updated 2026-02-23)
 
-### Session 24: Test Raffle now sends 100 sats + admin delete raffle
+### Session 24: Test Raffle + BIP-353/Bolt12 detection
 
 **What was done:**
 - **Test Raffle button** now sends a real 100 sats Lightning payment, creates a raffle record in DB, winner shows in public raffle history
 - **Delete raffle endpoint:** `DELETE /api/admin/raffle/:id` — admin can delete raffle records with optional refund to raffle fund
 - **Delete button (🗑️)** added to every row in admin Raffles tab for easy cleanup
-- Files changed: `src/routes/admin.js`, `src/services/database.js` (`deleteRaffle`), `src/views/admin.ejs`
+- **BIP-353/Bolt12 detection:** `@phoenixwallet.me` addresses use BIP-353 DNS TXT records with Bolt12 offers (not LNURL). LND can't pay Bolt12. When LNURL fails, we now check BIP-353 via Google DNS API and show a clear error explaining incompatibility.
+- **Better error messages:** All Lightning payment steps (LNURL resolution, invoice request, LND payment) now show specific error context instead of generic "fetch failed"
+- Files changed: `src/routes/admin.js`, `src/services/database.js`, `src/views/admin.ejs`, `src/services/lightning.js`
+
+**Known limitation:** Phoenix Wallet `@phoenixwallet.me` addresses are Bolt12-only (BIP-353). LND doesn't support Bolt12. Reviewers with Phoenix addresses need to use a standard LNURL-compatible wallet (WoS, Alby, Coinos, etc.) to receive raffle prizes. See `checkBip353()` in `lightning.js`.
 
 ### Previous: Session 23: Page load performance optimization
 
