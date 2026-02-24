@@ -43,11 +43,16 @@ async function lndRequest(path, method = 'GET', body = null) {
         options.body = JSON.stringify(body);
     }
 
-    const response = await fetch(url, options);
+    let response;
+    try {
+        response = await fetch(url, options);
+    } catch (fetchErr) {
+        throw new Error(`LND connection failed (${path}): ${fetchErr.message}`);
+    }
     
     if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`LND API error (${response.status}): ${errorText}`);
+        throw new Error(`LND API error (${response.status} on ${path}): ${errorText}`);
     }
 
     return await response.json();
@@ -117,7 +122,12 @@ async function resolveLightningAddress(address) {
 
     console.log(`Resolving Lightning Address: ${address} -> ${url}`);
 
-    const response = await fetch(url);
+    let response;
+    try {
+        response = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    } catch (fetchErr) {
+        throw new Error(`Failed to connect to ${domain} for Lightning Address resolution: ${fetchErr.message}`);
+    }
     if (!response.ok) {
         throw new Error(`Failed to resolve Lightning Address ${address}: ${response.status}`);
     }
@@ -155,7 +165,12 @@ async function requestInvoice(callback, amountSats, comment = '') {
 
     console.log(`Requesting invoice for ${amountSats} sats from ${url}`);
 
-    const response = await fetch(url);
+    let response;
+    try {
+        response = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    } catch (fetchErr) {
+        throw new Error(`Failed to connect to LNURL callback for invoice request: ${fetchErr.message}`);
+    }
     if (!response.ok) {
         throw new Error(`Failed to request invoice: ${response.status}`);
     }
