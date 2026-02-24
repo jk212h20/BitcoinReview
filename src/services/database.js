@@ -128,6 +128,28 @@ async function initializeDatabase() {
         // Column already exists — that's fine
     }
 
+    // LNURL-withdraw claim columns on raffles table (migration for existing DBs)
+    try {
+        db.run(`ALTER TABLE raffles ADD COLUMN claim_token TEXT`);
+        console.log('✅ Added claim_token column to raffles');
+    } catch (e) { /* already exists */ }
+    try {
+        db.run(`ALTER TABLE raffles ADD COLUMN claim_status TEXT DEFAULT 'pending'`);
+        console.log('✅ Added claim_status column to raffles');
+    } catch (e) { /* already exists */ }
+    try {
+        db.run(`ALTER TABLE raffles ADD COLUMN claim_expires_at TEXT`);
+        console.log('✅ Added claim_expires_at column to raffles');
+    } catch (e) { /* already exists */ }
+    try {
+        db.run(`ALTER TABLE raffles ADD COLUMN claimed_at TEXT`);
+        console.log('✅ Added claimed_at column to raffles');
+    } catch (e) { /* already exists */ }
+    try {
+        db.run(`ALTER TABLE raffles ADD COLUMN claim_payment_hash TEXT`);
+        console.log('✅ Added claim_payment_hash column to raffles');
+    } catch (e) { /* already exists */ }
+
     // Insert default settings if they don't exist
     const defaultSettings = [
         ['review_mode', 'manual_review'],       // 'auto_approve' or 'manual_review'
@@ -541,6 +563,39 @@ function getTotalDonationsReceived() {
     return result ? (result.total || 0) : 0;
 }
 
+// Claim functions (LNURL-withdraw)
+function setRaffleClaimToken(raffleId, claimToken, expiresAt) {
+    run(`UPDATE raffles SET claim_token = ?, claim_status = 'pending', claim_expires_at = ? WHERE id = ?`, [claimToken, expiresAt, raffleId]);
+}
+
+function findRaffleByClaimToken(token) {
+    if (!token) return null;
+    return queryOne(`
+        SELECT r.*, t.review_link, u.email, u.lnurl_address
+        FROM raffles r
+        LEFT JOIN tickets t ON r.winning_ticket_id = t.id
+        LEFT JOIN users u ON t.user_id = u.id
+        WHERE r.claim_token = ?
+    `, [token]);
+}
+
+function markRaffleClaimed(raffleId, paymentHash) {
+    run(`UPDATE raffles SET claim_status = 'claimed', claimed_at = datetime('now'), claim_payment_hash = ?, payment_status = 'paid', paid_at = datetime('now') WHERE id = ?`, [paymentHash, raffleId]);
+}
+
+function markRaffleClaimExpired(raffleId) {
+    run(`UPDATE raffles SET claim_status = 'expired' WHERE id = ?`, [raffleId]);
+}
+
+function getExpiredUnclaimedRaffles() {
+    return query(`
+        SELECT * FROM raffles 
+        WHERE claim_status = 'pending' 
+          AND claim_expires_at IS NOT NULL 
+          AND claim_expires_at < datetime('now')
+    `);
+}
+
 // Settings functions
 function getSetting(key) {
     const row = queryOne(`SELECT value FROM settings WHERE key = ?`, [key]);
@@ -599,6 +654,13 @@ module.exports = {
     deleteRaffle,
     getMostRecentlyReviewedMerchant,
     getLatestRaffle,
+    
+    // Claim functions (LNURL-withdraw)
+    setRaffleClaimToken,
+    findRaffleByClaimToken,
+    markRaffleClaimed,
+    markRaffleClaimExpired,
+    getExpiredUnclaimedRaffles,
     
     // Deposit address functions
     createDepositAddress,

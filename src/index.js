@@ -333,6 +333,7 @@ async function checkRaffleEvents() {
  */
 async function commitRaffleResult(blockHeight, autoPay) {
     try {
+        const { v4: uuidv4 } = require('uuid');
         const blockHash = await bitcoin.getBlockHash(blockHeight);
         const tickets = db.getValidTicketsForBlock(blockHeight);
 
@@ -362,37 +363,29 @@ async function commitRaffleResult(blockHeight, autoPay) {
             blockHeight, blockHash, tickets.length, winnerIndex, winningTicket.id, prizeSats || null
         );
 
-        console.log(`🎰 Raffle committed! Block #${blockHeight}, hash: ${blockHash.substring(0, 16)}..., winner index: ${winnerIndex}/${tickets.length}, ticket #${winningTicket.id}`);
+        // Generate claim token and set 30-day expiry
+        const claimToken = uuidv4();
+        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+        db.setRaffleClaimToken(raffle.id, claimToken, expiresAt);
 
-        // Notify via Telegram (always)
+        console.log(`🎰 Raffle committed! Block #${blockHeight}, hash: ${blockHash.substring(0, 16)}..., winner index: ${winnerIndex}/${tickets.length}, ticket #${winningTicket.id}`);
+        console.log(`🔗 Claim link: ${process.env.BASE_URL || 'http://localhost:3000'}/claim/${claimToken}`);
+
+        // Notify via Telegram (always — include claim link for admin)
         await telegram.notifyRaffleResult(
             { block_height: blockHeight, total_tickets: tickets.length, prize_amount_sats: prizeSats },
             winningTicket,
             db
         );
 
-        // Send winner email (always)
-        email.sendWinnerEmail(
-            winningTicket.email, prizeSats, winningTicket.lnurl_address, blockHeight
-        ).catch(err => console.error('Winner email error:', err));
-
-        // Auto-pay only if enabled (raffle_auto_trigger=true AND AUTO_PAY_ENABLED=true)
-        if (autoPay && process.env.AUTO_PAY_ENABLED === 'true' && winningTicket.lnurl_address && prizeSats > 0) {
-            try {
-                console.log(`⚡ Auto-paying ${prizeSats} sats to ${winningTicket.lnurl_address}...`);
-                const paymentResult = await lightning.payLightningAddress(
-                    winningTicket.lnurl_address, prizeSats,
-                    `Bitcoin Review Raffle winner! Block #${blockHeight}`
-                );
-                db.markRafflePaid(raffle.id, paymentResult.paymentHash);
-                console.log(`✅ Auto-payment: ${paymentResult.paymentHash}`);
-            } catch (payErr) {
-                console.error('⚠️ Auto-payment failed:', payErr.message);
-                db.markRafflePaymentFailed(raffle.id, payErr.message);
-            }
-        } else if (!autoPay) {
-            console.log(`💤 Auto-pay disabled — admin must pay manually via dashboard.`);
+        // Send winner email with claim link (LNURL-withdraw)
+        if (winningTicket.email) {
+            email.sendWinnerEmail(
+                winningTicket.email, prizeSats, claimToken, blockHeight
+            ).catch(err => console.error('Winner claim email error:', err));
         }
+
+        console.log(`📧 Claim link emailed to winner. Prize will be paid when they scan the QR code.`);
     } catch (err) {
         console.error('Raffle commit error:', err.message);
         // Notify admin of the failure

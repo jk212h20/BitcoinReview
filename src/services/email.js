@@ -98,9 +98,13 @@ Didn't sign up for this? Remove your email: ${optOutLink}
 }
 
 /**
- * Send winner notification email
+ * Send winner notification email with claim link (LNURL-withdraw)
+ * Winner clicks link → sees QR code → scans with any Lightning wallet → gets sats
  */
-async function sendWinnerEmail(email, prizeAmount, lnurlAddress, blockHeight) {
+async function sendWinnerEmail(emailAddr, prizeAmount, claimToken, blockHeight) {
+    const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+    const claimLink = `${baseUrl}/claim/${claimToken}`;
+    
     const html = `
         <!DOCTYPE html>
         <html>
@@ -110,7 +114,9 @@ async function sendWinnerEmail(email, prizeAmount, lnurlAddress, blockHeight) {
                 .container { max-width: 600px; margin: 0 auto; padding: 20px; }
                 .header { background: #f7931a; color: white; padding: 20px; text-align: center; }
                 .content { padding: 20px; background: #f9f9f9; }
-                .prize { font-size: 24px; color: #f7931a; text-align: center; padding: 20px; }
+                .prize { font-size: 28px; color: #f7931a; text-align: center; padding: 20px; font-weight: bold; }
+                .claim-button { display: inline-block; padding: 15px 30px; background: #f7931a; color: white; text-decoration: none; border-radius: 8px; font-size: 18px; font-weight: bold; }
+                .footer { padding: 15px; text-align: center; font-size: 12px; color: #999; }
             </style>
         </head>
         <body>
@@ -122,15 +128,28 @@ async function sendWinnerEmail(email, prizeAmount, lnurlAddress, blockHeight) {
                     <p>Great news! You've been selected as the winner of the Bitcoin Review Raffle!</p>
                     
                     <div class="prize">
-                        <strong>${prizeAmount ? prizeAmount.toLocaleString() + ' sats' : 'Prize'}</strong>
+                        ${prizeAmount ? prizeAmount.toLocaleString() + ' sats' : 'Prize'}
                     </div>
                     
-                    <p><strong>Raffle Block:</strong> ${blockHeight}</p>
-                    <p><strong>Your LNURL:</strong> ${lnurlAddress}</p>
+                    <p style="text-align: center; margin: 25px 0;">
+                        <a href="${claimLink}" class="claim-button">⚡ Claim Your Prize</a>
+                    </p>
                     
-                    <p>We'll be sending your prize to your Lightning address shortly!</p>
+                    <p style="text-align: center; color: #666;">
+                        Click the button above to see a QR code.<br>
+                        Scan it with <strong>any Lightning wallet</strong> to receive your sats instantly.
+                    </p>
+                    
+                    <p style="margin-top: 20px; font-size: 14px; color: #666;">
+                        <strong>Raffle Block:</strong> #${blockHeight ? blockHeight.toLocaleString() : 'N/A'}<br>
+                        <strong>Works with:</strong> Phoenix, Wallet of Satoshi, Muun, Breez, Zeus, BlueWallet, and more
+                    </p>
                     
                     <p>Thank you for supporting Bitcoin adoption in Roatan! 🌴⚡</p>
+                </div>
+                <div class="footer">
+                    <p>This claim link expires in 30 days. If you have trouble, reply to this email.</p>
+                    <p>Can't click the button? Copy this link: ${claimLink}</p>
                 </div>
             </div>
         </body>
@@ -138,20 +157,25 @@ async function sendWinnerEmail(email, prizeAmount, lnurlAddress, blockHeight) {
     `;
     
     const text = `
-🎊 Congratulations! You Won! 🎊
+🎊 Congratulations! You Won the Bitcoin Review Raffle! 🎊
 
-Great news! You've been selected as the winner of the Bitcoin Review Raffle!
+Your prize: ${prizeAmount ? prizeAmount.toLocaleString() + ' sats' : 'TBD'}
 
-Prize: ${prizeAmount ? prizeAmount.toLocaleString() + ' sats' : 'TBD'}
-Raffle Block: ${blockHeight}
-Your LNURL: ${lnurlAddress}
+Click here to claim your prize:
+${claimLink}
 
-We'll be sending your prize to your Lightning address shortly!
+You'll see a QR code — just scan it with any Lightning wallet to receive your sats.
+Works with: Phoenix, Wallet of Satoshi, Muun, Breez, Zeus, BlueWallet, and more.
+
+Raffle Block: #${blockHeight ? blockHeight.toLocaleString() : 'N/A'}
+This link expires in 30 days.
 
 Thank you for supporting Bitcoin adoption in Roatan! 🌴⚡
+
+— Bitcoin Review
     `;
     
-    return sendEmail(email, '🎊 You Won the Bitcoin Review Raffle!', html, text);
+    return sendEmail(emailAddr, '🎊 You Won the Bitcoin Review Raffle! Claim your sats →', html, text);
 }
 
 /**

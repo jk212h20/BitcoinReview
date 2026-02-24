@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claim Your Prize - Bitcoin Review Raffle</title>
+    <link href="/styles.css" rel="stylesheet">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-sm">
+        <div class="max-w-6xl mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <a href="/" class="flex items-center space-x-2">
+                    <span class="text-2xl">₿</span>
+                    <span class="font-bold text-xl">Bitcoin Review Raffle</span>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-2xl mx-auto px-4 py-12">
+        <% if (typeof error !== 'undefined' && error) { %>
+        <!-- Error State -->
+        <div class="text-center">
+            <div class="text-6xl mb-4">😕</div>
+            <h1 class="text-2xl font-bold text-gray-800 mb-4"><%= error %></h1>
+            <a href="/" class="text-bitcoin hover:underline">← Back to home</a>
+        </div>
+
+        <% } else if (raffle.claim_status === 'claimed') { %>
+        <!-- Already Claimed -->
+        <div class="text-center">
+            <div class="text-6xl mb-4">✅</div>
+            <h1 class="text-3xl font-bold text-green-700 mb-2">Prize Claimed!</h1>
+            <p class="text-gray-600 mb-4">
+                This prize of <strong class="text-bitcoin"><%= raffle.prize_amount_sats ? raffle.prize_amount_sats.toLocaleString() : '0' %> sats</strong> 
+                has already been claimed.
+            </p>
+            <% if (raffle.claimed_at) { %>
+            <p class="text-sm text-gray-500">Claimed on <%= new Date(raffle.claimed_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) %></p>
+            <% } %>
+            <a href="/" class="mt-6 inline-block text-bitcoin hover:underline">← Back to home</a>
+        </div>
+
+        <% } else if (raffle.claim_status === 'expired') { %>
+        <!-- Expired -->
+        <div class="text-center">
+            <div class="text-6xl mb-4">⏰</div>
+            <h1 class="text-3xl font-bold text-yellow-700 mb-2">Claim Expired</h1>
+            <p class="text-gray-600 mb-4">
+                This claim link has expired. The prize of <strong><%= raffle.prize_amount_sats ? raffle.prize_amount_sats.toLocaleString() : '0' %> sats</strong> 
+                has been returned to the raffle fund.
+            </p>
+            <a href="/" class="mt-6 inline-block text-bitcoin hover:underline">← Back to home</a>
+        </div>
+
+        <% } else { %>
+        <!-- Active Claim -->
+        <div x-data="claimPage()" x-init="startPolling()">
+            
+            <!-- Claimed state (shown after successful scan) -->
+            <div x-show="claimed" x-cloak class="text-center">
+                <div class="text-6xl mb-4">🎉</div>
+                <h1 class="text-3xl font-bold text-green-700 mb-2">Prize Claimed!</h1>
+                <p class="text-gray-600 text-lg">
+                    <strong class="text-bitcoin"><%= raffle.prize_amount_sats ? raffle.prize_amount_sats.toLocaleString() : '0' %> sats</strong> 
+                    have been sent to your wallet!
+                </p>
+                <p class="text-gray-500 mt-4">Thank you for supporting Bitcoin adoption in Roatan! 🌴⚡</p>
+            </div>
+
+            <!-- Pending claim state -->
+            <div x-show="!claimed">
+                <div class="text-center mb-8">
+                    <div class="text-6xl mb-4">🎊</div>
+                    <h1 class="text-3xl font-bold text-gray-900 mb-2">You Won!</h1>
+                    <p class="text-gray-600 text-lg mb-1">Congratulations on winning the Bitcoin Review Raffle!</p>
+                    <div class="mt-4 inline-block bg-orange-50 border-2 border-bitcoin rounded-xl px-8 py-4">
+                        <div class="text-sm text-gray-500 mb-1">Your Prize</div>
+                        <div class="text-4xl font-bold text-bitcoin"><%= raffle.prize_amount_sats ? raffle.prize_amount_sats.toLocaleString() : '0' %> sats</div>
+                    </div>
+                </div>
+
+                <!-- QR Code -->
+                <div class="bg-white rounded-xl shadow-lg p-8 text-center mb-8">
+                    <h2 class="text-xl font-bold mb-2">Scan to Claim</h2>
+                    <p class="text-gray-600 text-sm mb-6">Open any Lightning wallet and scan this QR code to receive your sats.</p>
+                    
+                    <div class="inline-block bg-white p-4 rounded-xl border-2 border-gray-200">
+                        <img 
+                            src="https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=<%= encodeURIComponent(lnurlEncoded) %>&bgcolor=ffffff&color=000000&margin=10"
+                            alt="LNURL-withdraw QR code"
+                            class="w-[280px] h-[280px]"
+                            loading="eager"
+                        >
+                    </div>
+
+                    <!-- Copy LNURL button -->
+                    <div class="mt-4">
+                        <button 
+                            onclick="copyLnurl()"
+                            class="inline-flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm transition"
+                        >
+                            📋 <span id="copy-btn-text">Copy LNURL</span>
+                        </button>
+                        <input type="hidden" id="lnurl-value" value="<%= lnurlEncoded %>">
+                    </div>
+
+                    <!-- Polling status -->
+                    <div class="mt-4 text-sm text-gray-400">
+                        <span x-show="polling">⏳ Waiting for you to scan...</span>
+                    </div>
+                </div>
+
+                <!-- Instructions -->
+                <div class="bg-white rounded-xl shadow-sm p-6 mb-8">
+                    <h3 class="font-bold text-lg mb-4">📱 How to Claim</h3>
+                    <ol class="list-decimal list-inside space-y-3 text-gray-700">
+                        <li>Open <strong>any Lightning wallet</strong> on your phone</li>
+                        <li>Tap <strong>Scan</strong> or <strong>Receive</strong> (varies by wallet)</li>
+                        <li>Scan the QR code above</li>
+                        <li>Confirm the withdrawal in your wallet</li>
+                        <li>Done! The sats will appear in your wallet instantly ⚡</li>
+                    </ol>
+                </div>
+
+                <!-- Compatible wallets -->
+                <div class="bg-gray-50 rounded-xl p-6">
+                    <h3 class="font-bold text-lg mb-3">⚡ Compatible Wallets</h3>
+                    <p class="text-gray-600 text-sm mb-3">This works with virtually every Lightning wallet:</p>
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm text-gray-700">
+                        <div class="bg-white rounded-lg px-3 py-2 text-center">🟠 Phoenix</div>
+                        <div class="bg-white rounded-lg px-3 py-2 text-center">🔵 Wallet of Satoshi</div>
+                        <div class="bg-white rounded-lg px-3 py-2 text-center">🟢 Muun</div>
+                        <div class="bg-white rounded-lg px-3 py-2 text-center">🔴 Breez</div>
+                        <div class="bg-white rounded-lg px-3 py-2 text-center">⚡ Zeus</div>
+                        <div class="bg-white rounded-lg px-3 py-2 text-center">🔷 BlueWallet</div>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-3">Don't have a Lightning wallet? Download <a href="https://phoenix.acinq.co/" target="_blank" class="text-bitcoin hover:underline font-medium">Phoenix Wallet</a> — it's the easiest way to get started.</p>
+                </div>
+
+                <!-- Raffle details -->
+                <div class="mt-8 text-center text-sm text-gray-500">
+                    <p>Raffle Block: #<%= raffle.block_height ? raffle.block_height.toLocaleString() : 'N/A' %></p>
+                    <% if (raffle.claim_expires_at) { %>
+                    <p class="mt-1">This claim link expires: <%= new Date(raffle.claim_expires_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) %></p>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+        <% } %>
+    </main>
+
+    <script>
+    function copyLnurl() {
+        var value = document.getElementById('lnurl-value').value;
+        navigator.clipboard.writeText(value).then(function() {
+            var btn = document.getElementById('copy-btn-text');
+            btn.textContent = '✓ Copied!';
+            setTimeout(function() { btn.textContent = 'Copy LNURL'; }, 2000);
+        }).catch(function() {
+            // Fallback
+            prompt('Copy this LNURL:', value);
+        });
+    }
+
+    function claimPage() {
+        return {
+            claimed: false,
+            polling: true,
+            pollInterval: null,
+
+            startPolling() {
+                var self = this;
+                this.pollInterval = setInterval(function() {
+                    self.checkStatus();
+                }, 3000); // Poll every 3 seconds
+            },
+
+            async checkStatus() {
+                try {
+                    var response = await fetch('/api/claim/<%= raffle.claim_token %>/status');
+                    var data = await response.json();
+                    if (data.success && data.status === 'claimed') {
+                        this.claimed = true;
+                        this.polling = false;
+                        if (this.pollInterval) clearInterval(this.pollInterval);
+                    }
+                } catch (e) {
+                    // Silently ignore poll errors
+                }
+            }
+        };
+    }
+    </script>
+</body>
+</html>

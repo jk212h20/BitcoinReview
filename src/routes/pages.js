@@ -5,10 +5,19 @@
 const express = require('express');
 const router = express.Router();
 
+const { bech32 } = require('bech32');
 const db = require('../services/database');
 const bitcoin = require('../services/bitcoin');
 const btcmap = require('../services/btcmap');
 const lightning = require('../services/lightning');
+
+/**
+ * Encode a URL as an LNURL (bech32-encoded, uppercase)
+ */
+function encodeLnurl(url) {
+    const words = bech32.toWords(Buffer.from(url, 'utf8'));
+    return bech32.encode('lnurl', words, 2000).toUpperCase();
+}
 
 /**
  * GET /
@@ -261,6 +270,52 @@ router.get('/how-it-works', async (req, res) => {
         res.render('how-it-works', {
             title: 'How It Works - Bitcoin Review Raffle',
             donationAddress: process.env.DONATION_ADDRESS || 'Not configured'
+        });
+    }
+});
+
+/**
+ * GET /claim/:token
+ * Claim page — winner sees QR code to withdraw prize via LNURL-withdraw
+ */
+router.get('/claim/:token', (req, res) => {
+    try {
+        const { token } = req.params;
+        const raffle = db.findRaffleByClaimToken(token);
+        
+        if (!raffle) {
+            return res.render('claim', {
+                title: 'Claim Prize - Bitcoin Review Raffle',
+                error: 'Invalid or unknown claim link',
+                raffle: null,
+                lnurlEncoded: null
+            });
+        }
+        
+        // Check expiry
+        if (raffle.claim_status === 'pending' && raffle.claim_expires_at && new Date(raffle.claim_expires_at) < new Date()) {
+            db.markRaffleClaimExpired(raffle.id);
+            raffle.claim_status = 'expired';
+        }
+        
+        // Generate LNURL-withdraw encoded string for QR code
+        const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
+        const withdrawUrl = `${baseUrl}/api/lnurl/withdraw/${token}`;
+        const lnurlEncoded = encodeLnurl(withdrawUrl);
+        
+        res.render('claim', {
+            title: 'Claim Your Prize - Bitcoin Review Raffle',
+            raffle,
+            lnurlEncoded,
+            error: null
+        });
+    } catch (error) {
+        console.error('Claim page error:', error);
+        res.render('claim', {
+            title: 'Claim Prize - Bitcoin Review Raffle',
+            error: 'Something went wrong loading this page',
+            raffle: null,
+            lnurlEncoded: null
         });
     }
 });

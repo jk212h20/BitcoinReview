@@ -102,7 +102,7 @@
                 '<div class="flex flex-wrap items-start justify-between gap-4">' +
                     '<div>' +
                         '<h2 class="text-xl font-bold text-yellow-800 mb-1">⚡ Raffle Winner — Payment Needed</h2>' +
-                        '<p class="text-yellow-700 text-sm mb-3">Block #' + unpaid.block_height.toLocaleString() + ' raffle has been committed. The winner is determined — payment is pending.</p>' +
+                        '<p class="text-yellow-700 text-sm mb-3">Block #' + unpaid.block_height.toLocaleString() + ' raffle has been committed. The winner is determined — ' + (unpaid.claim_token ? 'claim link sent via email.' : 'payment is pending.') + '</p>' +
                         '<div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">' +
                             '<div><span class="text-yellow-600">Winner:</span> <strong>' + (unpaid.email || 'Anonymous') + '</strong></div>' +
                             '<div><span class="text-yellow-600">LN Address:</span> <strong>' + (unpaid.lnurl_address || 'None') + '</strong></div>' +
@@ -408,24 +408,17 @@
                                     <td class="py-2">${r.total_tickets}</td>
                                     <td class="py-2">${r.email || '-'}</td>
                                     <td class="py-2">${r.prize_amount_sats ? r.prize_amount_sats.toLocaleString() + ' sats' : '-'}</td>
-                                    <td class="py-2">${r.paid_at ? '<span class="text-green-500">✓</span>' : '<span class="text-yellow-500">Pending</span>'}</td>
+                                    <td class="py-2">${r.claim_status === 'claimed' || r.paid_at ? '<span class="text-green-500">✓ Claimed</span>' : r.claim_status === 'expired' ? '<span class="text-gray-500">⏰ Expired</span>' : '<span class="text-yellow-500">⏳ Awaiting</span>'}</td>
                                     <td class="py-2 space-x-2">
+                                        ${r.claim_token ? '<a href="/claim/' + r.claim_token + '" target="_blank" class="text-bitcoin hover:underline text-xs">🔗 Claim Link</a>' : ''}
                                         ${!r.paid_at ? `
-                                        ${r.lnurl_address ? `
-                                        <button 
-                                            @click="payWinner(${r.id}, ${r.prize_amount_sats || 0})"
-                                            class="text-yellow-600 hover:underline font-medium"
-                                        >
-                                            ⚡ Pay
-                                        </button>
-                                        ` : ''}
                                         <button 
                                             @click="markPaid(${r.id})"
-                                            class="text-bitcoin hover:underline"
+                                            class="text-bitcoin hover:underline text-xs"
                                         >
                                             Mark Paid
                                         </button>
-                                        ` : '<span class="text-green-500">Done</span>'}
+                                        ` : '<span class="text-green-500 text-xs">Done</span>'}
                                         <button 
                                             @click="deleteRaffle(${r.id}, ${r.prize_amount_sats || 0})"
                                             class="text-red-500 hover:underline text-xs ml-2"

@@ -35,6 +35,7 @@
 - **✅ Homepage raffle result** - Latest raffle stays visible with full verification until next raffle
 - **✅ Admin unpaid-raffle banner** - Yellow alert with ⚡ Pay button when payment is pending
 - **✅ Donation address on all pages** - Every page footer shows Voltage node on-chain address with clickable mempool.space link, QR code on hover, and copy button
+- **✅ LNURL-withdraw claim-based prizes** - Winners get email with claim link → scan QR with ANY Lightning wallet → sats pulled from LND node. No Lightning address needed upfront. Works with Phoenix, WoS, Muun, Breez, Zeus, BlueWallet, etc.
 
 ## What's Left to Build
 - [x] Node.js project setup (package.json, dependencies)

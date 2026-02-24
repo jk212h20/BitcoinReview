@@ -163,26 +163,19 @@ var timeEst = typeof raffleInfo !== 'undefined' && raffleInfo && raffleInfo.bloc
                 </div>
             </div>
 
-            <!-- Lightning Address (required) -->
+            <!-- Lightning Address (optional) -->
             <div>
                 <label for="lnurl" class="block text-sm font-semibold text-gray-700 mb-1">
-                    ⚡ Lightning Address <span class="text-red-500">*</span>
+                    ⚡ Lightning Address <span class="text-gray-400 font-normal">(optional)</span>
                 </label>
                 <input
                     type="text"
                     id="lnurl"
                     x-model="lnurl"
-                    required
                     placeholder="you@walletofsatoshi.com"
                     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-bitcoin focus:border-bitcoin outline-none transition"
                 >
-                <p class="text-xs text-gray-500 mt-1">Your Lightning address so we can send prizes if you win.</p>
-                <div class="mt-2 bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-xs text-gray-600">
-                    <p class="font-medium text-gray-700 mb-1">💡 Don't have a Lightning address?</p>
-                    <p>Download <a href="https://phoenix.acinq.co/" target="_blank" class="text-bitcoin font-semibold hover:underline">Phoenix Wallet</a> — it's the easiest way to get one.</p>
-                    <p class="mt-1">Once installed, go to <strong>Settings → Experimental features</strong> to find your Lightning address. It looks like:</p>
-                    <code class="block mt-1 bg-white border border-gray-200 rounded px-2 py-1 text-gray-800 font-mono">somethingUnique@phoenixwallet.me</code>
-                </div>
+                <p class="text-xs text-gray-500 mt-1">Optional — if you win, we'll email you a link to claim your sats with <strong>any</strong> Lightning wallet. No address needed upfront!</p>
             </div>
 
             <!-- Email (required) -->
@@ -204,7 +197,7 @@ var timeEst = typeof raffleInfo !== 'undefined' && raffleInfo && raffleInfo.bloc
             <!-- Submit Button -->
             <button
                 type="submit"
-                :disabled="loading || !reviewLink.trim() || !lnurl.trim() || !email.trim() || !merchantName.trim()"
+                :disabled="loading || !reviewLink.trim() || !email.trim() || !merchantName.trim()"
                 class="w-full bg-bitcoin hover:bg-bitcoin-dark text-white font-bold py-3 px-6 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 <span x-show="!loading">Submit Review</span>
@@ -394,11 +387,6 @@ var timeEst = typeof raffleInfo !== 'undefined' && raffleInfo && raffleInfo.bloc
                 }
                 if (!this.email.trim()) {
                     this.error = 'Please provide your email address';
-                    this.loading = false;
-                    return;
-                }
-                if (!this.lnurl.trim()) {
-                    this.error = 'Please provide your Lightning address';
                     this.loading = false;
                     return;
                 }

@@ -2,17 +2,34 @@
 
 ## Current Focus (Updated 2026-02-23)
 
-### Session 24: Test Raffle + BIP-353/Bolt12 detection
+### Session 25: LNURL-withdraw claim-based raffle prizes
 
 **What was done:**
-- **Test Raffle button** now sends a real 100 sats Lightning payment, creates a raffle record in DB, winner shows in public raffle history
-- **Delete raffle endpoint:** `DELETE /api/admin/raffle/:id` — admin can delete raffle records with optional refund to raffle fund
-- **Delete button (🗑️)** added to every row in admin Raffles tab for easy cleanup
-- **BIP-353/Bolt12 detection:** `@phoenixwallet.me` addresses use BIP-353 DNS TXT records with Bolt12 offers (not LNURL). LND can't pay Bolt12. When LNURL fails, we now check BIP-353 via Google DNS API and show a clear error explaining incompatibility.
-- **Better error messages:** All Lightning payment steps (LNURL resolution, invoice request, LND payment) now show specific error context instead of generic "fetch failed"
-- Files changed: `src/routes/admin.js`, `src/services/database.js`, `src/views/admin.ejs`, `src/services/lightning.js`
+- **Email-only submission:** Lightning address is now optional on the submit form. Only email is required upfront.
+- **Claim-based prize distribution (LNURL-withdraw / LUD-03):**
+  - When a raffle winner is selected, a unique claim token (UUID) is generated with 30-day expiry
+  - Winner receives email with a "Claim Your Prize" button linking to `/claim/:token`
+  - Claim page shows a QR code (bech32-encoded LNURL) that any Lightning wallet can scan
+  - Wallet scans QR → fetches withdraw parameters → sends BOLT11 invoice → our LND node pays it
+  - Works with **every** Lightning wallet: Phoenix, WoS, Muun, Breez, Zeus, BlueWallet, etc.
+  - Claim page polls for status and shows success animation when claimed
+- **New files:** `src/views/claim.ejs` (claim page with QR)
+- **New routes:** `GET /claim/:token` (page), `GET /api/lnurl/withdraw/:token` (LUD-03 first call), `GET /api/lnurl/withdraw/:token/callback` (LUD-03 callback), `GET /api/claim/:token/status` (polling)
+- **New DB columns on `raffles`:** `claim_token`, `claim_status` (pending/claimed/expired), `claim_expires_at`, `claimed_at`, `claim_payment_hash`
+- **New DB functions:** `setRaffleClaimToken()`, `findRaffleByClaimToken()`, `markRaffleClaimed()`, `markRaffleClaimExpired()`, `getExpiredUnclaimedRaffles()`
+- **Updated email:** Winner email now contains claim link + button instead of just notification
+- **Updated views:** Raffles page and admin show claim status (Claimed/Awaiting/Expired) instead of Paid/Pending. Admin raffles tab shows claim links.
+- **New dependency:** `bech32` npm package for LNURL encoding
+- Files changed: `src/services/database.js`, `src/routes/api.js`, `src/routes/pages.js`, `src/services/email.js`, `src/index.js`, `src/views/submit.ejs`, `src/views/raffles.ejs`, `src/views/admin.ejs`, `src/views/claim.ejs`
 
-**Known limitation:** Phoenix Wallet `@phoenixwallet.me` addresses are Bolt12-only (BIP-353). LND doesn't support Bolt12. Reviewers with Phoenix addresses need to use a standard LNURL-compatible wallet (WoS, Alby, Coinos, etc.) to receive raffle prizes. See `checkBip353()` in `lightning.js`.
+**IMPORTANT: `BASE_URL` env var** must be set to the public HTTPS URL for LNURL-withdraw to work (wallets need to reach the callback URL). Already in `.env.example`.
+
+**Previous limitation resolved:** Phoenix Wallet (Bolt12-only) users can now receive prizes — they scan the LNURL-withdraw QR code with Phoenix which supports LNURL-withdraw. No Lightning address needed upfront.
+
+### Previous: Session 24: Test Raffle + BIP-353/Bolt12 detection
+
+- Test Raffle button, delete raffle endpoint, BIP-353/Bolt12 detection
+- Better Lightning payment error messages
 
 ### Previous: Session 23: Page load performance optimization
 
