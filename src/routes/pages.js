@@ -143,14 +143,14 @@ router.get('/merchants', async (req, res) => {
         });
 
         res.render('merchants', {
-            title: 'Bitcoin Merchants - Roatan',
+            title: 'Bitcoin Merchants - Bay Islands',
             merchants: annotated,
             donationAddress: depositInfo.onchainAddress || process.env.DONATION_ADDRESS || 'Not configured'
         });
     } catch (error) {
         console.error('Merchants page error:', error);
         res.render('merchants', {
-            title: 'Bitcoin Merchants - Roatan',
+            title: 'Bitcoin Merchants - Bay Islands',
             error: 'Failed to load merchants',
             merchants: [],
             donationAddress: process.env.DONATION_ADDRESS || 'Not configured'

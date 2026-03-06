@@ -1,8 +1,18 @@
 # Active Context
 
-## Current Focus (Updated 2026-02-24)
+## Current Focus (Updated 2026-03-06)
 
-### Session 26: Telegram Win Notifications for Players
+### Session 27: Utila Merchants Added
+- Merchants page now shows Bitcoin-accepting businesses from **both Roatan and Utila**
+- `btcmap.js`: Added `getUtilaMerchants()` with Utila bounding box (16.06–16.13 lat, -86.97–-86.85 lon)
+- `getMerchantList()` fetches both islands in parallel, deduplicates by element ID, tags each merchant with `location: "Roatan"` or `location: "Utila"`
+- `formatMerchant()` now accepts optional `location` parameter
+- `searchMerchants()` also searches across both islands
+- `merchants.ejs`: Header changed to "Bay Islands", each merchant card shows a `🏝 Roatan` or `🏝 Utila` badge (blue pill), Google Maps links use dynamic island name
+- Page title updated to "Bitcoin Merchants - Bay Islands"
+- Files changed: `src/services/btcmap.js`, `src/views/merchants.ejs`, `src/routes/pages.js`, `public/styles.css` (rebuilt)
+
+### Previous: Session 26: Telegram Win Notifications for Players
 - Players can optionally link their Telegram on the submit form to receive win notifications via DM
 - Deep-link flow: "Connect Telegram" button → `t.me/Bot?start=notify_<PIN>` → bot links chat ID to user email
 - PIN stored in `telegram_link_pins` setting (similar to admin invite PINs, 30min expiry)

@@ -122,6 +122,21 @@ async function getRoatanMerchants() {
 }
 
 /**
+ * Get merchants on Utila island (Honduras Bay Islands)
+ * Bounding box covers the main island area
+ */
+async function getUtilaMerchants() {
+    return fetchMerchants({
+        bounds: {
+            minLat: 16.06,
+            maxLat: 16.13,
+            minLon: -86.97,
+            maxLon: -86.85
+        }
+    });
+}
+
+/**
  * Get all Honduras merchants (broader search)
  */
 async function getHondurasMerchants() {
@@ -137,8 +152,10 @@ async function getHondurasMerchants() {
 
 /**
  * Format merchant for display
+ * @param {object} merchant - Raw BTCMap element
+ * @param {string} [location] - Island/area name (e.g., "Roatan", "Utila")
  */
-function formatMerchant(merchant) {
+function formatMerchant(merchant, location) {
     const tags = merchant.osm_json?.tags || {};
     
     return {
@@ -152,7 +169,8 @@ function formatMerchant(merchant) {
         website: tags.website || tags['contact:website'],
         lightning: tags['payment:lightning'] === 'yes',
         onchain: tags['payment:onchain'] === 'yes' || tags['payment:bitcoin'] === 'yes',
-        openingHours: tags.opening_hours
+        openingHours: tags.opening_hours,
+        location: location || null
     };
 }
 
@@ -198,31 +216,72 @@ function isValidBitcoinMerchant(merchant) {
 }
 
 /**
- * Get formatted merchant list for display
- * Filters out merchants without confirmed payment methods or with stale data (>1 year)
+ * Get formatted merchant list for display (Roatan + Utila)
+ * Filters out merchants without confirmed payment methods or with stale data (>2 years)
+ * Each merchant is tagged with its island location
  */
 async function getMerchantList() {
-    const merchants = await getRoatanMerchants();
-    return merchants
-        .filter(isValidBitcoinMerchant)
-        .map(formatMerchant);
+    const [roatanRaw, utilaRaw] = await Promise.all([
+        getRoatanMerchants(),
+        getUtilaMerchants()
+    ]);
+
+    // Deduplicate by element ID (in case bounding boxes overlap)
+    const seen = new Set();
+    const roatanValid = roatanRaw.filter(isValidBitcoinMerchant).filter(m => {
+        if (seen.has(m.id)) return false;
+        seen.add(m.id);
+        return true;
+    });
+    const utilaValid = utilaRaw.filter(isValidBitcoinMerchant).filter(m => {
+        if (seen.has(m.id)) return false;
+        seen.add(m.id);
+        return true;
+    });
+
+    const roatanFormatted = roatanValid.map(m => formatMerchant(m, 'Roatan'));
+    const utilaFormatted = utilaValid.map(m => formatMerchant(m, 'Utila'));
+
+    return [...roatanFormatted, ...utilaFormatted];
 }
 
 /**
- * Search merchants by name
+ * Search merchants by name (across all islands)
  */
 async function searchMerchants(query) {
-    const merchants = await getRoatanMerchants();
-    const filtered = merchants.filter(m => {
+    const [roatanRaw, utilaRaw] = await Promise.all([
+        getRoatanMerchants(),
+        getUtilaMerchants()
+    ]);
+
+    const queryLower = query.toLowerCase();
+    const filterByName = m => {
         const name = m.osm_json?.tags?.name || '';
-        return name.toLowerCase().includes(query.toLowerCase());
+        return name.toLowerCase().includes(queryLower);
+    };
+
+    const seen = new Set();
+    const roatanFiltered = roatanRaw.filter(filterByName).filter(m => {
+        if (seen.has(m.id)) return false;
+        seen.add(m.id);
+        return true;
     });
-    return filtered.map(formatMerchant);
+    const utilaFiltered = utilaRaw.filter(filterByName).filter(m => {
+        if (seen.has(m.id)) return false;
+        seen.add(m.id);
+        return true;
+    });
+
+    return [
+        ...roatanFiltered.map(m => formatMerchant(m, 'Roatan')),
+        ...utilaFiltered.map(m => formatMerchant(m, 'Utila'))
+    ];
 }
 
 module.exports = {
     fetchMerchants,
     getRoatanMerchants,
+    getUtilaMerchants,
     getHondurasMerchants,
     getMerchantList,
     searchMerchants,
