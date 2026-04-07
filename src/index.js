@@ -278,11 +278,10 @@ async function startServer() {
     }
     
     // Pre-warm deposit address cache + start real-time LND subscriptions
-    try {
-        await lightning.warmDepositCache();
-    } catch (err) {
+    // Non-blocking: don't let LND issues prevent server from starting
+    lightning.warmDepositCache().catch(err => {
         console.warn('⚠️  Failed to warm deposit cache:', err.message);
-    }
+    });
     
     // Pre-warm BTCMap merchant cache so /submit and /merchants load instantly
     try {

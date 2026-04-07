@@ -45,7 +45,7 @@ async function lndRequest(path, method = 'GET', body = null) {
 
     let response;
     try {
-        response = await fetch(url, options);
+        response = await fetch(url, { ...options, signal: AbortSignal.timeout(10000) });
     } catch (fetchErr) {
         throw new Error(`LND connection failed (${path}): ${fetchErr.message}`);
     }
@@ -558,10 +558,21 @@ async function handleSettledInvoice(settledInvoice) {
     }
 }
 
+// Retry state for subscription backoff
+let invoiceSubRetries = 0;
+let txSubRetries = 0;
+
+/**
+ * Calculate exponential backoff delay: 30s, 60s, 120s, ... capped at 5 minutes
+ */
+function backoffDelay(retries) {
+    return Math.min(30000 * Math.pow(2, retries), 5 * 60 * 1000);
+}
+
 /**
  * Subscribe to LND invoice updates via streaming REST API.
  * This gives us instant notification when any invoice is settled.
- * Auto-reconnects on disconnection.
+ * Auto-reconnects on disconnection with exponential backoff.
  */
 async function subscribeToInvoices() {
     if (!LND_REST_URL || !LND_MACAROON) return;
@@ -579,11 +590,13 @@ async function subscribeToInvoices() {
                 headers: {
                     'Grpc-Metadata-macaroon': LND_MACAROON,
                     'Content-Type': 'application/json'
-                }
+                },
+                signal: AbortSignal.timeout(15000)
             });
             
             if (response.ok) {
                 console.log(`⚡ Connected to LND invoice stream via ${endpoint}`);
+                invoiceSubRetries = 0; // Reset backoff on successful connection
                 break;
             } else {
                 console.warn(`⚠️  ${endpoint} returned ${response.status}`);
@@ -596,8 +609,11 @@ async function subscribeToInvoices() {
     }
     
     if (!response) {
-        console.warn('⚠️  No working invoice subscription endpoint found. Falling back to polling only.');
-        return; // Don't retry — endpoints aren't available on this node
+        const delay = backoffDelay(invoiceSubRetries);
+        invoiceSubRetries++;
+        console.warn(`⚠️  Invoice subscription failed. Retrying in ${Math.round(delay/1000)}s...`);
+        setTimeout(() => subscribeToInvoices(), delay);
+        return;
     }
     
     try {
@@ -632,15 +648,17 @@ async function subscribeToInvoices() {
         console.warn('⚠️  Invoice subscription stream error:', err.message);
     }
     
-    // Auto-reconnect after 30 seconds
-    console.log('⚡ Reconnecting invoice subscription in 30s...');
-    setTimeout(() => subscribeToInvoices(), 30000);
+    // Stream disconnected — reconnect with backoff
+    const delay = backoffDelay(invoiceSubRetries);
+    invoiceSubRetries++;
+    console.log(`⚡ Reconnecting invoice subscription in ${Math.round(delay/1000)}s...`);
+    setTimeout(() => subscribeToInvoices(), delay);
 }
 
 /**
  * Subscribe to on-chain transaction updates via LND streaming REST API.
  * Detects on-chain deposits as soon as LND sees them (even unconfirmed).
- * Auto-reconnects on disconnection.
+ * Auto-reconnects on disconnection with exponential backoff.
  */
 async function subscribeToTransactions() {
     if (!LND_REST_URL || !LND_MACAROON) return;
@@ -654,7 +672,8 @@ async function subscribeToTransactions() {
             headers: {
                 'Grpc-Metadata-macaroon': LND_MACAROON,
                 'Content-Type': 'application/json'
-            }
+            },
+            signal: AbortSignal.timeout(15000)
         });
         
         if (!response.ok) {
@@ -662,13 +681,15 @@ async function subscribeToTransactions() {
             return; // Don't retry on 404/permanent errors
         }
     } catch (err) {
-        console.warn('⚠️  Transaction subscribe connection error:', err.message);
-        // Reconnect after 30s for network errors
-        setTimeout(() => subscribeToTransactions(), 30000);
+        const delay = backoffDelay(txSubRetries);
+        txSubRetries++;
+        console.warn(`⚠️  Transaction subscribe connection error: ${err.message}. Retrying in ${Math.round(delay/1000)}s...`);
+        setTimeout(() => subscribeToTransactions(), delay);
         return;
     }
     
     console.log('💰 Connected to LND on-chain transaction stream');
+    txSubRetries = 0; // Reset backoff on successful connection
     
     try {
         const reader = response.body.getReader();
@@ -723,25 +744,45 @@ async function subscribeToTransactions() {
         console.warn('⚠️  Transaction subscription error:', err.message);
     }
     
-    // Auto-reconnect after 5 seconds
-    console.log('💰 Reconnecting transaction subscription in 5s...');
-    setTimeout(() => subscribeToTransactions(), 5000);
+    // Stream disconnected — reconnect with backoff
+    const delay = backoffDelay(txSubRetries);
+    txSubRetries++;
+    console.log(`💰 Reconnecting transaction subscription in ${Math.round(delay/1000)}s...`);
+    setTimeout(() => subscribeToTransactions(), delay);
 }
 
 /**
- * Initialize deposit cache on startup
+ * Initialize deposit cache on startup.
+ * Loads cached deposit info from DB, then tries LND.
+ * Always starts subscriptions regardless of LND availability —
+ * they retry with exponential backoff independently.
  */
 async function warmDepositCache() {
     try {
         await getDepositInfo();
         console.log(`✅ Deposit cache warmed - On-chain: ${depositCache.onchainAddress?.substring(0, 12)}... | Lightning: ready`);
-        
-        // Start real-time subscriptions (non-blocking)
-        subscribeToInvoices();
-        subscribeToTransactions();
     } catch (err) {
-        console.warn('⚠️  Failed to warm deposit cache:', err.message);
+        console.warn('⚠️  Failed to warm deposit cache (LND may be down):', err.message);
+        // Still try to load from DB even if LND is unreachable
+        try {
+            const onchain = db.getActiveDepositAddress('onchain');
+            const lightning = db.getActiveDepositAddress('lightning');
+            if (onchain) depositCache.onchainAddress = onchain.address;
+            if (lightning) {
+                depositCache.lightningInvoice = lightning.invoice;
+                depositCache.lightningPaymentHash = lightning.payment_hash;
+            }
+            if (depositCache.onchainAddress || depositCache.lightningInvoice) {
+                console.log('📦 Loaded deposit info from DB cache (LND offline)');
+            }
+        } catch (dbErr) {
+            console.warn('⚠️  DB deposit cache load also failed:', dbErr.message);
+        }
     }
+    
+    // Always start real-time subscriptions (non-blocking, retry with backoff)
+    subscribeToInvoices();
+    subscribeToTransactions();
 }
 
 module.exports = {

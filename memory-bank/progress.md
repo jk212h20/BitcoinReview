@@ -81,6 +81,20 @@
 
 ## Session Log
 
+### Session 32 (2026-04-07)
+- **GitHub Issues system for partner collaboration:**
+  - 4 issue templates: bug-report, feature-request, content-change, design-tweak (`.github/ISSUE_TEMPLATE/`)
+  - `issue-to-cline.sh` script: fetches issue via `gh`, formats as Cline dispatch prompt
+  - Partner files GitHub issues → run script → Cline sub-agent works on it
+  - Committed on main: `f6c6f8f`
+- **Clonable branch (`clonable`):**
+  - `site.config.js` — extracts all location/branding strings (siteName, regionName, merchantAreas, timezone, page text)
+  - 17 files updated to use `siteConfig` instead of hardcoded strings
+  - `index.js` injects siteConfig into all EJS views via `res.locals`
+  - README.md updated with "Deploy Your Own" instructions
+  - Verified: config loads, grep for hardcoded strings returns zero matches
+  - Commit: `320706f`, pushed to `origin/clonable` — **not merged to main yet**
+
 ### Session 1 (2026-02-05)
 - Created memory bank documentation
 - Defined project architecture and tech stack

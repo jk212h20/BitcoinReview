@@ -1,16 +1,34 @@
 # Active Context
 
-## Current Focus (Updated 2026-03-06)
+## Current Focus (Updated 2026-04-07)
 
-### Session 27: Utila Merchants Added
+### Session 32: GitHub Issues System + Clonable Branch
+
+**GitHub Issues for Partner Collaboration:**
+- Created `.github/ISSUE_TEMPLATE/` with 4 structured templates: bug-report.yml, feature-request.yml, content-change.yml, design-tweak.yml
+- `.github/ISSUE_TEMPLATE/config.yml` disables blank issues
+- `issue-to-cline.sh` script converts GitHub issues to Cline dispatch tasks via `gh` CLI
+- Partner can file issues on GitHub → you run `./issue-to-cline.sh <issue-number>` → Cline sub-agent works on it
+- Committed on main: `f6c6f8f`
+
+**Clonable Branch (`clonable`):**
+- Branch pushed to GitHub: `origin/clonable` (3 commits ahead of main)
+- `site.config.js` created — single file with ALL location/branding strings (siteName, regionName, locations, merchantAreas with BTCMap bounding boxes, timezone, page text, etc.)
+- 17 files updated to reference `siteConfig` instead of hardcoded strings:
+  - Services: btcmap.js, telegram.js, email.js
+  - Routes: pages.js, admin.js, api.js
+  - Server: index.js (injects `siteConfig` into all views via `res.locals`)
+  - EJS templates: layout, index, submit, merchants, reviews, how-it-works, claim, opt-out
+  - README.md: "Deploy Your Own" section added
+- Config verified: `node -e "require('./site.config')"` passes
+- grep for hardcoded "Roatan"/"Bay Islands"/"Bitcoin Review Raffle" in EJS templates returns zero matches
+- Commit: `320706f Make site clonable: extract location/branding to site.config.js`
+- **Status: NOT merged to main yet** — needs review + testing before merge
+
+### Previous: Session 27: Utila Merchants Added
 - Merchants page now shows Bitcoin-accepting businesses from **both Roatan and Utila**
-- `btcmap.js`: Added `getUtilaMerchants()` with Utila bounding box (16.06–16.13 lat, -86.97–-86.85 lon)
-- `getMerchantList()` fetches both islands in parallel, deduplicates by element ID, tags each merchant with `location: "Roatan"` or `location: "Utila"`
-- `formatMerchant()` now accepts optional `location` parameter
-- `searchMerchants()` also searches across both islands
-- `merchants.ejs`: Header changed to "Bay Islands", each merchant card shows a `🏝 Roatan` or `🏝 Utila` badge (blue pill), Google Maps links use dynamic island name
-- Page title updated to "Bitcoin Merchants - Bay Islands"
-- Files changed: `src/services/btcmap.js`, `src/views/merchants.ejs`, `src/routes/pages.js`, `public/styles.css` (rebuilt)
+- `btcmap.js`: Added `getUtilaMerchants()` with Utila bounding box
+- Files changed: `src/services/btcmap.js`, `src/views/merchants.ejs`, `src/routes/pages.js`, `public/styles.css`
 
 ### Previous: Session 26: Telegram Win Notifications for Players
 - Players can optionally link their Telegram on the submit form to receive win notifications via DM
