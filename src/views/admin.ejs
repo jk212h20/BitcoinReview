@@ -965,7 +965,7 @@ function emailPanel(pw, userList) {
         },
 
         loadTemplate(name) {
-            var templates = <%- typeof emailTemplates !== 'undefined' && emailTemplates ? emailTemplates : '{}' %>;
+            var templates = ${typeof emailTemplates !== 'undefined' && emailTemplates ? emailTemplates : '{}'};
             if (templates[name]) {
                 this.emailSubject = templates[name].subject;
                 this.emailHtml = templates[name].html;
