@@ -23,7 +23,7 @@
         <div class="max-w-6xl mx-auto px-4 py-4">
             <div class="flex justify-between items-center">
                 <a href="/" class="flex items-center space-x-2">
-                    <img src="/icons/logo-bitcoin-palm.svg" alt="" class="w-8 h-8" />
+                    <img src="/icons/<%= siteConfig.icons.logo %>" alt="" class="w-8 h-8" />
                     <span class="font-bold text-xl"><%= siteConfig.siteName %></span>
                 </a>
                 <div class="hidden md:flex items-center space-x-6">
@@ -93,7 +93,7 @@
                 </div>
             </div>
             <div class="border-t border-gray-700 mt-8 pt-8 text-center text-gray-400">
-                <p class="inline-flex items-center gap-1"><img src="/icons/palm-tree.svg" alt="" class="w-5 h-5" /> <%= siteConfig.footerMadeIn %></p>
+                <p class="inline-flex items-center gap-1"><img src="/icons/<%= siteConfig.icons.footer %>" alt="" class="w-5 h-5" /> <%= siteConfig.footerMadeIn %></p>
             </div>
         </div>
     </footer>

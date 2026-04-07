@@ -13,6 +13,21 @@ module.exports = {
     footerTagline: 'Incentivizing Bitcoin adoption in Roatan through community reviews.',
     footerMadeIn: 'Made with ⚡ in Roatan',
 
+    // ── Icons & Emoji ──
+    // Override these to customize the visual branding for your region.
+    // SVG icon paths are relative to /public/icons/
+    // The defaults are generic Bitcoin-themed (no location-specific imagery).
+    icons: {
+        logo: 'logo-bitcoin-palm.svg',     // Navbar logo (32x32). Default: 'logo-bitcoin.svg'
+        hero: 'palm-tree.svg',             // Homepage hero icon (64x64). Default: 'hero-lightning.svg'
+        footer: 'palm-tree.svg',           // Footer decoration. Default: 'hero-lightning.svg'
+        notFound: 'lost-island.svg',       // 404 page. Default: '404-compass.svg'
+    },
+    emoji: {
+        location: '🏝',    // Used next to location tags on merchants. Default: '📍'
+        claim: '🌴⚡',     // Shown on claim success page. Default: '⚡'
+    },
+
     // ── Location ──
     regionName: 'Bay Islands',       // Shown on merchants page header, etc.
     locations: ['Roatan', 'Utila'],  // Individual area names

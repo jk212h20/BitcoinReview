@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Bitcoin circle -->
+  <circle cx="32" cy="32" r="26" fill="#FFF3E0" stroke="#f7931a" stroke-width="2.5"/>
+  <!-- Bitcoin B symbol -->
+  <line x1="28" y1="16" x2="28" y2="48" stroke="#f7931a" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="34" y1="16" x2="34" y2="48" stroke="#f7931a" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Top bump -->
+  <path d="M24 22 L28 22 L34 22 C40 22 40 32 34 32 L28 32 L24 32" stroke="#f7931a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Bottom bump -->
+  <path d="M24 32 L28 32 L34 32 C41 32 41 42 34 42 L28 42 L24 42" stroke="#f7931a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Lightning bolt accent -->
+  <path d="M44 18 L40 28 L46 28 L42 38" stroke="#eab308" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

@@ -39,7 +39,7 @@
                 
                 <div class="text-sm text-gray-500 mb-3 flex flex-wrap gap-1">
                     <span class="inline-block bg-gray-100 px-2 py-1 rounded">${m.type}</span>
-                    ${m.location ? '<span class="inline-block bg-blue-100 text-blue-700 px-2 py-1 rounded">🏝 ' + m.location + '</span>' : ''}
+                    ${m.location ? '<span class="inline-block bg-blue-100 text-blue-700 px-2 py-1 rounded">' + siteConfig.emoji.location + ' ' + m.location + '</span>' : ''}
                 </div>
                 
                 ${m.address ? `

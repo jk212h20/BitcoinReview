@@ -11,6 +11,19 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const siteConfig = require('../site.config');
 
+// Apply defaults for optional config sections so cloners don't need to set everything
+siteConfig.icons = Object.assign({
+    logo: 'logo-bitcoin.svg',
+    hero: 'hero-lightning.svg',
+    footer: 'hero-lightning.svg',
+    notFound: '404-compass.svg',
+}, siteConfig.icons || {});
+
+siteConfig.emoji = Object.assign({
+    location: '📍',
+    claim: '⚡',
+}, siteConfig.emoji || {});
+
 // Import services
 const db = require('./services/database');
 const email = require('./services/email');

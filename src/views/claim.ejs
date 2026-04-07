@@ -13,7 +13,7 @@
         <div class="max-w-6xl mx-auto px-4 py-4">
             <div class="flex justify-between items-center">
                 <a href="/" class="flex items-center space-x-2">
-                    <img src="/icons/logo-bitcoin-palm.svg" alt="" class="w-8 h-8" />
+                    <img src="/icons/<%= siteConfig.icons.logo %>" alt="" class="w-8 h-8" />
                     <span class="font-bold text-xl"><%= siteConfig.siteName %></span>
                 </a>
             </div>
@@ -68,7 +68,7 @@
                     <strong class="text-bitcoin"><%= raffle.prize_amount_sats ? raffle.prize_amount_sats.toLocaleString() : '0' %> sats</strong> 
                     have been sent to your wallet!
                 </p>
-                <p class="text-gray-500 mt-4">Thank you for supporting Bitcoin adoption in <%= siteConfig.primaryLocation %>! 🌴⚡</p>
+                <p class="text-gray-500 mt-4">Thank you for supporting Bitcoin adoption in <%= siteConfig.primaryLocation %>! <%= siteConfig.emoji.claim %></p>
             </div>
 
             <!-- Pending claim state -->
