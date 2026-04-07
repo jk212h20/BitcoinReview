@@ -4,7 +4,7 @@
     <div class="max-w-4xl mx-auto px-4 text-center">
         <h1 class="text-3xl md:text-4xl font-bold mb-4">How It Works</h1>
         <p class="text-lg opacity-90">
-            Everything you need to know about the Bitcoin Review Raffle
+            Everything you need to know about ${siteConfig.siteName}
         </p>
     </div>
 </section>
@@ -41,10 +41,10 @@
                     <h3 class="text-xl font-bold mb-2">Pay with Bitcoin</h3>
                     <p class="text-gray-600 mb-4">
                         Visit any merchant that accepts Bitcoin or Lightning payments. 
-                        This can be anywhere in the world, but we especially love supporting Roatan businesses!
+                        ${siteConfig.howItWorksStep1Detail}
                     </p>
                     <ul class="text-gray-500 text-sm space-y-1">
-                        <li>✓ Check our <a href="/merchants" class="text-bitcoin hover:underline">merchant list</a> for Bitcoin-accepting businesses in Roatan</li>
+                        <li>✓ Check our <a href="/merchants" class="text-bitcoin hover:underline">merchant list</a> for Bitcoin-accepting businesses in ${siteConfig.primaryLocation}</li>
                         <li>✓ Pay with Lightning for instant transactions</li>
                         <li>✓ On-chain Bitcoin works too!</li>
                     </ul>
@@ -170,9 +170,9 @@
             </div>
             
             <div class="bg-white rounded-lg p-6 shadow-sm">
-                <h3 class="font-bold mb-2">Do I need to be in Roatan?</h3>
+                <h3 class="font-bold mb-2">Do I need to be in ${siteConfig.primaryLocation}?</h3>
                 <p class="text-gray-600">
-                    No! You can review any Bitcoin-accepting merchant anywhere. We just have a special focus on Roatan.
+                    ${siteConfig.howItWorksFaq.locationFaqAnswer}
                 </p>
             </div>
             

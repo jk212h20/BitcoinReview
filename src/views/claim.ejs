@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Claim Your Prize - Bitcoin Review Raffle</title>
+    <title>Claim Your Prize - <%= siteConfig.siteName %></title>
     <link href="/styles.css" rel="stylesheet">
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
 </head>
@@ -14,7 +14,7 @@
             <div class="flex justify-between items-center">
                 <a href="/" class="flex items-center space-x-2">
                     <img src="/icons/logo-bitcoin-palm.svg" alt="" class="w-8 h-8" />
-                    <span class="font-bold text-xl">Bitcoin Review Raffle</span>
+                    <span class="font-bold text-xl"><%= siteConfig.siteName %></span>
                 </a>
             </div>
         </div>
@@ -68,7 +68,7 @@
                     <strong class="text-bitcoin"><%= raffle.prize_amount_sats ? raffle.prize_amount_sats.toLocaleString() : '0' %> sats</strong> 
                     have been sent to your wallet!
                 </p>
-                <p class="text-gray-500 mt-4">Thank you for supporting Bitcoin adoption in Roatan! 🌴⚡</p>
+                <p class="text-gray-500 mt-4">Thank you for supporting Bitcoin adoption in <%= siteConfig.primaryLocation %>! 🌴⚡</p>
             </div>
 
             <!-- Pending claim state -->
@@ -76,7 +76,7 @@
                 <div class="text-center mb-8">
                     <div class="mb-4"><img src="/icons/claim-prize.svg" alt="" class="w-20 h-20 mx-auto" /></div>
                     <h1 class="text-3xl font-bold text-gray-900 mb-2">You Won!</h1>
-                    <p class="text-gray-600 text-lg mb-1">Congratulations on winning the Bitcoin Review Raffle!</p>
+                    <p class="text-gray-600 text-lg mb-1">Congratulations on winning <%= siteConfig.siteName %>!</p>
                     <div class="mt-4 inline-block bg-orange-50 border-2 border-bitcoin rounded-xl px-8 py-4">
                         <div class="text-sm text-gray-500 mb-1">Your Prize</div>
                         <div class="text-4xl font-bold text-bitcoin"><%= raffle.prize_amount_sats ? raffle.prize_amount_sats.toLocaleString() : '0' %> sats</div>

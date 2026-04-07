@@ -13,6 +13,7 @@ const btcmap = require('../services/btcmap');
 const lightning = require('../services/lightning');
 const anthropic = require('../services/anthropic');
 const telegram = require('../services/telegram');
+const siteConfig = require('../../site.config');
 
 /**
  * POST /api/submit
@@ -473,7 +474,7 @@ router.post('/generate-invoice', async (req, res) => {
             });
         }
         
-        const result = await lightning.createDonationInvoice(amountSats, `Donation to Bitcoin Review Raffle - ${amountSats} sats`);
+        const result = await lightning.createDonationInvoice(amountSats, `Donation to ${siteConfig.siteName} - ${amountSats} sats`);
         
         res.json({
             success: true,

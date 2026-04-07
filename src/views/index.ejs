@@ -3,10 +3,10 @@
 <section class="bg-gradient-to-br from-orange-500 to-yellow-500 text-white py-16">
     <div class="max-w-6xl mx-auto px-4 text-center">
         <h1 class="text-4xl md:text-6xl font-bold mb-6 inline-flex items-center justify-center gap-3">
-            <img src="/icons/palm-tree.svg" alt="" class="w-12 h-12 md:w-16 md:h-16 inline-block" /> Bitcoin Review Raffle
+            <img src="/icons/palm-tree.svg" alt="" class="w-12 h-12 md:w-16 md:h-16 inline-block" /> ${siteConfig.siteName}
         </h1>
         <p class="text-xl md:text-2xl mb-8 opacity-90">
-            Write a review, win Bitcoin! Supporting Bitcoin adoption in Roatan.
+            ${siteConfig.siteTagline} Supporting Bitcoin adoption in ${siteConfig.primaryLocation}.
         </p>
         
         <!-- Raffle Countdown -->
@@ -73,7 +73,7 @@ ${typeof recentlyReviewedMerchant !== 'undefined' && recentlyReviewedMerchant ? 
             <div class="text-center">
                 <div class="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm border border-orange-100"><img src="/icons/step-pay-bitcoin.svg" alt="" class="w-10 h-10" /></div>
                 <h3 class="font-bold mb-2">Pay with Bitcoin</h3>
-                <p class="text-gray-600">Visit a merchant in Roatan and pay with Bitcoin or Lightning</p>
+                <p class="text-gray-600">Visit a merchant in ${siteConfig.primaryLocation} and pay with Bitcoin or Lightning</p>
             </div>
             <div class="text-center">
                 <div class="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm border border-orange-100"><img src="/icons/step-write-review.svg" alt="" class="w-10 h-10" /></div>

@@ -9,12 +9,13 @@
 const https = require('https');
 const path = require('path');
 const fs = require('fs');
+const siteConfig = require('../../site.config');
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const BASE_URL = process.env.BASE_URL || 'https://web-production-3a9f6.up.railway.app';
 
-// Roatan timezone (UTC-6, no DST)
-const ADMIN_TIMEZONE = process.env.ADMIN_TIMEZONE || 'America/Tegucigalpa';
+// Local timezone for quiet hours
+const ADMIN_TIMEZONE = process.env.ADMIN_TIMEZONE || siteConfig.timezone;
 const QUIET_HOUR_START = 18; // 6pm — no notifications after this hour
 const QUIET_HOUR_END = 9;    // 9am — notifications resume at this hour
 

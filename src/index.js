@@ -9,6 +9,7 @@ const express = require('express');
 const path = require('path');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
+const siteConfig = require('../site.config');
 
 // Import services
 const db = require('./services/database');
@@ -59,6 +60,12 @@ const registrationLimiter = rateLimit({
 // Apply rate limiting
 app.use('/api', apiLimiter);
 app.use('/api/register', registrationLimiter);
+
+// Inject site config into all views
+app.use((req, res, next) => {
+    res.locals.siteConfig = siteConfig;
+    next();
+});
 
 // Routes
 app.use('/api', apiRoutes);
@@ -244,7 +251,7 @@ app.use((err, req, res, next) => {
     }
     
     res.status(500).render('error', {
-        title: 'Error - Bitcoin Review Raffle',
+        title: 'Error - ' + siteConfig.siteName,
         error: 'Something went wrong. Please try again.'
     });
 });
@@ -256,7 +263,7 @@ app.use((req, res) => {
     }
     
     res.status(404).render('404', {
-        title: 'Not Found - Bitcoin Review Raffle'
+        title: 'Not Found - ' + siteConfig.siteName
     });
 });
 

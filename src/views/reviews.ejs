@@ -5,7 +5,7 @@
     <!-- Header -->
     <div class="text-center mb-10">
         <h1 class="text-3xl font-bold mb-2 inline-flex items-center justify-center gap-3"><img src="/icons/reviews-stars.svg" alt="" class="w-10 h-10" /> Bitcoin Reviews</h1>
-        <p class="text-gray-600">Real experiences spending Bitcoin at Roatan merchants</p>
+        <p class="text-gray-600">${siteConfig.reviewsSubtitle}</p>
     </div>
 
     ${typeof error !== 'undefined' && error ? `
@@ -36,7 +36,7 @@
                         <span class="inline-flex items-center gap-1 bg-bitcoin text-white text-xs font-bold px-2 py-1 rounded-full mb-2">
                             ⭐ Featured
                         </span>
-                        <h3 class="font-bold text-gray-900">${review.merchant_name ? review.merchant_name.replace(/</g, '&lt;').replace(/>/g, '&gt;') : 'Roatan Merchant'}</h3>
+                        <h3 class="font-bold text-gray-900">${review.merchant_name ? review.merchant_name.replace(/</g, '&lt;').replace(/>/g, '&gt;') : '${siteConfig.reviewsDefaultMerchant}'}</h3>
                     </div>
                     <span class="text-xs text-gray-500 mt-1 whitespace-nowrap ml-4">
                         ${new Date(review.submitted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -75,7 +75,7 @@
                 <div class="flex items-start justify-between mb-2">
                     <div class="flex-1 min-w-0">
                         <h3 class="font-semibold text-gray-900 truncate">
-                            ${review.merchant_name ? review.merchant_name.replace(/</g, '&lt;').replace(/>/g, '&gt;') : '<span class="text-gray-400 italic">Roatan merchant</span>'}
+                            ${review.merchant_name ? review.merchant_name.replace(/</g, '&lt;').replace(/>/g, '&gt;') : '<span class="text-gray-400 italic">${siteConfig.reviewsDefaultMerchant}</span>'}
                         </h3>
                     </div>
                     <span class="text-xs text-gray-400 ml-4 whitespace-nowrap mt-0.5">
@@ -108,7 +108,7 @@
     <!-- Submit CTA -->
     ${typeof reviews !== 'undefined' && reviews.length > 0 ? `
     <div class="mt-12 text-center bg-orange-50 rounded-xl p-8 border border-orange-100">
-        <p class="text-gray-700 font-medium mb-4">Visited a Bitcoin merchant in Roatan recently?</p>
+        <p class="text-gray-700 font-medium mb-4">${siteConfig.reviewsCta}</p>
         <a href="/submit" class="inline-block bg-bitcoin hover:bg-bitcoin-dark text-white font-bold px-8 py-3 rounded-lg transition">
             Submit Your Review
         </a>

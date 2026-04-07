@@ -10,6 +10,29 @@ A raffle system to incentivize Bitcoin adoption in Roatan by rewarding people wh
 4. **Submit** - Submit your review link on our site
 5. **Win!** - Every ~2 weeks (Bitcoin difficulty adjustment), one random reviewer wins Bitcoin!
 
+## Deploy Your Own
+
+Want to run this for your city or region? It's designed to be cloned:
+
+1. **Fork/clone** this repo
+2. **Edit `site.config.js`** — set your region name, merchant areas (BTCMap bounding boxes), branding, and timezone
+3. **Copy `.env.example` → `.env`** and fill in:
+   - Your Lightning node (LND REST URL + macaroon) — [Voltage](https://voltage.cloud) is easiest
+   - Email API key from [Resend](https://resend.com)
+   - Telegram bot token from [@BotFather](https://t.me/BotFather)
+   - AI review validation key (optional — works without it, reviews just need manual approval)
+4. **`npm install && npm start`** — runs locally on port 3000
+5. **Deploy to Railway:** `npm install -g @railway/cli && railway up`
+
+### Finding BTCMap Bounding Boxes
+
+To set up merchant areas for your region:
+
+1. Go to [btcmap.org](https://btcmap.org)
+2. Navigate to your area
+3. Note the approximate lat/lon bounds
+4. Or use the BTCMap API: `https://api.btcmap.org/v2/areas` to find existing community areas
+
 ## Features
 
 - 🎫 No login required - simple email + LNURL registration

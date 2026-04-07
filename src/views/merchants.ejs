@@ -2,9 +2,9 @@
 <!-- Header -->
 <section class="bg-gradient-to-br from-orange-500 to-yellow-500 text-white py-12">
     <div class="max-w-4xl mx-auto px-4 text-center">
-        <h1 class="text-3xl md:text-4xl font-bold mb-4 inline-flex items-center justify-center gap-3"><img src="/icons/merchants-storefront.svg" alt="" class="w-10 h-10 md:w-12 md:h-12" /> Bitcoin Merchants in the Bay Islands</h1>
+        <h1 class="text-3xl md:text-4xl font-bold mb-4 inline-flex items-center justify-center gap-3"><img src="/icons/merchants-storefront.svg" alt="" class="w-10 h-10 md:w-12 md:h-12" /> Bitcoin Merchants in ${siteConfig.regionName}</h1>
         <p class="text-lg opacity-90">
-            Find businesses that accept Bitcoin and Lightning payments on Roatan &amp; Utila
+            Find businesses that accept Bitcoin and Lightning payments in ${siteConfig.regionName}
         </p>
     </div>
 </section>
@@ -21,7 +21,7 @@
         ${typeof merchants !== 'undefined' && merchants.length > 0 ? `
         <div class="mb-8">
             <p class="text-gray-600">
-                Found <strong>${merchants.length}</strong> Bitcoin-accepting merchants across the Bay Islands.
+                Found <strong>${merchants.length}</strong> Bitcoin-accepting merchants across ${siteConfig.regionName}.
                 Data from <a href="https://btcmap.org" target="_blank" class="text-bitcoin hover:underline">BTCMap.org</a>
             </p>
         </div>
@@ -68,7 +68,7 @@
                 
                 <div class="mt-4 pt-4 border-t">
                     <a 
-                        href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(m.name + ' ' + (m.location || 'Roatan'))}" 
+                        href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(m.name + ' ' + (m.location || '${siteConfig.primaryLocation}'))}" 
                         target="_blank"
                         class="text-sm text-bitcoin hover:underline"
                     >
@@ -83,7 +83,7 @@
             <div class="text-6xl mb-4">🔍</div>
             <h2 class="text-2xl font-bold mb-4">No Merchants Found</h2>
             <p class="text-gray-600 mb-8">
-                We couldn't find any Bitcoin merchants in the Bay Islands right now.
+                We couldn't find any Bitcoin merchants in ${siteConfig.regionName} right now.
                 <br>Check back later or visit <a href="https://btcmap.org" target="_blank" class="text-bitcoin hover:underline">BTCMap.org</a> directly.
             </p>
         </div>
@@ -96,7 +96,7 @@
     <div class="max-w-4xl mx-auto px-4 text-center">
         <h2 class="text-2xl font-bold mb-4">Accept Bitcoin at Your Business?</h2>
         <p class="text-gray-600 mb-6">
-            Add your business to BTCMap.org to be listed here and help grow Bitcoin adoption in the Bay Islands!
+            Add your business to BTCMap.org to be listed here and help grow Bitcoin adoption in ${siteConfig.regionName}!
         </p>
         <a 
             href="https://btcmap.org/add-location" 

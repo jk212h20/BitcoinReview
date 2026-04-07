@@ -11,16 +11,17 @@
 const { Resend } = require('resend');
 const fs = require('fs');
 const path = require('path');
+const siteConfig = require('../../site.config');
 
 let resend = null;
 
 // Template descriptions and metadata for seeding
 const TEMPLATE_META = {
-    'welcome-email':     { type: 'email',    subject: '🎉 Welcome to Bitcoin Review Raffle!', description: 'Sent when a new user registers' },
-    'winner-email':      { type: 'email',    subject: '🎊 You Won the Bitcoin Review Raffle!', description: 'Sent to raffle winner with claim link' },
+    'welcome-email':     { type: 'email',    subject: `🎉 Welcome to ${siteConfig.siteName}!`, description: 'Sent when a new user registers' },
+    'winner-email':      { type: 'email',    subject: `🎊 You Won the ${siteConfig.siteName}!`, description: 'Sent to raffle winner with claim link' },
     'raffle-reminder':   { type: 'compose',  subject: '🎰 Raffle Drawing Coming Soon!', description: 'Admin compose: remind users about upcoming raffle' },
     'new-merchant':      { type: 'compose',  subject: '🏪 New Merchant Accepting Bitcoin!', description: 'Admin compose: announce a new merchant' },
-    'general-update':    { type: 'compose',  subject: '📢 Bitcoin Review Raffle Update', description: 'Admin compose: general announcement' },
+    'general-update':    { type: 'compose',  subject: `📢 ${siteConfig.siteName} Update`, description: 'Admin compose: general announcement' },
     'tg-new-review':     { type: 'telegram', subject: null, description: 'Telegram: new review submitted (admin notification)' },
     'tg-raffle-result':  { type: 'telegram', subject: null, description: 'Telegram: raffle result announcement' },
     'tg-raffle-warning': { type: 'telegram', subject: null, description: 'Telegram: raffle approaching warning' },
@@ -176,9 +177,9 @@ async function sendRegistrationEmail(email, optOutToken, db = null) {
             </head>
             <body>
                 <div class="container">
-                    <div class="header"><h1>🎉 Welcome to Bitcoin Review Raffle!</h1></div>
+                    <div class="header"><h1>🎉 Welcome to ${siteConfig.siteName}!</h1></div>
                     <div class="content">
-                        <p>Thanks for registering for the Bitcoin Review Raffle in the Bay Islands!</p>
+                        <p>Thanks for registering for the ${siteConfig.siteName} in the ${siteConfig.regionName}!</p>
                         <ol>
                             <li>Visit a Bitcoin-accepting merchant</li>
                             <li>Pay with Bitcoin</li>
@@ -199,12 +200,12 @@ async function sendRegistrationEmail(email, optOutToken, db = null) {
     }
     
     const text = `
-Welcome to Bitcoin Review Raffle!
+Welcome to ${siteConfig.siteName}!
 
-Thanks for registering for the Bitcoin Review Raffle in the Bay Islands!
+Thanks for registering for the ${siteConfig.siteName} in the ${siteConfig.regionName}!
 
 How it works:
-1. Visit a Bitcoin-accepting merchant in Roatan or Utila
+1. Visit a Bitcoin-accepting merchant in ${siteConfig.locations.join(' or ')}
 2. Pay with Bitcoin
 3. Write a Google review mentioning your Bitcoin purchase
 4. Submit your review link on our website
@@ -218,7 +219,7 @@ Submit a review: ${baseUrl}/submit
 Didn't sign up for this? Remove your email: ${optOutLink}
     `;
     
-    return sendEmail(email, 'Welcome to Bitcoin Review Raffle! 🎉', html, text);
+    return sendEmail(email, `Welcome to ${siteConfig.siteName}! 🎉`, html, text);
 }
 
 /**
@@ -258,12 +259,12 @@ async function sendWinnerEmail(emailAddr, prizeAmount, claimToken, blockHeight, 
                 <div class="container">
                     <div class="header"><h1>🎊 Congratulations! You Won! 🎊</h1></div>
                     <div class="content">
-                        <p>Great news! You've been selected as the winner of the Bitcoin Review Raffle!</p>
+                        <p>Great news! You've been selected as the winner of the ${siteConfig.siteName}!</p>
                         <div class="prize">⚡ ${prizeFormatted} sats</div>
                         <p style="text-align:center;margin:25px 0"><a href="${claimLink}" class="claim-button">⚡ Claim Your Prize</a></p>
                         <p style="text-align:center;color:#666">Click the button above to see a QR code.<br>Scan it with <strong>any Lightning wallet</strong> to receive your sats instantly.</p>
                         <p style="font-size:14px;color:#666"><strong>Raffle Block:</strong> #${blockFormatted}<br><strong>Works with:</strong> Phoenix, Wallet of Satoshi, Muun, Breez, Zeus, BlueWallet, and more</p>
-                        <p>Thank you for supporting Bitcoin adoption in the Bay Islands! 🌴⚡</p>
+                        <p>Thank you for supporting Bitcoin adoption in the ${siteConfig.regionName}! 🌴⚡</p>
                     </div>
                     <div class="footer">
                         <p>This claim link expires in 30 days. If you have trouble, reply to this email.</p>
@@ -276,7 +277,7 @@ async function sendWinnerEmail(emailAddr, prizeAmount, claimToken, blockHeight, 
     }
     
     const text = `
-🎊 Congratulations! You Won the Bitcoin Review Raffle! 🎊
+🎊 Congratulations! You Won the ${siteConfig.siteName}! 🎊
 
 Your prize: ${prizeFormatted} sats
 
@@ -289,12 +290,12 @@ Works with: Phoenix, Wallet of Satoshi, Muun, Breez, Zeus, BlueWallet, and more.
 Raffle Block: #${blockFormatted}
 This link expires in 30 days.
 
-Thank you for supporting Bitcoin adoption in the Bay Islands! 🌴⚡
+Thank you for supporting Bitcoin adoption in the ${siteConfig.regionName}! 🌴⚡
 
-— Bitcoin Review
+— ${siteConfig.siteName}
     `;
     
-    return sendEmail(emailAddr, '🎊 You Won the Bitcoin Review Raffle! Claim your sats →', html, text);
+    return sendEmail(emailAddr, `🎊 You Won the ${siteConfig.siteName}! Claim your sats →`, html, text);
 }
 
 /**
@@ -307,7 +308,7 @@ async function sendEmail(to, subject, html, text) {
     }
     
     try {
-        const from = process.env.EMAIL_FROM || 'Bitcoin Review Raffle <onboarding@resend.dev>';
+        const from = process.env.EMAIL_FROM || `${siteConfig.siteName} <onboarding@resend.dev>`;
         
         const { data, error } = await resend.emails.send({
             from,

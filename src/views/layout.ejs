@@ -24,7 +24,7 @@
             <div class="flex justify-between items-center">
                 <a href="/" class="flex items-center space-x-2">
                     <img src="/icons/logo-bitcoin-palm.svg" alt="" class="w-8 h-8" />
-                    <span class="font-bold text-xl">Bitcoin Review Raffle</span>
+                    <span class="font-bold text-xl"><%= siteConfig.siteName %></span>
                 </a>
                 <div class="hidden md:flex items-center space-x-6">
                     <a href="/" class="text-gray-600 hover:text-bitcoin">Home</a>
@@ -73,8 +73,8 @@
         <div class="max-w-6xl mx-auto px-4 py-8">
             <div class="grid md:grid-cols-3 gap-8">
                 <div>
-                    <h3 class="font-bold text-lg mb-4">Bitcoin Review Raffle</h3>
-                    <p class="text-gray-400">Incentivizing Bitcoin adoption in Roatan through community reviews.</p>
+                    <h3 class="font-bold text-lg mb-4"><%= siteConfig.siteName %></h3>
+                    <p class="text-gray-400"><%= siteConfig.footerTagline %></p>
                 </div>
                 <div>
                     <h3 class="font-bold text-lg mb-4">Quick Links</h3>
@@ -93,7 +93,7 @@
                 </div>
             </div>
             <div class="border-t border-gray-700 mt-8 pt-8 text-center text-gray-400">
-                <p class="inline-flex items-center gap-1"><img src="/icons/palm-tree.svg" alt="" class="w-5 h-5" /> Made with <img src="/icons/lightning-bolt.svg" alt="" class="w-4 h-4" /> in Roatan</p>
+                <p class="inline-flex items-center gap-1"><img src="/icons/palm-tree.svg" alt="" class="w-5 h-5" /> <%= siteConfig.footerMadeIn %></p>
             </div>
         </div>
     </footer>

@@ -11,6 +11,7 @@ const email = require('../services/email');
 const lightning = require('../services/lightning');
 const anthropic = require('../services/anthropic');
 const telegram = require('../services/telegram');
+const siteConfig = require('../../site.config');
 
 /**
  * Simple password authentication middleware
@@ -473,7 +474,7 @@ router.post('/raffle/:id/pay', async (req, res) => {
         const paymentResult = await lightning.payLightningAddress(
             raffle.lnurl_address,
             prizeSats,
-            `Bitcoin Review Raffle winner! Block #${raffle.block_height}`
+            `${siteConfig.siteName} winner! Block #${raffle.block_height}`
         );
         
         db.markRafflePaid(parseInt(id), paymentResult.paymentHash);
@@ -823,7 +824,7 @@ router.post('/telegram/chats', (req, res) => {
         db.setSetting('extra_telegram_chats', extra.join(','));
 
         // Send a confirmation message to the new chat
-        telegram.sendMessage(String(chatId).trim(), `✅ You've been added as a Bitcoin Review Raffle admin. You'll receive notifications for new reviews, raffle events, and more.`).catch(() => {});
+        telegram.sendMessage(String(chatId).trim(), `✅ You've been added as a ${siteConfig.siteName} admin. You'll receive notifications for new reviews, raffle events, and more.`).catch(() => {});
 
         res.json({
             success: true,

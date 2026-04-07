@@ -3,6 +3,7 @@
  * Fetches Bitcoin-accepting merchants
  */
 
+const siteConfig = require('../../site.config');
 const BTCMAP_API = 'https://api.btcmap.org/v2';
 
 // Cache for merchants (refresh every hour)
@@ -107,33 +108,11 @@ function filterMerchants(merchants, options = {}) {
 }
 
 /**
- * Get merchants in the AmityAge community area (Roatan, Honduras)
- * Bounding box from BTCMap API: /v2/areas/amityage
+ * Get merchants for a single configured area
+ * @param {object} area - An entry from siteConfig.merchantAreas
  */
-async function getRoatanMerchants() {
-    return fetchMerchants({
-        bounds: {
-            minLat: 16.21599324835452,
-            maxLat: 16.509832826905846,
-            minLon: -86.6374969482422,
-            maxLon: -86.22825622558594
-        }
-    });
-}
-
-/**
- * Get merchants on Utila island (Honduras Bay Islands)
- * Bounding box covers the main island area
- */
-async function getUtilaMerchants() {
-    return fetchMerchants({
-        bounds: {
-            minLat: 16.06,
-            maxLat: 16.13,
-            minLon: -86.97,
-            maxLon: -86.85
-        }
-    });
+async function getAreaMerchants(area) {
+    return fetchMerchants({ bounds: area.bounds });
 }
 
 /**
@@ -216,43 +195,35 @@ function isValidBitcoinMerchant(merchant) {
 }
 
 /**
- * Get formatted merchant list for display (Roatan + Utila)
+ * Get formatted merchant list for display (all configured areas)
  * Filters out merchants without confirmed payment methods or with stale data (>2 years)
- * Each merchant is tagged with its island location
+ * Each merchant is tagged with its area location
  */
 async function getMerchantList() {
-    const [roatanRaw, utilaRaw] = await Promise.all([
-        getRoatanMerchants(),
-        getUtilaMerchants()
-    ]);
+    const areas = siteConfig.merchantAreas;
+    const rawResults = await Promise.all(areas.map(area => getAreaMerchants(area)));
 
-    // Deduplicate by element ID (in case bounding boxes overlap)
     const seen = new Set();
-    const roatanValid = roatanRaw.filter(isValidBitcoinMerchant).filter(m => {
-        if (seen.has(m.id)) return false;
-        seen.add(m.id);
-        return true;
-    });
-    const utilaValid = utilaRaw.filter(isValidBitcoinMerchant).filter(m => {
-        if (seen.has(m.id)) return false;
-        seen.add(m.id);
-        return true;
-    });
+    const allMerchants = [];
 
-    const roatanFormatted = roatanValid.map(m => formatMerchant(m, 'Roatan'));
-    const utilaFormatted = utilaValid.map(m => formatMerchant(m, 'Utila'));
+    for (let i = 0; i < areas.length; i++) {
+        const valid = rawResults[i].filter(isValidBitcoinMerchant).filter(m => {
+            if (seen.has(m.id)) return false;
+            seen.add(m.id);
+            return true;
+        });
+        allMerchants.push(...valid.map(m => formatMerchant(m, areas[i].name)));
+    }
 
-    return [...roatanFormatted, ...utilaFormatted];
+    return allMerchants;
 }
 
 /**
- * Search merchants by name (across all islands)
+ * Search merchants by name (across all configured areas)
  */
 async function searchMerchants(query) {
-    const [roatanRaw, utilaRaw] = await Promise.all([
-        getRoatanMerchants(),
-        getUtilaMerchants()
-    ]);
+    const areas = siteConfig.merchantAreas;
+    const rawResults = await Promise.all(areas.map(area => getAreaMerchants(area)));
 
     const queryLower = query.toLowerCase();
     const filterByName = m => {
@@ -261,27 +232,23 @@ async function searchMerchants(query) {
     };
 
     const seen = new Set();
-    const roatanFiltered = roatanRaw.filter(filterByName).filter(m => {
-        if (seen.has(m.id)) return false;
-        seen.add(m.id);
-        return true;
-    });
-    const utilaFiltered = utilaRaw.filter(filterByName).filter(m => {
-        if (seen.has(m.id)) return false;
-        seen.add(m.id);
-        return true;
-    });
+    const allMerchants = [];
 
-    return [
-        ...roatanFiltered.map(m => formatMerchant(m, 'Roatan')),
-        ...utilaFiltered.map(m => formatMerchant(m, 'Utila'))
-    ];
+    for (let i = 0; i < areas.length; i++) {
+        const filtered = rawResults[i].filter(filterByName).filter(m => {
+            if (seen.has(m.id)) return false;
+            seen.add(m.id);
+            return true;
+        });
+        allMerchants.push(...filtered.map(m => formatMerchant(m, areas[i].name)));
+    }
+
+    return allMerchants;
 }
 
 module.exports = {
     fetchMerchants,
-    getRoatanMerchants,
-    getUtilaMerchants,
+    getAreaMerchants,
     getHondurasMerchants,
     getMerchantList,
     searchMerchants,

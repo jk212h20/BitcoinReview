@@ -6,6 +6,7 @@ const express = require('express');
 const router = express.Router();
 
 const { bech32 } = require('bech32');
+const siteConfig = require('../../site.config');
 const db = require('../services/database');
 const bitcoin = require('../services/bitcoin');
 const btcmap = require('../services/btcmap');
@@ -40,7 +41,7 @@ router.get('/', async (req, res) => {
         const recentlyReviewedMerchant = db.getMostRecentlyReviewedMerchant();
         
         res.render('index', {
-            title: 'Bitcoin Review Raffle - Roatan',
+            title: siteConfig.siteName,
             raffleInfo,
             userCount,
             ticketCount,
@@ -55,7 +56,7 @@ router.get('/', async (req, res) => {
     } catch (error) {
         console.error('Landing page error:', error);
         res.render('index', {
-            title: 'Bitcoin Review Raffle - Roatan',
+            title: siteConfig.siteName,
             error: 'Failed to load raffle info',
             raffleInfo: null,
             userCount: 0,
@@ -91,7 +92,7 @@ router.get('/submit', async (req, res) => {
         }
         
         res.render('submit', {
-            title: 'Submit Review - Bitcoin Review Raffle',
+            title: 'Submit Review - ' + siteConfig.siteName,
             raffleInfo,
             merchants,
             donationAddress: depositInfo.onchainAddress || process.env.DONATION_ADDRESS || 'Not configured'
@@ -99,7 +100,7 @@ router.get('/submit', async (req, res) => {
     } catch (error) {
         console.error('Submit page error:', error);
         res.render('submit', {
-            title: 'Submit Review - Bitcoin Review Raffle',
+            title: 'Submit Review - ' + siteConfig.siteName,
             error: 'Failed to load page data',
             merchants: [],
             donationAddress: process.env.DONATION_ADDRESS || 'Not configured'
@@ -144,14 +145,14 @@ router.get('/merchants', async (req, res) => {
         });
 
         res.render('merchants', {
-            title: 'Bitcoin Merchants - Bay Islands',
+            title: 'Bitcoin Merchants - ' + siteConfig.regionName,
             merchants: annotated,
             donationAddress: depositInfo.onchainAddress || process.env.DONATION_ADDRESS || 'Not configured'
         });
     } catch (error) {
         console.error('Merchants page error:', error);
         res.render('merchants', {
-            title: 'Bitcoin Merchants - Bay Islands',
+            title: 'Bitcoin Merchants - ' + siteConfig.regionName,
             error: 'Failed to load merchants',
             merchants: [],
             donationAddress: process.env.DONATION_ADDRESS || 'Not configured'
@@ -170,14 +171,14 @@ router.get('/opt-out/:token', (req, res) => {
     
     if (!user) {
         return res.render('opt-out', {
-            title: 'Opt Out - Bitcoin Review Raffle',
+            title: 'Opt Out - ' + siteConfig.siteName,
             error: 'Invalid or expired opt-out link'
         });
     }
     
     if (!user.is_active) {
         return res.render('opt-out', {
-            title: 'Opt Out - Bitcoin Review Raffle',
+            title: 'Opt Out - ' + siteConfig.siteName,
             message: 'You have already been removed from the raffle.'
         });
     }
@@ -186,7 +187,7 @@ router.get('/opt-out/:token', (req, res) => {
     db.deactivateUser(token);
     
     res.render('opt-out', {
-        title: 'Opt Out - Bitcoin Review Raffle',
+        title: 'Opt Out - ' + siteConfig.siteName,
         message: 'You have been successfully removed from the Bitcoin Review Raffle. Sorry to see you go!'
     });
 });
@@ -205,7 +206,7 @@ router.get('/reviews', (req, res) => {
         const depositInfo = lightning.getDepositInfoCached();
         
         res.render('reviews', {
-            title: 'Reviews - Bitcoin Review Raffle',
+            title: 'Reviews - ' + siteConfig.siteName,
             reviews,
             featuredReviews,
             regularReviews,
@@ -214,7 +215,7 @@ router.get('/reviews', (req, res) => {
     } catch (error) {
         console.error('Reviews page error:', error);
         res.render('reviews', {
-            title: 'Reviews - Bitcoin Review Raffle',
+            title: 'Reviews - ' + siteConfig.siteName,
             error: 'Failed to load reviews',
             reviews: [],
             featuredReviews: [],
@@ -236,14 +237,14 @@ router.get('/raffles', (req, res) => {
         const depositInfo = lightning.getDepositInfoCached();
         
         res.render('raffles', {
-            title: 'Raffle History - Bitcoin Review Raffle',
+            title: 'Raffle History - ' + siteConfig.siteName,
             raffles,
             donationAddress: depositInfo.onchainAddress || process.env.DONATION_ADDRESS || 'Not configured'
         });
     } catch (error) {
         console.error('Raffles page error:', error);
         res.render('raffles', {
-            title: 'Raffle History - Bitcoin Review Raffle',
+            title: 'Raffle History - ' + siteConfig.siteName,
             error: 'Failed to load raffle history',
             raffles: [],
             donationAddress: process.env.DONATION_ADDRESS || 'Not configured'
@@ -263,13 +264,13 @@ router.get('/how-it-works', async (req, res) => {
         const depositInfo = lightning.getDepositInfoCached();
         
         res.render('how-it-works', {
-            title: 'How It Works - Bitcoin Review Raffle',
+            title: 'How It Works - ' + siteConfig.siteName,
             raffleInfo,
             donationAddress: depositInfo.onchainAddress || process.env.DONATION_ADDRESS || 'Not configured'
         });
     } catch (error) {
         res.render('how-it-works', {
-            title: 'How It Works - Bitcoin Review Raffle',
+            title: 'How It Works - ' + siteConfig.siteName,
             donationAddress: process.env.DONATION_ADDRESS || 'Not configured'
         });
     }
@@ -286,7 +287,7 @@ router.get('/claim/:token', (req, res) => {
         
         if (!raffle) {
             return res.render('claim', {
-                title: 'Claim Prize - Bitcoin Review Raffle',
+                title: 'Claim Prize - ' + siteConfig.siteName,
                 error: 'Invalid or unknown claim link',
                 raffle: null,
                 lnurlEncoded: null
@@ -305,7 +306,7 @@ router.get('/claim/:token', (req, res) => {
         const lnurlEncoded = encodeLnurl(withdrawUrl);
         
         res.render('claim', {
-            title: 'Claim Your Prize - Bitcoin Review Raffle',
+            title: 'Claim Prize - ' + siteConfig.siteName,
             raffle,
             lnurlEncoded,
             error: null
@@ -313,7 +314,7 @@ router.get('/claim/:token', (req, res) => {
     } catch (error) {
         console.error('Claim page error:', error);
         res.render('claim', {
-            title: 'Claim Prize - Bitcoin Review Raffle',
+            title: 'Claim Prize - ' + siteConfig.siteName,
             error: 'Something went wrong loading this page',
             raffle: null,
             lnurlEncoded: null
@@ -337,7 +338,7 @@ router.get('/admin/review/:id', (req, res) => {
     
     if (!isAdmin && !isToken) {
         return res.render('admin-login', {
-            title: 'Admin Login - Bitcoin Review Raffle'
+            title: 'Admin Login - ' + siteConfig.siteName
         });
     }
     
@@ -345,7 +346,7 @@ router.get('/admin/review/:id', (req, res) => {
         const ticket = db.getTicketById(parseInt(id));
         
         if (!ticket) {
-            return res.status(404).render('404', { title: 'Not Found' });
+            return res.status(404).render('404', { title: 'Not Found - ' + siteConfig.siteName });
         }
         
         // Use the token/password that was passed so approve buttons work
@@ -359,7 +360,7 @@ router.get('/admin/review/:id', (req, res) => {
         });
     } catch (error) {
         console.error('Admin review page error:', error);
-        res.status(500).render('error', { title: 'Error', error: 'Failed to load review' });
+        res.status(500).render('error', { title: 'Error - ' + siteConfig.siteName, error: 'Failed to load review' });
     }
 });
 
@@ -372,7 +373,7 @@ router.get('/admin', async (req, res) => {
     
     if (!password || password !== process.env.ADMIN_PASSWORD) {
         return res.render('admin-login', {
-            title: 'Admin Login - Bitcoin Review Raffle'
+            title: 'Admin Login - ' + siteConfig.siteName
         });
     }
     
@@ -387,7 +388,7 @@ router.get('/admin', async (req, res) => {
         const emailTemplates = email.getAdminComposeTemplates(db);
         
         res.render('admin', {
-            title: 'Admin Dashboard - Bitcoin Review Raffle',
+            title: 'Admin Dashboard - ' + siteConfig.siteName,
             password,
             users,
             tickets,
@@ -399,7 +400,7 @@ router.get('/admin', async (req, res) => {
     } catch (error) {
         console.error('Admin page error:', error);
         res.render('admin', {
-            title: 'Admin Dashboard - Bitcoin Review Raffle',
+            title: 'Admin Dashboard - ' + siteConfig.siteName,
             password,
             error: 'Failed to load admin data'
         });
