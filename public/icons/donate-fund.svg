@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Heart shape -->
+  <path d="M32 54 C28 50 8 38 8 22 C8 14 14 8 22 8 C27 8 30 11 32 14 C34 11 37 8 42 8 C50 8 56 14 56 22 C56 38 36 50 32 54Z" fill="#FFF3E0" stroke="#f7931a" stroke-width="2.5" stroke-linejoin="round"/>
+  <!-- Bitcoin symbol inside heart -->
+  <text x="32" y="34" font-family="Arial, sans-serif" font-weight="bold" font-size="16" fill="#f7931a" text-anchor="middle">₿</text>
+  <!-- Lightning bolt accent -->
+  <path d="M46 42 L44 46 L47 46 L45 50" stroke="#0EA5E9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

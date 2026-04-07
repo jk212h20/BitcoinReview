@@ -18,15 +18,15 @@ var timeEst = typeof raffleInfo !== 'undefined' && raffleInfo && raffleInfo.bloc
         <div class="max-w-6xl mx-auto px-4 py-4">
             <div class="flex justify-between items-center">
                 <a href="/" class="flex items-center space-x-2">
-                    <span class="text-2xl">₿</span>
+                    <img src="/icons/logo-bitcoin-palm.svg" alt="" class="w-8 h-8" />
                     <span class="font-bold text-xl">Bitcoin Review Raffle</span>
                 </a>
-                <div class="hidden md:flex space-x-6">
-                    <a href="/" class="text-gray-600 hover:text-bitcoin">Home</a>
-                    <a href="/submit" class="text-gray-600 hover:text-bitcoin font-semibold text-bitcoin">Submit Review</a>
-                    <a href="/reviews" class="text-gray-600 hover:text-bitcoin">Reviews</a>
-                    <a href="/merchants" class="text-gray-600 hover:text-bitcoin">Merchants</a>
-                    <a href="/how-it-works" class="text-gray-600 hover:text-bitcoin">How It Works</a>
+                <div class="hidden md:flex items-center space-x-6">
+                    <a href="/" class="inline-flex items-center gap-1.5 text-gray-600 hover:text-bitcoin"><img src="/icons/nav-home.svg" alt="" class="w-5 h-5" />Home</a>
+                    <a href="/submit" class="inline-flex items-center gap-1.5 text-bitcoin font-semibold"><img src="/icons/nav-submit.svg" alt="" class="w-5 h-5" />Submit Review</a>
+                    <a href="/reviews" class="inline-flex items-center gap-1.5 text-gray-600 hover:text-bitcoin"><img src="/icons/nav-reviews.svg" alt="" class="w-5 h-5" />Reviews</a>
+                    <a href="/merchants" class="inline-flex items-center gap-1.5 text-gray-600 hover:text-bitcoin"><img src="/icons/nav-merchants.svg" alt="" class="w-5 h-5" />Merchants</a>
+                    <a href="/how-it-works" class="inline-flex items-center gap-1.5 text-gray-600 hover:text-bitcoin"><img src="/icons/nav-how-it-works.svg" alt="" class="w-5 h-5" />How It Works</a>
                 </div>
                 <div class="md:hidden">
                     <button id="mobile-menu-btn" class="text-gray-600">
@@ -37,11 +37,11 @@ var timeEst = typeof raffleInfo !== 'undefined' && raffleInfo && raffleInfo.bloc
                 </div>
             </div>
             <div id="mobile-menu" class="hidden md:hidden mt-4 space-y-2">
-                <a href="/" class="block py-2 text-gray-600 hover:text-bitcoin">Home</a>
-                <a href="/submit" class="block py-2 text-gray-600 hover:text-bitcoin">Submit Review</a>
-                <a href="/reviews" class="block py-2 text-gray-600 hover:text-bitcoin">Reviews</a>
-                <a href="/merchants" class="block py-2 text-gray-600 hover:text-bitcoin">Merchants</a>
-                <a href="/how-it-works" class="block py-2 text-gray-600 hover:text-bitcoin">How It Works</a>
+                <a href="/" class="flex items-center gap-2 py-2 text-gray-600 hover:text-bitcoin"><img src="/icons/nav-home.svg" alt="" class="w-5 h-5" />Home</a>
+                <a href="/submit" class="flex items-center gap-2 py-2 text-bitcoin font-semibold"><img src="/icons/nav-submit.svg" alt="" class="w-5 h-5" />Submit Review</a>
+                <a href="/reviews" class="flex items-center gap-2 py-2 text-gray-600 hover:text-bitcoin"><img src="/icons/nav-reviews.svg" alt="" class="w-5 h-5" />Reviews</a>
+                <a href="/merchants" class="flex items-center gap-2 py-2 text-gray-600 hover:text-bitcoin"><img src="/icons/nav-merchants.svg" alt="" class="w-5 h-5" />Merchants</a>
+                <a href="/how-it-works" class="flex items-center gap-2 py-2 text-gray-600 hover:text-bitcoin"><img src="/icons/nav-how-it-works.svg" alt="" class="w-5 h-5" />How It Works</a>
             </div>
         </div>
     </nav>
@@ -284,12 +284,12 @@ var timeEst = typeof raffleInfo !== 'undefined' && raffleInfo && raffleInfo.bloc
                     <h3 class="font-bold text-lg mb-4">Support the Raffle</h3>
                     <p class="text-gray-400 text-sm mb-3">Every sat donated goes directly into the prize pool.</p>
                     <a href="/#donate" class="inline-flex items-center gap-2 bg-bitcoin hover:bg-bitcoin-dark text-white px-4 py-2 rounded-lg text-sm font-medium transition">
-                        ⚡ Donate (On-chain or Lightning)
+                        <img src="/icons/donate-fund.svg" alt="" class="w-5 h-5" /> Donate (On-chain or Lightning)
                     </a>
                 </div>
             </div>
             <div class="border-t border-gray-700 mt-8 pt-8 text-center text-gray-400">
-                <p>🌴 Made with ⚡ in Roatan</p>
+                <p class="inline-flex items-center gap-1"><img src="/icons/palm-tree.svg" alt="" class="w-5 h-5" /> Made with <img src="/icons/lightning-bolt.svg" alt="" class="w-4 h-4" /> in Roatan</p>
             </div>
         </div>
     </footer>

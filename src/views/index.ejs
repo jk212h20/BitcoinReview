@@ -2,8 +2,8 @@
 <!-- Hero Section -->
 <section class="bg-gradient-to-br from-orange-500 to-yellow-500 text-white py-16">
     <div class="max-w-6xl mx-auto px-4 text-center">
-        <h1 class="text-4xl md:text-6xl font-bold mb-6">
-            🌴 Bitcoin Review Raffle
+        <h1 class="text-4xl md:text-6xl font-bold mb-6 inline-flex items-center justify-center gap-3">
+            <img src="/icons/palm-tree.svg" alt="" class="w-12 h-12 md:w-16 md:h-16 inline-block" /> Bitcoin Review Raffle
         </h1>
         <p class="text-xl md:text-2xl mb-8 opacity-90">
             Write a review, win Bitcoin! Supporting Bitcoin adoption in Roatan.
@@ -71,17 +71,17 @@ ${typeof recentlyReviewedMerchant !== 'undefined' && recentlyReviewedMerchant ? 
         <h2 class="text-3xl font-bold text-center mb-12">How It Works</h2>
         <div class="grid md:grid-cols-3 gap-8">
             <div class="text-center">
-                <div class="w-16 h-16 bg-bitcoin text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">1</div>
+                <div class="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm border border-orange-100"><img src="/icons/step-pay-bitcoin.svg" alt="" class="w-10 h-10" /></div>
                 <h3 class="font-bold mb-2">Pay with Bitcoin</h3>
                 <p class="text-gray-600">Visit a merchant in Roatan and pay with Bitcoin or Lightning</p>
             </div>
             <div class="text-center">
-                <div class="w-16 h-16 bg-bitcoin text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">2</div>
+                <div class="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm border border-orange-100"><img src="/icons/step-write-review.svg" alt="" class="w-10 h-10" /></div>
                 <h3 class="font-bold mb-2">Write a Review</h3>
                 <p class="text-gray-600">Leave a Google review mentioning your Bitcoin experience</p>
             </div>
             <div class="text-center">
-                <div class="w-16 h-16 bg-bitcoin text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">3</div>
+                <div class="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm border border-orange-100"><img src="/icons/step-submit-win.svg" alt="" class="w-10 h-10" /></div>
                 <h3 class="font-bold mb-2">Submit &amp; Win!</h3>
                 <p class="text-gray-600">Submit your review link with your Lightning address to enter the raffle</p>
             </div>
@@ -138,15 +138,15 @@ ${typeof latestRaffle !== 'undefined' && latestRaffle ? `
 <!-- Donation / Deposit Section -->
 <section class="py-16 bg-gray-50" id="donate">
     <div class="max-w-5xl mx-auto px-4">
-        <h2 class="text-3xl font-bold text-center mb-4">⚡ Fund the Raffle</h2>
+        <h2 class="text-3xl font-bold text-center mb-4 inline-flex items-center justify-center gap-2 w-full"><img src="/icons/lightning-bolt.svg" alt="" class="w-8 h-8" /> Fund the Raffle</h2>
         <p class="text-gray-600 text-center mb-6 max-w-2xl mx-auto">
             This raffle is 100% community funded. Every sat donated goes directly into the prize pool.
             Half of the fund is awarded each raffle — the rest carries over, so the pool keeps growing!
         </p>
 
         <div class="text-center mb-8 hidden" id="homepage-fund-wrapper">
-            <div class="inline-block bg-gradient-to-r from-orange-500 to-yellow-500 text-white px-6 py-3 rounded-xl font-bold text-xl shadow-md">
-                ⚡ Next Prize: <span id="homepage-fund-amount">0</span> sats
+            <div class="inline-flex items-center gap-2 bg-gradient-to-r from-orange-500 to-yellow-500 text-white px-6 py-3 rounded-xl font-bold text-xl shadow-md">
+                <img src="/icons/lightning-bolt.svg" alt="" class="w-6 h-6" /> Next Prize: <span id="homepage-fund-amount">0</span> sats
             </div>
             <div class="text-sm text-gray-500 mt-2">
                 Total fund: <span id="homepage-total-fund">0</span> sats · 50% awarded per raffle
@@ -157,14 +157,14 @@ ${typeof latestRaffle !== 'undefined' && latestRaffle ? `
 
             <!-- On-chain Bitcoin Address -->
             <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-                <div class="text-2xl mb-2">🔗</div>
+                <div class="mb-2 flex justify-center"><img src="/icons/onchain-bitcoin.svg" alt="" class="w-10 h-10" /></div>
                 <h3 class="text-xl font-bold mb-4">On-Chain Bitcoin</h3>
                 ${typeof onchainAddress !== 'undefined' && onchainAddress ? '<div class="mb-4"><img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=bitcoin:' + onchainAddress + '" alt="Bitcoin QR Code" class="mx-auto rounded-lg" width="200" height="200" /></div><div class="bg-gray-50 rounded-lg p-3 mb-3"><code id="onchain-addr" class="text-xs break-all select-all text-gray-700">' + onchainAddress + '</code></div><button onclick="copyToClipboard(&#39;onchain-addr&#39;, this)" class="bg-bitcoin text-white px-5 py-2 rounded-lg font-semibold hover:bg-bitcoin-dark transition text-sm">📋 Copy Address</button>' : '<p class="text-gray-400 italic">Connecting to node...</p>'}
             </div>
 
             <!-- Lightning Invoice -->
             <div class="bg-white rounded-xl shadow-sm p-6 text-center">
-                <div class="text-2xl mb-2">⚡</div>
+                <div class="mb-2 flex justify-center"><img src="/icons/lightning-bolt.svg" alt="" class="w-10 h-10" /></div>
                 <h3 class="text-xl font-bold mb-4">Lightning Network</h3>
                 ${typeof lightningInvoice !== 'undefined' && lightningInvoice ? '<div class="mb-4"><img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=lightning:' + lightningInvoice + '" alt="Lightning QR Code" class="mx-auto rounded-lg" width="200" height="200" /></div><div class="bg-gray-50 rounded-lg p-3 mb-3"><code id="ln-invoice" class="text-xs break-all select-all text-gray-700">' + lightningInvoice.substring(0, 42) + '...</code></div><button onclick="copyToClipboard(&#39;ln-invoice-full&#39;, this)" class="bg-bitcoin text-white px-5 py-2 rounded-lg font-semibold hover:bg-bitcoin-dark transition text-sm mb-3">📋 Copy Invoice</button><input type="hidden" id="ln-invoice-full" value="' + lightningInvoice + '" /><div class="mt-4 pt-4 border-t border-gray-100"><p class="text-sm text-gray-500 mb-2">Or generate an invoice with a specific amount:</p><div class="flex gap-2 justify-center"><input type="number" id="invoice-amount" placeholder="sats" min="1" class="w-28 px-3 py-2 border rounded-lg text-sm text-center" /><button onclick="generateInvoice()" id="gen-invoice-btn" class="bg-yellow-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-yellow-600 transition text-sm">Generate</button></div><div id="custom-invoice-result" class="mt-3 hidden"><div class="bg-gray-50 rounded-lg p-3 mb-2"><code id="custom-invoice-text" class="text-xs break-all select-all text-gray-700"></code></div><button onclick="copyToClipboard(&#39;custom-invoice-full&#39;, this)" class="bg-bitcoin text-white px-4 py-2 rounded-lg font-semibold hover:bg-bitcoin-dark transition text-sm">📋 Copy Invoice</button><input type="hidden" id="custom-invoice-full" value="" /></div></div>' : '<p class="text-gray-400 italic">Connecting to node...</p>'}
             </div>

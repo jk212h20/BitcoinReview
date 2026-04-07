@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Speech bubble -->
+  <path d="M10 10 L54 10 Q58 10 58 14 L58 38 Q58 42 54 42 L22 42 L14 52 L16 42 L10 42 Q6 42 6 38 L6 14 Q6 10 10 10Z" fill="#FFF3E0" stroke="#f7931a" stroke-width="2.5" stroke-linejoin="round"/>
+  <!-- Stars inside bubble (rating) -->
+  <polygon points="20,22 22,28 28,28 23,32 25,38 20,34 15,38 17,32 12,28 18,28" fill="#f7931a" opacity="0.8"/>
+  <polygon points="36,22 38,28 44,28 39,32 41,38 36,34 31,38 33,32 28,28 34,28" fill="#f7931a" opacity="0.5"/>
+  <polygon points="52,22 54,28 60,28 55,32 57,38 52,34 47,38 49,32 44,28 50,28" fill="#f7931a" opacity="0.3"/>
+  <!-- Pencil -->
+  <line x1="44" y1="48" x2="54" y2="58" stroke="#e8850f" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M54 58 L56 52 L50 54 Z" fill="#e8850f"/>
+</svg>

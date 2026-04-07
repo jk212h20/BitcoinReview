@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #f7931a; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+        .content { padding: 20px; background: #f9f9f9; }
+        .prize { font-size: 28px; color: #f7931a; text-align: center; padding: 20px; font-weight: bold; }
+        .claim-button { display: inline-block; padding: 15px 30px; background: #f7931a; color: white; text-decoration: none; border-radius: 8px; font-size: 18px; font-weight: bold; }
+        .footer { padding: 15px; text-align: center; font-size: 12px; color: #999; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header"><h1>🎊 Congratulations! You Won! 🎊</h1></div>
+        <div class="content">
+            <p>Great news! You've been selected as the winner of the Bitcoin Review Raffle!</p>
+            <div class="prize">⚡ {{prizeAmount}} sats</div>
+            <p style="text-align:center;margin:25px 0"><a href="{{claimLink}}" class="claim-button">⚡ Claim Your Prize</a></p>
+            <p style="text-align:center;color:#666">Click the button above to see a QR code.<br>Scan it with <strong>any Lightning wallet</strong> to receive your sats instantly.</p>
+            <p style="font-size:14px;color:#666"><strong>Raffle Block:</strong> #{{blockHeight}}<br><strong>Works with:</strong> Phoenix, Wallet of Satoshi, Muun, Breez, Zeus, BlueWallet, and more</p>
+            <p>Thank you for supporting Bitcoin adoption in the Bay Islands! 🌴⚡</p>
+        </div>
+        <div class="footer">
+            <p>This claim link expires in 30 days. If you have trouble, reply to this email.</p>
+            <p>Can't click the button? Copy this link: {{claimLink}}</p>
+        </div>
+    </div>
+</body>
+</html>

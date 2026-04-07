@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Large star -->
+  <path d="M32 8 L36.5 22 L52 22 L39.5 31 L43.5 45 L32 36 L20.5 45 L24.5 31 L12 22 L27.5 22 Z" fill="#FFF3E0" stroke="#f7931a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Inner star highlight -->
+  <path d="M32 15 L34.5 23 L43 23 L36 28.5 L38.5 37 L32 32 L25.5 37 L28 28.5 L21 23 L29.5 23 Z" fill="#f7931a" opacity="0.15"/>
+  <!-- Small stars -->
+  <path d="M8 10 L9.5 14 L14 14 L10.5 16.5 L12 20.5 L8 17.5 L4 20.5 L5.5 16.5 L2 14 L6.5 14 Z" fill="#22c55e" stroke="#22c55e" stroke-width="1" stroke-linejoin="round"/>
+  <path d="M54 6 L55.5 10 L60 10 L56.5 12.5 L58 16.5 L54 13.5 L50 16.5 L51.5 12.5 L48 10 L52.5 10 Z" fill="#0EA5E9" stroke="#0EA5E9" stroke-width="1" stroke-linejoin="round"/>
+  <!-- Review lines -->
+  <line x1="18" y1="52" x2="46" y2="52" stroke="#e8850f" stroke-width="2" stroke-linecap="round"/>
+  <line x1="22" y1="57" x2="42" y2="57" stroke="#e8850f" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+</svg>

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Chain links -->
+  <rect x="8" y="24" width="16" height="16" rx="6" fill="none" stroke="#f7931a" stroke-width="2.5"/>
+  <rect x="20" y="24" width="16" height="16" rx="6" fill="none" stroke="#f7931a" stroke-width="2.5"/>
+  <!-- Bitcoin coin -->
+  <circle cx="46" cy="32" r="14" fill="#FFF3E0" stroke="#f7931a" stroke-width="2.5"/>
+  <text x="46" y="37" font-family="Arial, sans-serif" font-weight="bold" font-size="16" fill="#f7931a" text-anchor="middle">₿</text>
+  <!-- Connection dots -->
+  <circle cx="36" cy="32" r="2" fill="#f7931a"/>
+</svg>

@@ -266,6 +266,7 @@ async function startServer() {
     
     await db.initializeDatabase();
     email.initializeEmail();
+    email.seedTemplates(db);  // Seed templates from disk into DB (only if missing)
     anthropic.initializeAnthropic();
     
     // Pre-warm the raffle info cache BEFORE accepting requests
@@ -432,7 +433,7 @@ async function commitRaffleResult(blockHeight, autoPay) {
         // Send winner email with claim link (LNURL-withdraw)
         if (winningTicket.email) {
             email.sendWinnerEmail(
-                winningTicket.email, prizeSats, claimToken, blockHeight
+                winningTicket.email, prizeSats, claimToken, blockHeight, db
             ).catch(err => console.error('Winner claim email error:', err));
         }
 
@@ -440,7 +441,7 @@ async function commitRaffleResult(blockHeight, autoPay) {
         if (winningTicket.email) {
             const winnerUser = db.findUserByEmail(winningTicket.email);
             if (winnerUser && winnerUser.telegram_chat_id) {
-                telegram.notifyWinner(winnerUser.telegram_chat_id, prizeSats, claimToken, blockHeight)
+                telegram.notifyWinner(winnerUser.telegram_chat_id, prizeSats, claimToken, blockHeight, db)
                     .catch(err => console.error('Winner Telegram notification error:', err));
             }
         }

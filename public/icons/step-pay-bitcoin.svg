@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Phone/wallet shape -->
+  <rect x="18" y="8" width="28" height="48" rx="5" fill="#FFF3E0" stroke="#f7931a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Screen area -->
+  <rect x="22" y="14" width="20" height="30" rx="2" fill="white" stroke="#f7931a" stroke-width="1.5"/>
+  <!-- Bitcoin symbol on screen -->
+  <circle cx="32" cy="26" r="8" fill="#f7931a" opacity="0.15"/>
+  <text x="32" y="30" font-family="Arial, sans-serif" font-weight="bold" font-size="14" fill="#f7931a" text-anchor="middle">₿</text>
+  <!-- Lightning bolt coming out -->
+  <path d="M38 34 L34 38 L38 38 L34 44" stroke="#0EA5E9" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Home button dot -->
+  <circle cx="32" cy="51" r="2" stroke="#f7931a" stroke-width="1.5"/>
+</svg>

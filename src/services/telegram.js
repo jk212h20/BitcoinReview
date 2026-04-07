@@ -1,9 +1,14 @@
 /**
  * Telegram notification service
  * Sends admin notifications via the CoraTelegramBot
+ * 
+ * Templates are loaded from /templates/ directory (shared with email.js).
+ * Telegram templates use {{variable}} placeholders and Telegram HTML subset.
  */
 
 const https = require('https');
+const path = require('path');
+const fs = require('fs');
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const BASE_URL = process.env.BASE_URL || 'https://web-production-3a9f6.up.railway.app';
@@ -12,6 +17,30 @@ const BASE_URL = process.env.BASE_URL || 'https://web-production-3a9f6.up.railwa
 const ADMIN_TIMEZONE = process.env.ADMIN_TIMEZONE || 'America/Tegucigalpa';
 const QUIET_HOUR_START = 18; // 6pm — no notifications after this hour
 const QUIET_HOUR_END = 9;    // 9am — notifications resume at this hour
+
+/**
+ * Render a Telegram template by substituting {{variable}} placeholders.
+ * Reads from DB via the dbModule parameter.
+ * @param {string} templateName - template name (e.g. 'tg-new-review')
+ * @param {Object} vars - key/value pairs to substitute
+ * @param {Object} [dbModule] - database module (reads from message_templates table)
+ * @returns {string|null} rendered text or null if template not found
+ */
+function renderTgTemplate(templateName, vars = {}, dbModule = null) {
+    let tmplBody = null;
+    if (dbModule) {
+        try {
+            const row = dbModule.getTemplate(templateName);
+            if (row) tmplBody = row.body;
+        } catch (e) { /* DB not ready */ }
+    }
+    
+    if (!tmplBody) return null;
+    
+    return tmplBody.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+        return vars[key] !== undefined ? vars[key] : match;
+    });
+}
 
 /**
  * Check if it's currently within quiet hours (6pm–9am Roatan time)
@@ -174,28 +203,42 @@ async function notifyNewReview(ticket, user, dbModule) {
     const triedBtc = ticket.tried_bitcoin === 1 ? '✅ Yes' : (ticket.tried_bitcoin === 0 ? '❌ No' : '❓ N/A');
     const acceptedBtc = ticket.merchant_accepted === 1 ? '✅ Yes' : (ticket.merchant_accepted === 0 ? '❌ No' : '❓ N/A');
 
-    let message = `🔔 <b>New Review Submitted</b>\n\n`;
-    message += `Merchant: ${merchantDisplay}\n`;
-    message += `Tried Bitcoin: ${triedBtc}\n`;
-    message += `Merchant Accepted: ${acceptedBtc}\n`;
-    message += `Submitted by: ${submitterDisplay}\n`;
-    message += `Review Link: <a href="${ticket.review_link}">Open Review</a>\n`;
-
+    let reviewPreview = '';
     if (ticket.review_text) {
         const preview = ticket.review_text.length > 200
             ? ticket.review_text.substring(0, 200) + '…'
             : ticket.review_text;
-        message += `\n📝 <i>"${escapeHtml(preview)}"</i>\n`;
+        reviewPreview = `\n📝 <i>"${escapeHtml(preview)}"</i>\n`;
     }
 
-    message += `\n`;
-    message += `<a href="${BASE_URL}/admin/review/${ticketId}?token=${approveToken}">👁 View in Admin</a>\n`;
+    // Try template
+    let message = renderTgTemplate('tg-new-review', {
+        merchantDisplay,
+        triedBtc,
+        acceptedBtc,
+        submitterDisplay,
+        reviewLink: ticket.review_link,
+        reviewPreview,
+        baseUrl: BASE_URL,
+        ticketId,
+        approveToken: approveToken || ''
+    }, dbModule);
 
-    if (approveToken) {
-        message += `<a href="${BASE_URL}/api/admin/tickets/${ticketId}/quick-approve?token=${approveToken}">✅ Approve</a>\n`;
-        message += `<a href="${BASE_URL}/api/admin/tickets/${ticketId}/quick-reject?token=${approveToken}">❌ Reject</a>`;
-    } else {
-        message += `\n⚠️ Set TELEGRAM_APPROVE_TOKEN env var for one-tap approve/reject links`;
+    // Fallback to inline
+    if (!message) {
+        message = `🔔 <b>New Review Submitted</b>\n\n`;
+        message += `Merchant: ${merchantDisplay}\n`;
+        message += `Tried Bitcoin: ${triedBtc}\n`;
+        message += `Merchant Accepted: ${acceptedBtc}\n`;
+        message += `Submitted by: ${submitterDisplay}\n`;
+        message += `Review Link: <a href="${ticket.review_link}">Open Review</a>\n`;
+        if (reviewPreview) message += reviewPreview;
+        message += `\n`;
+        message += `<a href="${BASE_URL}/admin/review/${ticketId}?token=${approveToken}">👁 View in Admin</a>\n`;
+        if (approveToken) {
+            message += `<a href="${BASE_URL}/api/admin/tickets/${ticketId}/quick-approve?token=${approveToken}">✅ Approve</a>\n`;
+            message += `<a href="${BASE_URL}/api/admin/tickets/${ticketId}/quick-reject?token=${approveToken}">❌ Reject</a>`;
+        }
     }
 
     for (const chatId of chatIds) {
@@ -218,21 +261,33 @@ async function notifyRaffleResult(raffle, winner, dbModule) {
     const chatIds = getAdminChatIds(dbModule);
     if (chatIds.length === 0) return;
 
-    let message = `🎰 <b>Raffle Complete!</b>\n\n`;
-    message += `Block: #${raffle.block_height.toLocaleString()}\n`;
-    message += `Total Tickets: ${raffle.total_tickets}\n`;
-    message += `Winner: ${winner.email ? escapeHtml(maskEmail(winner.email)) : (winner.lnurl_address ? `⚡ ${escapeHtml(winner.lnurl_address)}` : '<i>Anonymous</i>')}\n`;
-    if (raffle.prize_amount_sats) {
-        message += `Prize: ${raffle.prize_amount_sats.toLocaleString()} sats\n`;
+    const winnerDisplay = winner.email ? escapeHtml(maskEmail(winner.email)) : (winner.lnurl_address ? `⚡ ${escapeHtml(winner.lnurl_address)}` : '<i>Anonymous</i>');
+    const prizeDisplay = raffle.prize_amount_sats ? `Prize: ${raffle.prize_amount_sats.toLocaleString()} sats\n` : '';
+    const lightningDisplay = winner.lnurl_address ? `Lightning Address: <code>${escapeHtml(winner.lnurl_address)}</code>\n` : '';
+
+    // Try template
+    let message = renderTgTemplate('tg-raffle-result', {
+        blockHeight: raffle.block_height.toLocaleString(),
+        totalTickets: raffle.total_tickets,
+        winnerDisplay,
+        prizeDisplay,
+        lightningDisplay,
+        baseUrl: BASE_URL
+    }, dbModule);
+
+    // Fallback to inline
+    if (!message) {
+        message = `🎰 <b>Raffle Complete!</b>\n\n`;
+        message += `Block: #${raffle.block_height.toLocaleString()}\n`;
+        message += `Total Tickets: ${raffle.total_tickets}\n`;
+        message += `Winner: ${winnerDisplay}\n`;
+        message += prizeDisplay;
+        message += lightningDisplay;
+        message += `\nManage at: ${BASE_URL}/admin`;
     }
-    if (winner.lnurl_address) {
-        message += `Lightning Address: <code>${escapeHtml(winner.lnurl_address)}</code>\n`;
-    }
-    message += `\nManage at: ${BASE_URL}/admin`;
 
     if (isQuietHours()) {
         console.log('📵 Raffle result notification suppressed (quiet hours) — will send at 9am');
-        // Store the pending message in DB for the watcher to send at 9am
         if (dbModule) {
             try {
                 dbModule.setSetting('pending_telegram_message', JSON.stringify({ chatIds, message, type: 'raffle_result' }));
@@ -263,20 +318,31 @@ async function notifyRaffleWarning(raffleBlock, approvedTickets, dbModule) {
 
     const autoEnabled = dbModule ? dbModule.getSetting('raffle_auto_trigger') === 'true' : false;
     const modeText = autoEnabled ? '🤖 Auto-trigger is ON' : '👋 Manual trigger required';
+    const manualNote = !autoEnabled ? `When the block is mined, go to:\n${BASE_URL}/admin` : '';
 
-    let message = `⏰ <b>Raffle in ~24 hours!</b>\n\n`;
-    message += `Block #${raffleBlock.toLocaleString()} is ~144 blocks away.\n`;
-    message += `Approved tickets in pool: <b>${approvedTickets}</b>\n`;
-    message += `${modeText}\n\n`;
-    if (!autoEnabled) {
-        message += `When the block is mined, go to:\n${BASE_URL}/admin`;
+    // Try template
+    let message = renderTgTemplate('tg-raffle-warning', {
+        raffleBlock: raffleBlock.toLocaleString(),
+        approvedTickets: String(approvedTickets),
+        modeText,
+        manualNote
+    }, dbModule);
+
+    // Fallback to inline
+    if (!message) {
+        message = `⏰ <b>Raffle in ~24 hours!</b>\n\n`;
+        message += `Block #${raffleBlock.toLocaleString()} is ~144 blocks away.\n`;
+        message += `Approved tickets in pool: <b>${approvedTickets}</b>\n`;
+        message += `${modeText}\n\n`;
+        if (!autoEnabled) {
+            message += `When the block is mined, go to:\n${BASE_URL}/admin`;
+        }
     }
 
     if (isQuietHours()) {
         console.log('📵 Raffle warning suppressed (quiet hours) — storing for 9am delivery');
         if (dbModule) {
             try {
-                // Only store if nothing already pending (avoid clobbering raffle result)
                 const existing = dbModule.getSetting('pending_telegram_message');
                 if (!existing) {
                     dbModule.setSetting('pending_telegram_message', JSON.stringify({ chatIds, message, type: 'raffle_warning' }));
@@ -307,15 +373,33 @@ async function notifyRaffleBlockMined(raffleBlock, approvedTickets, autoTriggere
     const chatIds = getAdminChatIds(dbModule);
     if (chatIds.length === 0) return;
 
-    let message;
+    let headerSuffix, bodyText;
     if (autoTriggered) {
-        message = `🎲 <b>Raffle block #${raffleBlock.toLocaleString()} mined!</b>\n`;
-        message += `Running raffle automatically with ${approvedTickets} approved tickets...\n`;
-        message += `(Winner announcement coming shortly)`;
+        headerSuffix = 'mined!';
+        bodyText = `Running raffle automatically with ${approvedTickets} approved tickets...\n(Winner announcement coming shortly)`;
     } else {
-        message = `🎲 <b>Raffle block #${raffleBlock.toLocaleString()} has been mined!</b>\n\n`;
-        message += `${approvedTickets} approved tickets in the pool.\n`;
-        message += `👉 <a href="${BASE_URL}/admin">Run the raffle now</a>`;
+        headerSuffix = 'has been mined!';
+        bodyText = `${approvedTickets} approved tickets in the pool.\n👉 <a href="${BASE_URL}/admin">Run the raffle now</a>`;
+    }
+
+    // Try template
+    let message = renderTgTemplate('tg-block-mined', {
+        raffleBlock: raffleBlock.toLocaleString(),
+        headerSuffix,
+        bodyText
+    }, dbModule);
+
+    // Fallback to inline
+    if (!message) {
+        if (autoTriggered) {
+            message = `🎲 <b>Raffle block #${raffleBlock.toLocaleString()} mined!</b>\n`;
+            message += `Running raffle automatically with ${approvedTickets} approved tickets...\n`;
+            message += `(Winner announcement coming shortly)`;
+        } else {
+            message = `🎲 <b>Raffle block #${raffleBlock.toLocaleString()} has been mined!</b>\n\n`;
+            message += `${approvedTickets} approved tickets in the pool.\n`;
+            message += `👉 <a href="${BASE_URL}/admin">Run the raffle now</a>`;
+        }
     }
 
     if (isQuietHours()) {
@@ -375,10 +459,26 @@ async function deliverPendingNotifications(dbModule) {
             const pendingTickets = dbModule.getPendingTickets ? dbModule.getPendingTickets() : [];
             const pendingCount = pendingTickets.length;
 
-            let message = `☀️ <b>Good morning!</b>\n\n`;
-            message += `${queuedCount} review${queuedCount > 1 ? 's' : ''} submitted overnight.\n`;
-            message += `${pendingCount} review${pendingCount !== 1 ? 's' : ''} pending approval.\n\n`;
-            message += `<a href="${BASE_URL}/admin?password=${approveToken || ''}">👉 Review them now</a>`;
+            const overnightPlural = queuedCount > 1 ? 's' : '';
+            const pendingPlural = pendingCount !== 1 ? 's' : '';
+
+            // Try template
+            let message = renderTgTemplate('tg-morning-summary', {
+                overnightCount: String(queuedCount),
+                overnightPlural,
+                pendingCount: String(pendingCount),
+                pendingPlural,
+                baseUrl: BASE_URL,
+                approveToken: approveToken || ''
+            }, dbModule);
+
+            // Fallback to inline
+            if (!message) {
+                message = `☀️ <b>Good morning!</b>\n\n`;
+                message += `${queuedCount} review${overnightPlural} submitted overnight.\n`;
+                message += `${pendingCount} review${pendingPlural} pending approval.\n\n`;
+                message += `<a href="${BASE_URL}/admin?password=${approveToken || ''}">👉 Review them now</a>`;
+            }
 
             console.log(`📬 Sending morning review summary: ${queuedCount} overnight, ${pendingCount} pending`);
             for (const chatId of chatIds) {
@@ -402,11 +502,24 @@ async function notifyTicketDecision(ticket, isApproved, adminNote, dbModule) {
 
     const emoji = isApproved ? '✅' : '❌';
     const action = isApproved ? 'Approved' : 'Rejected';
-    const merchantDisplay = ticket.merchant_name || 'Unknown merchant';
+    const merchantDisplay = escapeHtml(ticket.merchant_name || 'Unknown merchant');
+    const adminNoteText = adminNote ? `\nReason: ${escapeHtml(adminNote)}` : '';
 
-    let message = `${emoji} <b>Review ${action}</b>\n`;
-    message += `Ticket #${ticket.id} — ${escapeHtml(merchantDisplay)}`;
-    if (adminNote) message += `\nReason: ${escapeHtml(adminNote)}`;
+    // Try template
+    let message = renderTgTemplate('tg-ticket-decision', {
+        emoji,
+        action,
+        ticketId: ticket.id,
+        merchantDisplay,
+        adminNote: adminNoteText
+    }, dbModule);
+
+    // Fallback to inline
+    if (!message) {
+        message = `${emoji} <b>Review ${action}</b>\n`;
+        message += `Ticket #${ticket.id} — ${merchantDisplay}`;
+        if (adminNote) message += `\nReason: ${escapeHtml(adminNote)}`;
+    }
 
     for (const chatId of chatIds) {
         try {
@@ -425,18 +538,28 @@ async function notifyTicketDecision(ticket, isApproved, adminNote, dbModule) {
  * @param {string} claimToken - The claim token for LNURL-withdraw
  * @param {number} blockHeight - The raffle block height
  */
-async function notifyWinner(chatId, prizeSats, claimToken, blockHeight) {
+async function notifyWinner(chatId, prizeSats, claimToken, blockHeight, dbModule) {
     if (!chatId) return false;
 
     const baseUrl = BASE_URL;
     const claimLink = `${baseUrl}/claim/${claimToken}`;
 
-    let message = `🎉 <b>You won the Bitcoin Review Raffle!</b>\n\n`;
-    message += `Block #${blockHeight.toLocaleString()}\n`;
-    message += `Prize: <b>${prizeSats.toLocaleString()} sats</b>\n\n`;
-    message += `👉 <a href="${claimLink}">Claim Your Prize</a>\n\n`;
-    message += `Open the link above, then scan the QR code with any Lightning wallet to receive your sats. ⚡\n\n`;
-    message += `<i>This claim link expires in 30 days.</i>`;
+    // Try template
+    let message = renderTgTemplate('tg-winner-dm', {
+        blockHeight: blockHeight.toLocaleString(),
+        prizeSats: prizeSats.toLocaleString(),
+        claimLink
+    }, dbModule);
+
+    // Fallback to inline
+    if (!message) {
+        message = `🎉 <b>You won the Bitcoin Review Raffle!</b>\n\n`;
+        message += `Block #${blockHeight.toLocaleString()}\n`;
+        message += `Prize: <b>${prizeSats.toLocaleString()} sats</b>\n\n`;
+        message += `👉 <a href="${claimLink}">Claim Your Prize</a>\n\n`;
+        message += `Open the link above, then scan the QR code with any Lightning wallet to receive your sats. ⚡\n\n`;
+        message += `<i>This claim link expires in 30 days.</i>`;
+    }
 
     try {
         const sent = await sendMessage(chatId, message);
@@ -484,5 +607,6 @@ module.exports = {
     notifyRaffleBlockMined,
     deliverPendingNotifications,
     notifyTicketDecision,
-    notifyWinner
+    notifyWinner,
+    renderTgTemplate
 };

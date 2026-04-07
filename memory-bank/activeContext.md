@@ -1,8 +1,96 @@
 # Active Context
 
-## Current Focus (Updated 2026-03-06)
+## Current Focus (Updated 2026-04-07)
 
-### Session 27: Utila Merchants Added
+### Session 32: GitHub Issues → Cline Workflow (replaces Cline widget)
+- **Replaced the planned cline-widget** (in-browser Cline interface) with a simpler **GitHub Issues** workflow
+- Partner files structured issues on GitHub → you dispatch to Cline locally → Cline implements + PRs
+- **4 GitHub Issue Templates** created (`.github/ISSUE_TEMPLATE/`):
+  - 🐛 Bug Report — page dropdown, device/browser, screenshot upload
+  - ✨ Feature Request — what/why, area dropdown, priority, design ideas
+  - 📝 Content Change — current text, new text, page dropdown
+  - 🎨 Design/UI Tweak — what to change, screenshot, reference, device
+- **`issue-to-cline.sh`** convenience script:
+  - `./issue-to-cline.sh --list` — lists open issues
+  - `./issue-to-cline.sh 42` — fetches issue #42, builds Cline prompt, copies to clipboard
+  - Auto-generates branch name (`issue-42-fix-mobile-layout`), labels issue `cline-working`
+  - Prompt instructs Cline to: read memory bank → implement → commit to branch → push → create PR → comment on issue
+- **`cline-widget/` directory** still exists (reference code) but is NOT implemented — GitHub Issues approach was chosen instead
+- Partner just needs to be added as a collaborator on `jk212h20/BitcoinReview` GitHub repo
+
+### Previous: Session 31: Template System — Email & Telegram Optimization (DB-backed)
+- Created `bitcoin-review` family in **template server** with full style guide
+- **12 templates** created via template server, exported to `templates/` directory, seeded into DB:
+  - **5 Email templates:** welcome-email, winner-email, raffle-reminder, new-merchant, general-update
+  - **7 Telegram templates:** tg-new-review, tg-raffle-result, tg-raffle-warning, tg-block-mined, tg-morning-summary, tg-ticket-decision, tg-winner-dm
+- **DB-backed template storage** (`message_templates` table in SQLite):
+  - `database.js`: New `message_templates` table with `getTemplate()`, `getAllTemplates()`, `upsertTemplate()`, `deleteTemplate()` functions
+  - `email.js`: `seedTemplates(db)` reads `templates/*.html` on startup, seeds DB if not already present. `renderTemplate(name, vars, db)` reads from DB, substitutes `{{var}}` placeholders. `resetTemplateToDefault(db, name)` re-reads from disk file.
+  - `telegram.js`: `renderTgTemplate(name, vars, dbModule)` reads from DB, substitutes `{{var}}` placeholders. All notification functions (`notifyNewReview`, `notifyRaffleResult`, `notifyRaffleWarning`, `notifyRaffleBlockMined`, `notifyTicketDecision`, `notifyWinner`) accept `dbModule` param and pass it through.
+  - All callers in `admin.js`, `api.js`, `index.js`, `pages.js` pass `db` to template-rendering functions.
+- **Admin Templates tab** (`admin.ejs` → 📝 Templates):
+  - Lists all 12 templates grouped by type (email/telegram/compose)
+  - Edit body + subject inline, save to DB instantly
+  - Reset to default (re-reads from disk `templates/` file)
+  - API routes: `GET/PUT /api/admin/templates/:name`, `POST /api/admin/templates/:name/reset`, `GET /api/admin/templates`
+- **Template workflow:** Template server → export to `templates/` on disk → `seedTemplates()` at startup → DB → admin edits via Templates tab → instant effect
+- All templates have **inline fallbacks** — if DB template is missing/corrupt, hardcoded message is used
+
+### Previous: Session 30: Icon Improvements — New Page Icons + Logo Fix
+- **Fixed logo:** `logo-bitcoin-palm.svg` now uses `<path>` elements for the Bitcoin ₿ symbol instead of `<text>` — renders consistently across all platforms/fonts
+- **5 new custom SVG icons** created and saved to the icon library:
+  - `raffle-trophy` — trophy with Bitcoin ₿ for the raffles page header
+  - `reviews-stars` — large star with smaller colored stars for the reviews page
+  - `merchants-storefront` — storefront with Bitcoin-accepted badge for merchants page
+  - `claim-prize` — gift box with bow and lightning bolt for the claim page
+  - `lost-island` — desert island with palm tree and question mark for the 404 page
+- **Templates updated with new icons:**
+  - `raffles.ejs` — trophy icon in page header (replaces 🎰 emoji)
+  - `reviews.ejs` — star icon in page header
+  - `merchants.ejs` — storefront icon in page header
+  - `claim.ejs` — logo icon in nav (replaces ₿ text), gift box icon in "You Won" section (replaces 🎊 emoji)
+  - `404.ejs` — lost island illustration (replaces 🔍 emoji), playful "Lost at sea!" copy
+- Total icon count: **19 icons** in the bitcoin-review family (14 original + 5 new)
+- All icons exported to `public/icons/` and deployed
+
+### Previous: Session 29: Custom Domain + Admin Email Management
+- **Custom domain:** `bitcoinreviewsraffle.com` registered on Railway (+ `www` subdomain)
+  - DNS CNAME: `bitcoinreviewsraffle.com` → `agv6lkgu.up.railway.app`
+  - DNS CNAME: `www.bitcoinreviewsraffle.com` → `nmgdoqyt.up.railway.app`
+  - `BASE_URL` env var updated to `https://bitcoinreviewsraffle.com`
+  - `.vscode/project-url.json` updated
+- **Email management tab** added to admin panel (`admin.ejs`)
+  - New "📧 Email" tab in the admin dashboard tabs
+  - Compose emails with 3 recipient modes: All Users, Select Users (checkboxes), Custom (manual entry)
+  - 3 body modes: Simple Text, HTML, Template (pre-built templates)
+  - 3 email templates: Raffle Reminder, New Merchant Announcement, General Update
+  - Preview panel (iframe-based HTML preview)
+  - Send with confirmation dialog, progress feedback, error reporting
+  - Sends via existing Resend API (200ms delay between sends for rate limits)
+- **New API routes** (`admin.js`):
+  - `POST /api/admin/email/send` — send to array of emails or "all" users
+  - `POST /api/admin/email/preview` — preview HTML rendering
+- Files changed: `src/routes/admin.js`, `src/views/admin.ejs`, `public/styles.css`
+
+### Previous: Session 28: Custom SVG Icons via Icon Skill
+- Created **"bitcoin-review" icon family** in the icon server with a style guide matching the site's Bitcoin-orange + tropical aesthetic
+- Designed and saved **14 custom SVG icons** to the library:
+  - **Logo**: `logo-bitcoin-palm` — palm tree + Bitcoin symbol brand mark
+  - **Nav icons** (6): `nav-home`, `nav-submit`, `nav-reviews`, `nav-raffles`, `nav-merchants`, `nav-how-it-works`
+  - **Step icons** (3): `step-pay-bitcoin`, `step-write-review`, `step-submit-win` — for "How It Works" process flow
+  - **Section icons** (4): `lightning-bolt`, `onchain-bitcoin`, `palm-tree`, `donate-fund`
+- Icons exported to `public/icons/` (14 SVG files, served statically)
+- **Templates updated**: `layout.ejs`, `index.ejs`, `submit.ejs`, `how-it-works.ejs`
+  - Nav bar: Each link now has a custom icon beside the text (desktop + mobile)
+  - Logo: Replaced `₿` text with `logo-bitcoin-palm.svg`
+  - Homepage "How It Works" steps: Replaced plain numbered circles with illustrated step icons in white circles
+  - Donation section: Replaced 🔗 and ⚡ emoji with `onchain-bitcoin.svg` and `lightning-bolt.svg`
+  - Fund badge: Lightning bolt icon replaces ⚡ emoji
+  - Footer: Custom palm tree + lightning bolt icons replace emoji
+- Tailwind CSS rebuilt with new utility classes
+- Style: Hybrid stroke+fill, 2.5 stroke width, Bitcoin orange (#f7931a), warm fills (#FFF3E0), tropical green (#22c55e), ocean blue (#0EA5E9)
+
+### Previous: Session 27: Utila Merchants Added
 - Merchants page now shows Bitcoin-accepting businesses from **both Roatan and Utila**
 - `btcmap.js`: Added `getUtilaMerchants()` with Utila bounding box (16.06–16.13 lat, -86.97–-86.85 lon)
 - `getMerchantList()` fetches both islands in parallel, deduplicates by element ID, tags each merchant with `location: "Roatan"` or `location: "Utila"`
@@ -174,7 +262,10 @@ When a review is submitted:
 - [ ] Turn on `raffle_auto_trigger` when ready
 
 ## Important Notes
-- **Live URL:** https://web-production-3a9f6.up.railway.app
+- **Live URL:** https://bitcoinreviewsraffle.com (custom domain, added 2026-03-08)
+- **Railway URL:** https://web-production-3a9f6.up.railway.app (still works)
+- **DNS CNAME records:** `bitcoinreviewsraffle.com` → `agv6lkgu.up.railway.app` | `www.bitcoinreviewsraffle.com` → `nmgdoqyt.up.railway.app`
+- **BASE_URL env var** updated to `https://bitcoinreviewsraffle.com` (required for LNURL-withdraw claim links)
 - Code: https://github.com/jk212h20/BitcoinReview.git (branch: main)
 - **Next raffle block: #939,456** (~11 days away from 2026-02-21)
 - **Admin Telegram management:** `POST /api/admin/telegram/chats` with `{chatId: "..."}` to add admins

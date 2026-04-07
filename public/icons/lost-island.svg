@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Ocean -->
+  <path d="M2 48 C10 46 18 50 26 48 C34 46 42 50 50 48 C54 47 58 48 62 48" stroke="#0EA5E9" stroke-width="2.5" stroke-linecap="round" opacity="0.5"/>
+  <path d="M2 54 C10 52 18 56 26 54 C34 52 42 56 50 54 C54 53 58 54 62 54" stroke="#0EA5E9" stroke-width="2" stroke-linecap="round" opacity="0.3"/>
+  <!-- Island sand -->
+  <ellipse cx="32" cy="44" rx="18" ry="5" fill="#f7931a" opacity="0.2" stroke="#e8850f" stroke-width="2"/>
+  <!-- Palm trunk -->
+  <path d="M30 44 C29 36 27 28 26 22" stroke="#e8850f" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Palm fronds -->
+  <path d="M26 22 C22 16 16 14 12 15" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M26 22 C24 15 26 10 30 7" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M26 22 C30 17 36 16 40 18" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Question mark -->
+  <path d="M44 14 C44 10 48 8 50 10 C52 12 50 16 48 16" stroke="#f7931a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="48" cy="20" r="1.5" fill="#f7931a"/>
+  <!-- Coconut -->
+  <circle cx="24" cy="24" r="2" fill="#e8850f" opacity="0.6"/>
+</svg>

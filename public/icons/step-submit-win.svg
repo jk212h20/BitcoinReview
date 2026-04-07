@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Trophy cup -->
+  <path d="M20 16 L20 32 C20 40 26 46 32 46 C38 46 44 40 44 32 L44 16 Z" fill="#FFF3E0" stroke="#f7931a" stroke-width="2.5" stroke-linejoin="round"/>
+  <!-- Trophy handles -->
+  <path d="M20 20 C14 20 10 24 10 28 C10 32 14 36 20 36" stroke="#f7931a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M44 20 C50 20 54 24 54 28 C54 32 50 36 44 36" stroke="#f7931a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Trophy base -->
+  <line x1="26" y1="46" x2="38" y2="46" stroke="#f7931a" stroke-width="2.5" stroke-linecap="round"/>
+  <rect x="24" y="48" width="16" height="4" rx="2" fill="#f7931a" opacity="0.3" stroke="#f7931a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Lightning bolt inside trophy -->
+  <path d="M35 22 L30 30 L35 30 L30 38" stroke="#0EA5E9" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Sparkles around trophy -->
+  <circle cx="14" cy="12" r="2" fill="#f7931a"/>
+  <circle cx="50" cy="12" r="2" fill="#22c55e"/>
+  <circle cx="32" cy="8" r="1.5" fill="#0EA5E9"/>
+  <path d="M8 8 L10 6 M10 8 L8 6" stroke="#f7931a" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M54 6 L56 4 M56 6 L54 4" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round"/>
+</svg>

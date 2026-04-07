@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Ticket shape -->
+  <path d="M8 20 L8 28 A4 4 0 0 1 8 36 L8 44 L56 44 L56 36 A4 4 0 0 1 56 28 L56 20 Z" fill="#FFF3E0" stroke="#f7931a" stroke-width="2.5" stroke-linejoin="round"/>
+  <!-- Dashed perforation line -->
+  <line x1="20" y1="22" x2="20" y2="42" stroke="#f7931a" stroke-width="1.5" stroke-dasharray="3 3" opacity="0.5"/>
+  <!-- Bitcoin symbol on ticket -->
+  <text x="34" y="37" font-family="Arial, sans-serif" font-weight="bold" font-size="16" fill="#f7931a" text-anchor="middle">₿</text>
+  <!-- Lightning bolt sparkle -->
+  <path d="M46 18 L43 24 L47 24 L44 30" stroke="#0EA5E9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Confetti dots -->
+  <circle cx="12" cy="14" r="2" fill="#f7931a" opacity="0.6"/>
+  <circle cx="52" cy="14" r="2" fill="#22c55e" opacity="0.6"/>
+  <circle cx="30" cy="10" r="1.5" fill="#0EA5E9" opacity="0.6"/>
+</svg>

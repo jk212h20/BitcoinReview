@@ -156,6 +156,18 @@ async function initializeDatabase() {
         console.log('✅ Added claim_payment_hash column to raffles');
     } catch (e) { /* already exists */ }
 
+    // Message templates table (admin-editable email + Telegram templates)
+    db.run(`
+        CREATE TABLE IF NOT EXISTS message_templates (
+            name TEXT PRIMARY KEY,
+            type TEXT NOT NULL DEFAULT 'email',
+            subject TEXT,
+            body TEXT NOT NULL,
+            description TEXT,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+    `);
+
     // Insert default settings if they don't exist
     const defaultSettings = [
         ['review_mode', 'manual_review'],       // 'auto_approve' or 'manual_review'
@@ -618,6 +630,26 @@ function getExpiredUnclaimedRaffles() {
     `);
 }
 
+// Message template functions
+function getTemplate(name) {
+    return queryOne(`SELECT * FROM message_templates WHERE name = ?`, [name]);
+}
+
+function getAllTemplates() {
+    return query(`SELECT * FROM message_templates ORDER BY type, name`);
+}
+
+function upsertTemplate(name, type, body, subject, description) {
+    run(
+        `INSERT OR REPLACE INTO message_templates (name, type, body, subject, description, updated_at) VALUES (?, ?, ?, ?, ?, datetime('now'))`,
+        [name, type, body, subject || null, description || null]
+    );
+}
+
+function deleteTemplate(name) {
+    run(`DELETE FROM message_templates WHERE name = ?`, [name]);
+}
+
 // Settings functions
 function getSetting(key) {
     const row = queryOne(`SELECT value FROM settings WHERE key = ?`, [key]);
@@ -697,6 +729,12 @@ module.exports = {
     getDepositAddressByPaymentHash,
     getUnpaidLightningInvoices,
     getTotalDonationsReceived,
+    
+    // Template functions
+    getTemplate,
+    getAllTemplates,
+    upsertTemplate,
+    deleteTemplate,
     
     // Settings functions
     getSetting,

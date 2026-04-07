@@ -218,7 +218,7 @@ router.post('/raffle/test', async (req, res) => {
         if (winningTicket.email) {
             try {
                 emailResult = await email.sendWinnerEmail(
-                    winningTicket.email, prizeSats, claimToken, currentHeight
+                    winningTicket.email, prizeSats, claimToken, currentHeight, db
                 );
                 console.log(`📧 Test raffle winner email sent to ${winningTicket.email}`);
             } catch (emailErr) {
@@ -374,7 +374,8 @@ router.post('/raffle/run', async (req, res) => {
                 winningTicket.email,
                 prizeSats,
                 claimToken,
-                blockHeight
+                blockHeight,
+                db
             ).catch(err => {
                 console.error('Failed to send winner email:', err);
             });
@@ -857,6 +858,149 @@ router.delete('/telegram/chats/:chatId', (req, res) => {
         });
     } catch (error) {
         res.status(500).json({ error: 'Failed to remove chat ID' });
+    }
+});
+
+/**
+ * POST /admin/email/send
+ * Send an email to one or more users
+ * Body: { to: ["email1", "email2"] | "all", subject: "...", html: "...", text: "..." }
+ */
+router.post('/email/send', async (req, res) => {
+    try {
+        const { to, subject, html, text } = req.body;
+        
+        if (!subject || (!html && !text)) {
+            return res.status(400).json({ error: 'Subject and message body (html or text) required' });
+        }
+        
+        // Resolve recipients
+        let recipients = [];
+        if (to === 'all') {
+            const users = db.getAllUsers();
+            recipients = users.filter(u => u.email).map(u => u.email);
+        } else if (Array.isArray(to) && to.length > 0) {
+            recipients = to.filter(e => e && e.includes('@'));
+        } else {
+            return res.status(400).json({ error: 'Recipients required: array of emails or "all"' });
+        }
+        
+        if (recipients.length === 0) {
+            return res.status(400).json({ error: 'No valid recipients found' });
+        }
+        
+        // Send emails (in batches to avoid rate limits)
+        const results = { sent: 0, failed: 0, errors: [] };
+        
+        for (const recipient of recipients) {
+            try {
+                const result = await email.sendEmail(recipient, subject, html || null, text || null);
+                if (result.success) {
+                    results.sent++;
+                } else {
+                    results.failed++;
+                    results.errors.push({ email: recipient, error: result.error });
+                }
+                // Small delay between sends to respect rate limits
+                if (recipients.length > 1) {
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                }
+            } catch (err) {
+                results.failed++;
+                results.errors.push({ email: recipient, error: err.message });
+            }
+        }
+        
+        console.log(`📧 Bulk email: "${subject}" — sent: ${results.sent}, failed: ${results.failed}`);
+        
+        res.json({
+            success: true,
+            message: `Sent to ${results.sent} of ${recipients.length} recipients`,
+            results
+        });
+    } catch (error) {
+        console.error('Email send error:', error);
+        res.status(500).json({ error: 'Failed to send emails: ' + error.message });
+    }
+});
+
+/**
+ * POST /admin/email/preview
+ * Preview email HTML rendering (returns rendered HTML)
+ * Body: { subject: "...", html: "...", text: "..." }
+ */
+router.post('/email/preview', (req, res) => {
+    try {
+        const { html, text } = req.body;
+        res.json({ success: true, html: html || `<pre>${text || ''}</pre>` });
+    } catch (error) {
+        res.status(500).json({ error: 'Preview failed' });
+    }
+});
+
+// ============================================================
+// Template CRUD routes
+// ============================================================
+
+/**
+ * GET /admin/templates
+ * List all message templates (email + telegram)
+ */
+router.get('/templates', (req, res) => {
+    try {
+        const templates = db.getAllTemplates();
+        res.json({ success: true, templates });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch templates' });
+    }
+});
+
+/**
+ * GET /admin/templates/:name
+ * Get a single template by name
+ */
+router.get('/templates/:name', (req, res) => {
+    try {
+        const tmpl = db.getTemplate(req.params.name);
+        if (!tmpl) return res.status(404).json({ error: 'Template not found' });
+        res.json({ success: true, template: tmpl });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch template' });
+    }
+});
+
+/**
+ * PUT /admin/templates/:name
+ * Update a template's subject and/or body
+ * Body: { subject?: string, body: string }
+ */
+router.put('/templates/:name', (req, res) => {
+    try {
+        const { subject, body, type } = req.body;
+        if (!body) return res.status(400).json({ error: 'Body is required' });
+        // Get existing template to preserve type if not provided
+        const existing = db.getTemplate(req.params.name);
+        const tmplType = type || (existing ? existing.type : 'email');
+        db.upsertTemplate(req.params.name, tmplType, body, subject || null, existing ? existing.description : null);
+        res.json({ success: true, message: 'Template updated' });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to update template' });
+    }
+});
+
+/**
+ * POST /admin/templates/:name/reset
+ * Reset a template to its default (re-seed from disk file)
+ */
+router.post('/templates/:name/reset', (req, res) => {
+    try {
+        const result = email.resetTemplateToDefault(db, req.params.name);
+        if (!result.success) {
+            return res.status(404).json({ error: result.error });
+        }
+        res.json({ success: true, message: 'Template reset to default' });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to reset template' });
     }
 });
 

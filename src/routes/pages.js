@@ -10,6 +10,7 @@ const db = require('../services/database');
 const bitcoin = require('../services/bitcoin');
 const btcmap = require('../services/btcmap');
 const lightning = require('../services/lightning');
+const email = require('../services/email');
 
 /**
  * Encode a URL as an LNURL (bech32-encoded, uppercase)
@@ -382,6 +383,9 @@ router.get('/admin', async (req, res) => {
         const raffles = db.getAllRaffles();
         const raffleInfo = await bitcoin.getRaffleInfo();
         
+        // Get email compose templates from template library
+        const emailTemplates = email.getAdminComposeTemplates(db);
+        
         res.render('admin', {
             title: 'Admin Dashboard - Bitcoin Review Raffle',
             password,
@@ -389,7 +393,8 @@ router.get('/admin', async (req, res) => {
             tickets,
             pendingTickets,
             raffles,
-            raffleInfo
+            raffleInfo,
+            emailTemplates: JSON.stringify(emailTemplates)
         });
     } catch (error) {
         console.error('Admin page error:', error);

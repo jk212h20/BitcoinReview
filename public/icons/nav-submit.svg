@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Paper/document -->
+  <rect x="14" y="8" width="30" height="40" rx="4" fill="#FFF3E0" stroke="#f7931a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Lines on paper -->
+  <line x1="22" y1="20" x2="36" y2="20" stroke="#f7931a" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+  <line x1="22" y1="28" x2="34" y2="28" stroke="#f7931a" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+  <line x1="22" y1="36" x2="30" y2="36" stroke="#f7931a" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+  <!-- Pencil writing -->
+  <path d="M42 28 L50 20 L54 24 L46 32 L40 34 Z" fill="#f7931a" stroke="#e8850f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Star/sparkle for "new" -->
+  <circle cx="48" cy="48" r="3" fill="#22c55e"/>
+  <path d="M48 42 V44 M48 52 V54 M42 48 H44 M52 48 H54" stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
+</svg>

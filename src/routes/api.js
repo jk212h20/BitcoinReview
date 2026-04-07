@@ -148,7 +148,7 @@ router.post('/submit', async (req, res) => {
             
             // Send registration email if new user with email
             if (userCreated && cleanEmail && user.opt_out_token) {
-                email.sendRegistrationEmail(cleanEmail, user.opt_out_token).catch(err => {
+                email.sendRegistrationEmail(cleanEmail, user.opt_out_token, db).catch(err => {
                     console.error('Failed to send registration email:', err);
                 });
             }
@@ -264,7 +264,7 @@ router.post('/register', async (req, res) => {
         }
         
         if (result.created && userEmail) {
-            email.sendRegistrationEmail(userEmail, result.user.opt_out_token).catch(err => {
+            email.sendRegistrationEmail(userEmail, result.user.opt_out_token, db).catch(err => {
                 console.error('Failed to send registration email:', err);
             });
         }

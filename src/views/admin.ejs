@@ -307,6 +307,20 @@
                 >
                     Raffles
                 </button>
+                <button 
+                    @click="activeTab = 'email'"
+                    :class="activeTab === 'email' ? 'bg-bitcoin text-white' : 'text-gray-600 hover:bg-gray-100'"
+                    class="px-6 py-3 font-medium"
+                >
+                    📧 Email
+                </button>
+                <button 
+                    @click="activeTab = 'templates'"
+                    :class="activeTab === 'templates' ? 'bg-bitcoin text-white' : 'text-gray-600 hover:bg-gray-100'"
+                    class="px-6 py-3 font-medium"
+                >
+                    📝 Templates
+                </button>
             </div>
             
             <!-- Tickets Tab -->
@@ -385,6 +399,156 @@
                 </div>
             </div>
             
+            <!-- Email Tab -->
+            <div x-show="activeTab === 'email'" x-cloak class="p-6" x-data="emailPanel('${typeof password !== 'undefined' ? password : ''}', ${typeof users !== 'undefined' ? JSON.stringify(users.filter(function(u){ return u.email; }).map(function(u){ return { id: u.id, email: u.email, active: u.is_active }; })) : '[]'})">
+                <h3 class="font-bold mb-4">📧 Compose Email</h3>
+                
+                <!-- Recipients -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Recipients</label>
+                    <div class="flex gap-3 mb-3">
+                        <button @click="recipientMode = 'all'" :class="recipientMode === 'all' ? 'bg-bitcoin text-white' : 'bg-gray-100 text-gray-700'" class="px-4 py-2 rounded-lg text-sm font-medium">
+                            All Users (<span x-text="allEmails.length"></span>)
+                        </button>
+                        <button @click="recipientMode = 'select'" :class="recipientMode === 'select' ? 'bg-bitcoin text-white' : 'bg-gray-100 text-gray-700'" class="px-4 py-2 rounded-lg text-sm font-medium">
+                            Select Users
+                        </button>
+                        <button @click="recipientMode = 'custom'" :class="recipientMode === 'custom' ? 'bg-bitcoin text-white' : 'bg-gray-100 text-gray-700'" class="px-4 py-2 rounded-lg text-sm font-medium">
+                            Custom
+                        </button>
+                    </div>
+                    
+                    <!-- Select Users list -->
+                    <div x-show="recipientMode === 'select'" class="border rounded-lg p-3 max-h-48 overflow-y-auto bg-gray-50 mb-3">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs text-gray-500" x-text="selectedEmails.length + ' selected'"></span>
+                            <div class="flex gap-2">
+                                <button @click="selectedEmails = allEmails.map(u => u.email)" class="text-xs text-bitcoin hover:underline">Select All</button>
+                                <button @click="selectedEmails = []" class="text-xs text-gray-500 hover:underline">Clear</button>
+                            </div>
+                        </div>
+                        <template x-for="u in allEmails" :key="u.id">
+                            <label class="flex items-center gap-2 py-1 cursor-pointer hover:bg-white rounded px-2">
+                                <input type="checkbox" :value="u.email" x-model="selectedEmails" class="rounded text-bitcoin">
+                                <span class="text-sm" x-text="u.email"></span>
+                                <span x-show="!u.active" class="text-xs text-red-400">(inactive)</span>
+                            </label>
+                        </template>
+                    </div>
+                    
+                    <!-- Custom email input -->
+                    <div x-show="recipientMode === 'custom'" class="mb-3">
+                        <textarea x-model="customEmails" rows="2" class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="Enter email addresses, one per line or comma-separated"></textarea>
+                    </div>
+                    
+                    <!-- Recipient summary -->
+                    <div class="text-xs text-gray-500">
+                        <span x-show="recipientMode === 'all'" x-text="'Will send to all ' + allEmails.length + ' active users'"></span>
+                        <span x-show="recipientMode === 'select'" x-text="selectedEmails.length + ' recipients selected'"></span>
+                        <span x-show="recipientMode === 'custom'" x-text="getCustomEmailCount() + ' email(s) entered'"></span>
+                    </div>
+                </div>
+                
+                <!-- Subject -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                    <input type="text" x-model="emailSubject" class="w-full px-4 py-2 border rounded-lg" placeholder="Email subject line...">
+                </div>
+                
+                <!-- Body Mode Toggle -->
+                <div class="mb-2 flex gap-2">
+                    <button @click="bodyMode = 'simple'" :class="bodyMode === 'simple' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-700'" class="px-3 py-1 rounded text-xs font-medium">Simple Text</button>
+                    <button @click="bodyMode = 'html'" :class="bodyMode === 'html' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-700'" class="px-3 py-1 rounded text-xs font-medium">HTML</button>
+                    <button @click="bodyMode = 'template'" :class="bodyMode === 'template' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-700'" class="px-3 py-1 rounded text-xs font-medium">Template</button>
+                </div>
+                
+                <!-- Simple text body -->
+                <div x-show="bodyMode === 'simple'" class="mb-4">
+                    <textarea x-model="emailText" rows="8" class="w-full px-4 py-2 border rounded-lg font-mono text-sm" placeholder="Type your message here..."></textarea>
+                </div>
+                
+                <!-- HTML body -->
+                <div x-show="bodyMode === 'html'" class="mb-4">
+                    <textarea x-model="emailHtml" rows="10" class="w-full px-4 py-2 border rounded-lg font-mono text-sm" placeholder="<h1>Hello!</h1><p>Your HTML content here...</p>"></textarea>
+                </div>
+                
+                <!-- Template body -->
+                <div x-show="bodyMode === 'template'" class="mb-4">
+                    <select @change="loadTemplate($event.target.value)" class="w-full px-3 py-2 border rounded-lg text-sm mb-2">
+                        <option value="">Choose a template...</option>
+                        <option value="raffle_reminder">🎰 Raffle Reminder</option>
+                        <option value="new_merchant">🏪 New Merchant Announcement</option>
+                        <option value="general_update">📢 General Update</option>
+                    </select>
+                    <textarea x-model="emailHtml" rows="10" class="w-full px-4 py-2 border rounded-lg font-mono text-sm" placeholder="Select a template above to pre-fill, then edit as needed..."></textarea>
+                </div>
+                
+                <!-- Preview / Send Buttons -->
+                <div class="flex gap-3 items-center">
+                    <button @click="previewEmail()" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-300">
+                        👁 Preview
+                    </button>
+                    <button @click="sendEmail()" :disabled="emailSending" class="bg-bitcoin text-white px-6 py-2 rounded-lg font-bold hover:bg-bitcoin-dark disabled:opacity-50">
+                        <span x-text="emailSending ? 'Sending...' : '📧 Send Email'"></span>
+                    </button>
+                    <div x-show="emailMsg" x-cloak class="text-sm" :class="emailOk ? 'text-green-600' : 'text-red-600'" x-text="emailMsg"></div>
+                </div>
+                
+                <!-- Preview Panel -->
+                <div x-show="previewHtml" x-cloak class="mt-4 border rounded-lg overflow-hidden">
+                    <div class="bg-gray-100 px-4 py-2 flex justify-between items-center">
+                        <span class="text-sm font-medium text-gray-600">Preview</span>
+                        <button @click="previewHtml = ''" class="text-gray-400 hover:text-gray-600 text-xs">Close</button>
+                    </div>
+                    <iframe :srcdoc="previewHtml" class="w-full border-0" style="height: 400px;"></iframe>
+                </div>
+            </div>
+
+            <!-- Templates Tab -->
+            <div x-show="activeTab === 'templates'" x-cloak class="p-6" x-data="templatesPanel('${typeof password !== 'undefined' ? password : ''}')">
+                <h3 class="font-bold mb-4">📝 Message Templates</h3>
+                <p class="text-sm text-gray-500 mb-4">Edit email and Telegram notification templates. Changes take effect immediately. Use <code>{{variable}}</code> for placeholders.</p>
+                
+                <template x-if="loading"><div class="text-gray-400 text-sm py-8 text-center">Loading templates...</div></template>
+                
+                <div x-show="!loading" class="space-y-3">
+                    <template x-for="tmpl in templates" :key="tmpl.name">
+                        <div class="border rounded-lg" x-data="{ open: false, editing: false, editBody: '', editSubject: '', saving: false, msg: '' }">
+                            <div class="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-50" @click="open = !open; if(open && !editing) { editBody = tmpl.body; editSubject = tmpl.subject || ''; }">
+                                <div class="flex items-center gap-3 text-sm">
+                                    <span class="text-lg" x-text="tmpl.type === 'telegram' ? '📱' : tmpl.type === 'compose' ? '✉️' : '📧'"></span>
+                                    <span class="font-mono font-medium" x-text="tmpl.name"></span>
+                                    <span class="text-gray-400 text-xs" x-text="tmpl.description || ''"></span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xs px-2 py-0.5 rounded" :class="tmpl.type === 'telegram' ? 'bg-blue-100 text-blue-700' : tmpl.type === 'compose' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'" x-text="tmpl.type"></span>
+                                    <span class="text-gray-400 text-xs" x-text="open ? '▲' : '▼'"></span>
+                                </div>
+                            </div>
+                            <div x-show="open" x-cloak class="border-t px-4 py-3 bg-gray-50 text-sm space-y-3">
+                                <div x-show="tmpl.subject">
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Subject</label>
+                                    <input type="text" x-model="editSubject" class="w-full px-3 py-1.5 border rounded text-sm font-mono">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Body</label>
+                                    <textarea x-model="editBody" rows="8" class="w-full px-3 py-2 border rounded font-mono text-xs leading-relaxed"></textarea>
+                                </div>
+                                <div class="flex gap-2 items-center">
+                                    <button @click="saving = true; msg = ''; saveTemplate(tmpl.name, editSubject, editBody, tmpl.type).then(r => { saving = false; if(r) { msg = '✅ Saved'; tmpl.body = editBody; tmpl.subject = editSubject; } else { msg = '❌ Failed'; } })" :disabled="saving" class="bg-bitcoin text-white px-4 py-1.5 rounded text-xs font-medium hover:bg-bitcoin-dark disabled:opacity-50">
+                                        <span x-text="saving ? 'Saving...' : '💾 Save'"></span>
+                                    </button>
+                                    <button @click="if(!confirm('Reset to default?')) return; saving = true; resetTemplate(tmpl.name).then(r => { saving = false; if(r) { editBody = r.body; editSubject = r.subject || ''; tmpl.body = r.body; tmpl.subject = r.subject; msg = '🔄 Reset to default'; } else { msg = '❌ No default found'; } })" :disabled="saving" class="bg-gray-200 text-gray-700 px-3 py-1.5 rounded text-xs font-medium hover:bg-gray-300 disabled:opacity-50">
+                                        🔄 Reset
+                                    </button>
+                                    <span class="text-xs" :class="msg.startsWith('✅') || msg.startsWith('🔄') ? 'text-green-600' : 'text-red-600'" x-text="msg"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
             <!-- Raffles Tab -->
             <div x-show="activeTab === 'raffles'" x-cloak class="p-6">
                 <h3 class="font-bold mb-4">Raffle History</h3>
@@ -773,6 +937,135 @@ function payUnpaidRaffle(raffleId, amountSats) {
         }
     })
     .catch(function(err) { alert('Error: ' + err.message); });
+}
+
+function emailPanel(pw, userList) {
+    return {
+        allEmails: userList || [],
+        selectedEmails: [],
+        customEmails: '',
+        recipientMode: 'all',
+        emailSubject: '',
+        emailText: '',
+        emailHtml: '',
+        bodyMode: 'simple',
+        emailSending: false,
+        emailMsg: '',
+        emailOk: true,
+        previewHtml: '',
+
+        getCustomEmailCount() {
+            return this.customEmails.split(/[,\\n]+/).map(function(e) { return e.trim(); }).filter(function(e) { return e.includes('@'); }).length;
+        },
+
+        getRecipients() {
+            if (this.recipientMode === 'all') return 'all';
+            if (this.recipientMode === 'select') return this.selectedEmails;
+            return this.customEmails.split(/[,\\n]+/).map(function(e) { return e.trim(); }).filter(function(e) { return e.includes('@'); });
+        },
+
+        loadTemplate(name) {
+            var templates = <%- typeof emailTemplates !== 'undefined' && emailTemplates ? emailTemplates : '{}' %>;
+            if (templates[name]) {
+                this.emailSubject = templates[name].subject;
+                this.emailHtml = templates[name].html;
+            }
+        },
+
+        async previewEmail() {
+            var html = this.bodyMode === 'simple'
+                ? '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;white-space:pre-wrap">' + this.emailText.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>'
+                : this.emailHtml;
+            this.previewHtml = html;
+        },
+
+        async sendEmail() {
+            var recipients = this.getRecipients();
+            var subject = this.emailSubject.trim();
+            if (!subject) { this.emailOk = false; this.emailMsg = 'Subject is required'; return; }
+
+            var body = this.bodyMode === 'simple' ? this.emailText.trim() : this.emailHtml.trim();
+            if (!body) { this.emailOk = false; this.emailMsg = 'Message body is required'; return; }
+
+            var recipientCount = recipients === 'all' ? this.allEmails.length : recipients.length;
+            if (recipientCount === 0) { this.emailOk = false; this.emailMsg = 'No recipients selected'; return; }
+
+            if (!confirm('Send email "' + subject + '" to ' + recipientCount + ' recipient(s)?')) return;
+
+            this.emailSending = true;
+            this.emailMsg = '';
+
+            try {
+                var payload = { to: recipients, subject: subject };
+                if (this.bodyMode === 'simple') {
+                    payload.text = this.emailText;
+                    payload.html = '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;white-space:pre-wrap">' + this.emailText.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>';
+                } else {
+                    payload.html = this.emailHtml;
+                }
+
+                var resp = await fetch('/api/admin/email/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Admin-Password': pw },
+                    body: JSON.stringify(payload)
+                });
+                var data = await resp.json();
+                if (data.success) {
+                    this.emailOk = true;
+                    this.emailMsg = '✅ ' + data.message;
+                    if (data.results && data.results.failed > 0) {
+                        this.emailMsg += ' (' + data.results.failed + ' failed)';
+                    }
+                } else {
+                    this.emailOk = false;
+                    this.emailMsg = '❌ ' + (data.error || 'Send failed');
+                }
+            } catch(e) {
+                this.emailOk = false;
+                this.emailMsg = '❌ Error: ' + e.message;
+            }
+            this.emailSending = false;
+        }
+    };
+}
+
+function templatesPanel(pw) {
+    return {
+        templates: [],
+        loading: true,
+        init() {
+            fetch('/api/admin/templates', { headers: { 'X-Admin-Password': pw } })
+                .then(r => r.json())
+                .then(d => { if (d.success) this.templates = d.templates; this.loading = false; })
+                .catch(() => { this.loading = false; });
+        },
+        async saveTemplate(name, subject, body, type) {
+            try {
+                const r = await fetch('/api/admin/templates/' + name, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'X-Admin-Password': pw },
+                    body: JSON.stringify({ subject: subject || null, body, type })
+                });
+                const d = await r.json();
+                return d.success;
+            } catch(e) { return false; }
+        },
+        async resetTemplate(name) {
+            try {
+                const r = await fetch('/api/admin/templates/' + name + '/reset', {
+                    method: 'POST',
+                    headers: { 'X-Admin-Password': pw }
+                });
+                const d = await r.json();
+                if (d.success) {
+                    const r2 = await fetch('/api/admin/templates/' + name, { headers: { 'X-Admin-Password': pw } });
+                    const d2 = await r2.json();
+                    return d2.success ? d2.template : null;
+                }
+                return null;
+            } catch(e) { return null; }
+        }
+    };
 }
 
 function markUnpaidRafflePaid(raffleId) {

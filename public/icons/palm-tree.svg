@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Trunk -->
+  <path d="M32 58 C32 58 30 42 28 34 C26 28 28 24 30 22" stroke="#e8850f" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <!-- Fronds - left -->
+  <path d="M30 22 C24 16 14 14 8 16" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+  <path d="M30 22 C26 14 18 10 10 10" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+  <path d="M30 22 C28 12 30 6 34 4" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+  <!-- Fronds - right -->
+  <path d="M30 22 C34 16 42 12 50 12" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+  <path d="M30 22 C36 18 46 18 54 20" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+  <!-- Coconuts -->
+  <circle cx="28" cy="24" r="2.5" fill="#e8850f"/>
+  <circle cx="33" cy="23" r="2.5" fill="#e8850f"/>
+  <!-- Ground -->
+  <path d="M20 58 C24 56 28 56 32 58 C36 56 40 56 44 58" stroke="#22c55e" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+</svg>

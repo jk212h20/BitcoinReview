@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Bitcoin circle -->
+  <circle cx="32" cy="32" r="26" fill="#FFF3E0" stroke="#f7931a" stroke-width="2.5"/>
+  <!-- Palm tree trunk - curved -->
+  <path d="M26 48 C26 40 24 34 22 28" stroke="#e8850f" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Palm fronds -->
+  <path d="M22 28 C18 22 12 20 8 21" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M22 28 C20 21 22 15 26 12" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M22 28 C26 23 32 22 36 24" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Bitcoin ₿ symbol as paths (no text element) -->
+  <!-- Vertical bars -->
+  <line x1="40" y1="30" x2="40" y2="52" stroke="#f7931a" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="44" y1="30" x2="44" y2="52" stroke="#f7931a" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Top bump -->
+  <path d="M36 34 L40 34 L44 34 C48 34 48 40 44 40 L40 40 L36 40" stroke="#f7931a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Bottom bump -->
+  <path d="M36 40 L40 40 L44 40 C49 40 49 47 44 47 L40 47 L36 47" stroke="#f7931a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

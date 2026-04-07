@@ -36,6 +36,7 @@
 - **✅ Admin unpaid-raffle banner** - Yellow alert with ⚡ Pay button when payment is pending
 - **✅ Donation address on all pages** - Every page footer shows Voltage node on-chain address with clickable mempool.space link, QR code on hover, and copy button
 - **✅ LNURL-withdraw claim-based prizes** - Winners get email with claim link → scan QR with ANY Lightning wallet → sats pulled from LND node. No Lightning address needed upfront. Works with Phoenix, WoS, Muun, Breez, Zeus, BlueWallet, etc.
+- **✅ DB-backed template system** - 12 templates (5 email, 7 Telegram) stored in `message_templates` table, seeded from `templates/` on disk at startup. Admin can edit/reset templates via 📝 Templates tab. All email and Telegram notifications use DB templates with inline fallbacks.
 
 ## What's Left to Build
 - [x] Node.js project setup (package.json, dependencies)
