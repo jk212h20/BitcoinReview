@@ -1,0 +1,77 @@
+name: 🐛 Bug Report
+description: Something isn't working right
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: page
+    attributes:
+      label: Which page?
+      options:
+        - Homepage
+        - Submit Review
+        - Reviews
+        - Raffles
+        - Merchants
+        - How It Works
+        - Claim Prize
+        - Admin Panel
+        - Other (describe below)
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the bug clearly. What did you see?
+      placeholder: "When I click the submit button, nothing happens and..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should have happened?
+      placeholder: "The review should have been submitted and I should see a confirmation..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: device
+    attributes:
+      label: Device
+      options:
+        - Phone (iOS)
+        - Phone (Android)
+        - Desktop/Laptop
+        - Tablet
+    validations:
+      required: true
+
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Browser
+      options:
+        - Safari
+        - Chrome
+        - Firefox
+        - Other
+    validations:
+      required: false
+
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot
+      description: Drag and drop a screenshot if you have one. Very helpful!
+    validations:
+      required: false
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Any other context, error messages, or details
+    validations:
+      required: false

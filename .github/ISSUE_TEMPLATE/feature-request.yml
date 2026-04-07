@@ -1,0 +1,58 @@
+name: ✨ Feature Request
+description: Suggest a new feature or improvement
+labels: ["feature"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What do you want?
+      description: Describe the feature clearly. What should it do?
+      placeholder: "I'd like a way to..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why?
+      description: Why would this be useful? What problem does it solve?
+      placeholder: "Right now users have to... but it would be better if..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area of the site
+      options:
+        - Homepage
+        - Submit flow
+        - Reviews page
+        - Raffles / prizes
+        - Merchants page
+        - Admin panel
+        - Emails / notifications
+        - New page / section
+        - Backend / API
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: design-ideas
+    attributes:
+      label: Design ideas (optional)
+      description: Any mockups, sketches, or references? Drag and drop images here.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: How important is this?
+      options:
+        - Nice to have
+        - Should have soon
+        - Urgent / blocking something
+    validations:
+      required: false

@@ -1,0 +1,58 @@
+name: 🎨 Design / UI Tweak
+description: Visual or layout change — colors, spacing, sizing, mobile issues
+labels: ["design"]
+body:
+  - type: dropdown
+    id: page
+    attributes:
+      label: Which page?
+      options:
+        - Homepage
+        - Submit Review
+        - Reviews
+        - Raffles
+        - Merchants
+        - How It Works
+        - Claim Prize
+        - Admin Panel
+        - All pages / layout
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-to-change
+    attributes:
+      label: What should change?
+      description: Be specific — which element, what's wrong with it, what should it look like?
+      placeholder: "The raffle card on mobile is too wide and overflows the screen..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot of the problem
+      description: Drag and drop a screenshot showing what you see now. Circle or annotate the issue if you can.
+    validations:
+      required: false
+
+  - type: textarea
+    id: reference
+    attributes:
+      label: Reference / inspiration (optional)
+      description: Link or screenshot of how you'd like it to look. A rough sketch works too.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: device
+    attributes:
+      label: Seen on which device?
+      options:
+        - Phone
+        - Desktop/Laptop
+        - Tablet
+        - All devices
+    validations:
+      required: true

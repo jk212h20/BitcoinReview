@@ -1,0 +1,47 @@
+name: 📝 Content Change
+description: Update text, copy, or information on the site
+labels: ["content"]
+body:
+  - type: dropdown
+    id: page
+    attributes:
+      label: Which page?
+      options:
+        - Homepage
+        - Submit Review
+        - Reviews
+        - Raffles
+        - Merchants
+        - How It Works
+        - Claim Prize
+        - Email templates
+        - Multiple pages
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: current-text
+    attributes:
+      label: Current text
+      description: Copy-paste or describe the text that needs changing
+      placeholder: "The homepage currently says..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: new-text
+    attributes:
+      label: What it should say
+      description: Write the new text, or describe the change you want
+      placeholder: "Change it to say..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Why the change?
+      description: Any context on why this needs updating
+    validations:
+      required: false
