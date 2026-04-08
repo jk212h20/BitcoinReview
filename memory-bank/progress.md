@@ -81,6 +81,17 @@
 
 ## Session Log
 
+### Session 33 (2026-04-08)
+- **Multi-location architecture** (replaces clonable branch approach):
+  - `locations.config.js` — location registry with BTCMap bounding boxes (Roatan default + Austin)
+  - `src/routes/location.js` — full mini-site routes: `/:slug`, `/:slug/submit`, `/:slug/merchants`, `/:slug/reviews`, `/:slug/raffles`, `/:slug/how-it-works`
+  - `src/services/btcmap.js` — `getMerchantsForAreas(areas)` fetches merchants by bounding box
+  - `src/services/database.js` — `location_slug` column on tickets, location-filtered queries
+  - `src/views/layout.ejs` — location-aware nav, communities dropdown, location footer
+  - `src/views/submit.ejs` — passes `locationSlug` to API
+  - One raffle, one DB — locations are filtered views, not separate instances
+  - Commit: `24aa7c2`, deployed to Railway
+
 ### Session 32 (2026-04-07)
 - **GitHub Issues system for partner collaboration:**
   - 4 issue templates: bug-report, feature-request, content-change, design-tweak (`.github/ISSUE_TEMPLATE/`)

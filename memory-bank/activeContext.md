@@ -1,29 +1,30 @@
 # Active Context
 
-## Current Focus (Updated 2026-04-07)
+## Current Focus (Updated 2026-04-08)
 
-### Session 32: GitHub Issues System + Clonable Branch
+### Session 33: Multi-Location Architecture (replaces clonable approach)
 
-**GitHub Issues for Partner Collaboration:**
-- Created `.github/ISSUE_TEMPLATE/` with 4 structured templates: bug-report.yml, feature-request.yml, content-change.yml, design-tweak.yml
-- `.github/ISSUE_TEMPLATE/config.yml` disables blank issues
-- `issue-to-cline.sh` script converts GitHub issues to Cline dispatch tasks via `gh` CLI
-- Partner can file issues on GitHub → you run `./issue-to-cline.sh <issue-number>` → Cline sub-agent works on it
-- Committed on main: `f6c6f8f`
+**Decision:** Instead of cloning the whole site for each city, we now run all locations under one deployment with URL-based sub-sites (`/austin`, `/roatan`). One raffle, one DB, one LND node — locations are just filtered views. The `clonable` branch is now deprecated.
 
-**Clonable Branch (`clonable`):**
-- Branch pushed to GitHub: `origin/clonable` (3 commits ahead of main)
-- `site.config.js` created — single file with ALL location/branding strings (siteName, regionName, locations, merchantAreas with BTCMap bounding boxes, timezone, page text, etc.)
-- 17 files updated to reference `siteConfig` instead of hardcoded strings:
-  - Services: btcmap.js, telegram.js, email.js
-  - Routes: pages.js, admin.js, api.js
-  - Server: index.js (injects `siteConfig` into all views via `res.locals`)
-  - EJS templates: layout, index, submit, merchants, reviews, how-it-works, claim, opt-out
-  - README.md: "Deploy Your Own" section added
-- Config verified: `node -e "require('./site.config')"` passes
-- grep for hardcoded "Roatan"/"Bay Islands"/"Bitcoin Review Raffle" in EJS templates returns zero matches
-- Commit: `320706f Make site clonable: extract location/branding to site.config.js`
-- **Status: NOT merged to main yet** — needs review + testing before merge
+**What was built:**
+- `locations.config.js` — Location registry with BTCMap bounding boxes. Roatan (default, serves at `/`) + Austin. To add a city: add entry here + deploy.
+- `src/routes/location.js` — Full mini-site route handler: `/:slug`, `/:slug/submit`, `/:slug/merchants`, `/:slug/reviews`, `/:slug/raffles`, `/:slug/how-it-works`
+- `src/services/btcmap.js` — New `getMerchantsForAreas(areas)` fetches merchants by bounding box rectangles. Supports multiple areas per location (Roatan + Utila).
+- `src/services/database.js` — `location_slug` column on tickets, `getApprovedPublicTicketsByLocation()`, `getMostRecentlyReviewedMerchantByLocation()`
+- `src/index.js` — Mounts location routes before page routes, injects default location into `res.locals`
+- `src/routes/api.js` — Accepts `locationSlug` in submit payload, passes to `createTicket()`
+- `src/views/layout.ejs` — Location-aware nav links (`locBase` prefix), AlpineJS communities dropdown, footer shows location description + communities list
+- `src/views/submit.ejs` — `locationSlug` in Alpine data + fetch body
+- Commit: `24aa7c2`, deployed to Railway
+
+**How it works:**
+- `/` → Roatan (default, `isDefault: true`)
+- `/austin` → Austin sub-site with Austin-specific merchants, reviews, nav links
+- `/austin/submit` → Submit form pre-tagged with `locationSlug: 'austin'`
+- All reviews enter the same global raffle pool
+- Nav shows communities dropdown when >1 location exists
+
+### Previous: Session 32: GitHub Issues System
 
 ### Previous: Session 27: Utila Merchants Added
 - Merchants page now shows Bitcoin-accepting businesses from **both Roatan and Utila**
