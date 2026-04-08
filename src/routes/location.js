@@ -30,6 +30,9 @@ for (const loc of locations) {
 router.locationMap = locationMap;
 router.locations = locations;
 
+// Debug: log available locations on startup
+console.log('📍 Location routes loaded:', Object.keys(locationMap).join(', '));
+
 /**
  * Middleware: resolve location from :slug param
  * Attaches `req.location` if valid, 404s otherwise
@@ -38,7 +41,7 @@ function resolveLocation(req, res, next) {
     const slug = req.params.slug;
     const location = locationMap[slug];
     if (!location) {
-        return next(); // Fall through to 404
+        return next('route'); // Skip this route entirely — fall through to pageRoutes/404
     }
     req.location = location;
     res.locals.location = location;
