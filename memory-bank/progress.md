@@ -90,7 +90,9 @@
   - `src/views/layout.ejs` — location-aware nav, communities dropdown, location footer
   - `src/views/submit.ejs` — passes `locationSlug` to API
   - One raffle, one DB — locations are filtered views, not separate instances
-  - Commit: `24aa7c2`, deployed to Railway
+  - Fixed `resolveLocation` middleware: `next('route')` instead of `next()` for non-matching slugs
+  - Commits: `24aa7c2` (architecture), `fba0864` (route fix)
+  - **Deployed and verified** — all location routes return 200: `/austin`, `/austin/submit`, `/austin/merchants`, `/austin/reviews`
 
 ### Session 32 (2026-04-07)
 - **GitHub Issues system for partner collaboration:**

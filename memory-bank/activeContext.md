@@ -15,7 +15,8 @@
 - `src/routes/api.js` — Accepts `locationSlug` in submit payload, passes to `createTicket()`
 - `src/views/layout.ejs` — Location-aware nav links (`locBase` prefix), AlpineJS communities dropdown, footer shows location description + communities list
 - `src/views/submit.ejs` — `locationSlug` in Alpine data + fetch body
-- Commit: `24aa7c2`, deployed to Railway
+- Commits: `24aa7c2` (architecture), `fba0864` (fix `next('route')` in resolveLocation)
+- **Deployed and verified** on Railway — all location routes return 200
 
 **How it works:**
 - `/` → Roatan (default, `isDefault: true`)
