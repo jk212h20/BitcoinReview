@@ -216,33 +216,50 @@ function isValidBitcoinMerchant(merchant) {
 }
 
 /**
- * Get formatted merchant list for display (Roatan + Utila)
- * Filters out merchants without confirmed payment methods or with stale data (>2 years)
- * Each merchant is tagged with its island location
+ * Get formatted merchant list for a set of merchant areas.
+ * Generic — works for any location's merchantAreas config.
+ * Filters out merchants without confirmed payment methods or with stale data (>2 years).
+ * Each merchant is tagged with its area name.
+ *
+ * @param {Array} merchantAreas - Array of { name, bounds } objects from locations.config.js
+ *                                If not provided, falls back to default Roatan + Utila
  */
-async function getMerchantList() {
-    const [roatanRaw, utilaRaw] = await Promise.all([
-        getRoatanMerchants(),
-        getUtilaMerchants()
-    ]);
+async function getMerchantsForAreas(merchantAreas) {
+    // Fallback for backwards compatibility (existing callers with no args)
+    if (!merchantAreas) {
+        merchantAreas = [
+            { name: 'Roatan', bounds: { minLat: 16.21599324835452, maxLat: 16.509832826905846, minLon: -86.6374969482422, maxLon: -86.22825622558594 } },
+            { name: 'Utila', bounds: { minLat: 16.06, maxLat: 16.13, minLon: -86.97, maxLon: -86.85 } }
+        ];
+    }
+
+    // Fetch all areas in parallel
+    const rawResults = await Promise.all(
+        merchantAreas.map(area => fetchMerchants({ bounds: area.bounds }).then(raw => ({ name: area.name, raw })))
+    );
 
     // Deduplicate by element ID (in case bounding boxes overlap)
     const seen = new Set();
-    const roatanValid = roatanRaw.filter(isValidBitcoinMerchant).filter(m => {
-        if (seen.has(m.id)) return false;
-        seen.add(m.id);
-        return true;
-    });
-    const utilaValid = utilaRaw.filter(isValidBitcoinMerchant).filter(m => {
-        if (seen.has(m.id)) return false;
-        seen.add(m.id);
-        return true;
-    });
+    const allMerchants = [];
 
-    const roatanFormatted = roatanValid.map(m => formatMerchant(m, 'Roatan'));
-    const utilaFormatted = utilaValid.map(m => formatMerchant(m, 'Utila'));
+    for (const { name, raw } of rawResults) {
+        const valid = raw.filter(isValidBitcoinMerchant).filter(m => {
+            if (seen.has(m.id)) return false;
+            seen.add(m.id);
+            return true;
+        });
+        allMerchants.push(...valid.map(m => formatMerchant(m, name)));
+    }
 
-    return [...roatanFormatted, ...utilaFormatted];
+    return allMerchants;
+}
+
+/**
+ * Get formatted merchant list for display (Roatan + Utila) — backwards compatible
+ * @deprecated Use getMerchantsForAreas() with location config instead
+ */
+async function getMerchantList() {
+    return getMerchantsForAreas(null);
 }
 
 /**
@@ -284,6 +301,7 @@ module.exports = {
     getUtilaMerchants,
     getHondurasMerchants,
     getMerchantList,
+    getMerchantsForAreas,
     searchMerchants,
     formatMerchant
 };

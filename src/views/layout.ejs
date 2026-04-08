@@ -6,12 +6,13 @@
     <title><%= title %></title>
     <link href="/styles.css" rel="stylesheet">
     <!-- Prefetch main pages for instant navigation -->
-    <link rel="prefetch" href="/">
-    <link rel="prefetch" href="/submit">
-    <link rel="prefetch" href="/reviews">
-    <link rel="prefetch" href="/raffles">
-    <link rel="prefetch" href="/merchants">
-    <link rel="prefetch" href="/how-it-works">
+    <% const locBase = (typeof location !== 'undefined' && location && !location.isDefault) ? '/' + location.slug : ''; %>
+    <link rel="prefetch" href="<%= locBase %>/">
+    <link rel="prefetch" href="<%= locBase %>/submit">
+    <link rel="prefetch" href="<%= locBase %>/reviews">
+    <link rel="prefetch" href="<%= locBase %>/raffles">
+    <link rel="prefetch" href="<%= locBase %>/merchants">
+    <link rel="prefetch" href="<%= locBase %>/how-it-works">
     <!-- Preconnect to external domains used on page -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
@@ -27,12 +28,27 @@
                     <span class="font-bold text-xl">Bitcoin Review Raffle</span>
                 </a>
                 <div class="hidden md:flex items-center space-x-6">
-                    <a href="/" class="text-gray-600 hover:text-bitcoin">Home</a>
-                    <a href="/submit" class="text-gray-600 hover:text-bitcoin">Submit Review</a>
-                    <a href="/reviews" class="text-gray-600 hover:text-bitcoin">Reviews</a>
-                    <a href="/raffles" class="text-gray-600 hover:text-bitcoin">Raffles</a>
-                    <a href="/merchants" class="text-gray-600 hover:text-bitcoin">Merchants</a>
-                    <a href="/how-it-works" class="text-gray-600 hover:text-bitcoin">How It Works</a>
+                    <a href="<%= locBase %>/" class="text-gray-600 hover:text-bitcoin">Home</a>
+                    <a href="<%= locBase %>/submit" class="text-gray-600 hover:text-bitcoin">Submit Review</a>
+                    <a href="<%= locBase %>/reviews" class="text-gray-600 hover:text-bitcoin">Reviews</a>
+                    <a href="<%= locBase %>/raffles" class="text-gray-600 hover:text-bitcoin">Raffles</a>
+                    <a href="<%= locBase %>/merchants" class="text-gray-600 hover:text-bitcoin">Merchants</a>
+                    <a href="<%= locBase %>/how-it-works" class="text-gray-600 hover:text-bitcoin">How It Works</a>
+                    <% if (typeof allLocations !== 'undefined' && allLocations && allLocations.length > 1) { %>
+                    <div class="relative" x-data="{ open: false }">
+                        <button @click="open = !open" class="text-gray-600 hover:text-bitcoin flex items-center gap-1">
+                            <span><%= (typeof location !== 'undefined' && location) ? location.emoji + ' ' + location.name : '📍' %></span>
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </button>
+                        <div x-show="open" @click.away="open = false" x-transition class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border z-50">
+                            <% allLocations.forEach(function(loc) { %>
+                            <a href="/<%= loc.slug %>" class="block px-4 py-2 text-gray-700 hover:bg-orange-50 hover:text-bitcoin <%= (typeof location !== 'undefined' && location && location.slug === loc.slug) ? 'font-bold bg-orange-50' : '' %>">
+                                <%= loc.emoji %> <%= loc.name %>
+                            </a>
+                            <% }); %>
+                        </div>
+                    </div>
+                    <% } %>
                     <a href="/#donate" id="raffle-fund-badge" class="hidden items-center gap-1.5 bg-gradient-to-r from-orange-500 to-yellow-500 text-white px-3 py-1.5 rounded-full text-sm font-bold shadow-sm hover:shadow-md transition-all" title="Next raffle prize">
                         <span>⚡</span>
                         <span>Next Prize:</span>
@@ -50,12 +66,22 @@
             </div>
             <!-- Mobile menu -->
             <div id="mobile-menu" class="hidden md:hidden mt-4 space-y-2">
-                <a href="/" class="block py-2 text-gray-600 hover:text-bitcoin">Home</a>
-                <a href="/submit" class="block py-2 text-gray-600 hover:text-bitcoin">Submit Review</a>
-                <a href="/reviews" class="block py-2 text-gray-600 hover:text-bitcoin">Reviews</a>
-                <a href="/raffles" class="block py-2 text-gray-600 hover:text-bitcoin">Raffles</a>
-                <a href="/merchants" class="block py-2 text-gray-600 hover:text-bitcoin">Merchants</a>
-                <a href="/how-it-works" class="block py-2 text-gray-600 hover:text-bitcoin">How It Works</a>
+                <a href="<%= locBase %>/" class="block py-2 text-gray-600 hover:text-bitcoin">Home</a>
+                <a href="<%= locBase %>/submit" class="block py-2 text-gray-600 hover:text-bitcoin">Submit Review</a>
+                <a href="<%= locBase %>/reviews" class="block py-2 text-gray-600 hover:text-bitcoin">Reviews</a>
+                <a href="<%= locBase %>/raffles" class="block py-2 text-gray-600 hover:text-bitcoin">Raffles</a>
+                <a href="<%= locBase %>/merchants" class="block py-2 text-gray-600 hover:text-bitcoin">Merchants</a>
+                <a href="<%= locBase %>/how-it-works" class="block py-2 text-gray-600 hover:text-bitcoin">How It Works</a>
+                <% if (typeof allLocations !== 'undefined' && allLocations && allLocations.length > 1) { %>
+                <div class="border-t border-gray-200 pt-2 mt-2">
+                    <span class="text-xs text-gray-400 uppercase tracking-wide">Communities</span>
+                    <% allLocations.forEach(function(loc) { %>
+                    <a href="/<%= loc.slug %>" class="block py-1 text-gray-600 hover:text-bitcoin pl-2 <%= (typeof location !== 'undefined' && location && location.slug === loc.slug) ? 'font-bold text-bitcoin' : '' %>">
+                        <%= loc.emoji %> <%= loc.name %>
+                    </a>
+                    <% }); %>
+                </div>
+                <% } %>
                 <a href="/#donate" id="raffle-fund-badge-mobile" class="hidden py-2 text-bitcoin font-bold">
                     ⚡ Next Prize: <span id="raffle-fund-amount-mobile">0</span> sats
                 </a>
@@ -74,14 +100,24 @@
             <div class="grid md:grid-cols-3 gap-8">
                 <div>
                     <h3 class="font-bold text-lg mb-4">Bitcoin Review Raffle</h3>
-                    <p class="text-gray-400">Incentivizing Bitcoin adoption in Roatan through community reviews.</p>
+                    <p class="text-gray-400"><%= (typeof location !== 'undefined' && location) ? location.description : 'Incentivizing Bitcoin adoption through community reviews.' %></p>
+                    <% if (typeof allLocations !== 'undefined' && allLocations && allLocations.length > 1) { %>
+                    <div class="mt-4">
+                        <h4 class="text-sm font-semibold text-gray-300 mb-2">Communities</h4>
+                        <div class="flex flex-wrap gap-2">
+                            <% allLocations.forEach(function(loc) { %>
+                            <a href="/<%= loc.slug %>" class="text-gray-400 hover:text-white text-sm"><%= loc.emoji %> <%= loc.name %></a>
+                            <% }); %>
+                        </div>
+                    </div>
+                    <% } %>
                 </div>
                 <div>
                     <h3 class="font-bold text-lg mb-4">Quick Links</h3>
                     <ul class="space-y-2 text-gray-400">
-                        <li><a href="/submit" class="hover:text-white">Submit a Review</a></li>
-                        <li><a href="/merchants" class="hover:text-white">Find Merchants</a></li>
-                        <li><a href="/how-it-works" class="hover:text-white">How It Works</a></li>
+                        <li><a href="<%= locBase %>/submit" class="hover:text-white">Submit a Review</a></li>
+                        <li><a href="<%= locBase %>/merchants" class="hover:text-white">Find Merchants</a></li>
+                        <li><a href="<%= locBase %>/how-it-works" class="hover:text-white">How It Works</a></li>
                     </ul>
                 </div>
                 <div>
@@ -93,7 +129,7 @@
                 </div>
             </div>
             <div class="border-t border-gray-700 mt-8 pt-8 text-center text-gray-400">
-                <p>🌴 Made with ⚡ in Roatan</p>
+                <p><%= (typeof location !== 'undefined' && location && location.footerMadeIn) ? location.footerMadeIn : '🌴 Made with ⚡ in Roatan' %></p>
             </div>
         </div>
     </footer>

@@ -21,7 +21,7 @@ const telegram = require('../services/telegram');
  */
 router.post('/submit', async (req, res) => {
     try {
-        const { email: userEmail, lnurl, reviewLink, reviewText, triedBitcoin, merchantAccepted } = req.body;
+        const { email: userEmail, lnurl, reviewLink, reviewText, triedBitcoin, merchantAccepted, locationSlug } = req.body;
         
         const hasEmail = userEmail && userEmail.trim().length > 0;
         const hasLnurl = lnurl && lnurl.trim().length > 0;
@@ -178,6 +178,7 @@ router.post('/submit', async (req, res) => {
             const cleanReviewText = (reviewText && reviewText.trim().length > 0) ? reviewText.trim() : null;
             
             const cleanMerchantName = (req.body.merchantName && req.body.merchantName.trim()) ? req.body.merchantName.trim() : null;
+            const cleanLocationSlug = (locationSlug && locationSlug.trim()) ? locationSlug.trim() : null;
             const ticket = db.createTicket(
                 user ? user.id : null,
                 cleanReview,
@@ -185,7 +186,8 @@ router.post('/submit', async (req, res) => {
                 cleanMerchantName,
                 raffleBlock,
                 !!triedBitcoin,
-                !!merchantAccepted
+                !!merchantAccepted,
+                cleanLocationSlug
             );
             
             // Check review_mode setting to determine validation behavior

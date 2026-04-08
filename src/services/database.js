@@ -134,6 +134,12 @@ async function initializeDatabase() {
         console.log('✅ Added telegram_chat_id column to users');
     } catch (e) { /* already exists */ }
 
+    // Add location_slug column to tickets (multi-location support)
+    try {
+        db.run(`ALTER TABLE tickets ADD COLUMN location_slug TEXT`);
+        console.log('✅ Added location_slug column to tickets');
+    } catch (e) { /* already exists */ }
+
     // LNURL-withdraw claim columns on raffles table (migration for existing DBs)
     try {
         db.run(`ALTER TABLE raffles ADD COLUMN claim_token TEXT`);
@@ -344,10 +350,10 @@ function getUserTelegramStatus(email) {
 }
 
 // Ticket functions
-function createTicket(userId, reviewLink, reviewText, merchantName, raffleBlock, triedBitcoin, merchantAccepted) {
+function createTicket(userId, reviewLink, reviewText, merchantName, raffleBlock, triedBitcoin, merchantAccepted, locationSlug) {
     const id = run(
-        `INSERT INTO tickets (user_id, review_link, review_text, merchant_name, raffle_block, tried_bitcoin, merchant_accepted) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [userId, reviewLink, reviewText, merchantName, raffleBlock, triedBitcoin ? 1 : 0, merchantAccepted ? 1 : 0]
+        `INSERT INTO tickets (user_id, review_link, review_text, merchant_name, raffle_block, tried_bitcoin, merchant_accepted, location_slug) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [userId, reviewLink, reviewText, merchantName, raffleBlock, triedBitcoin ? 1 : 0, merchantAccepted ? 1 : 0, locationSlug || null]
     );
     return { id };
 }
@@ -618,6 +624,42 @@ function getExpiredUnclaimedRaffles() {
     `);
 }
 
+// Location-filtered ticket queries
+/**
+ * Get approved tickets filtered by location slug.
+ * If locationSlug is null, returns all approved tickets (backwards compatible).
+ */
+function getApprovedPublicTicketsByLocation(locationSlug) {
+    if (!locationSlug) return getApprovedPublicTickets();
+    return query(`
+        SELECT t.id, t.review_link, t.review_text, t.merchant_name, t.is_valid, t.validation_reason, t.submitted_at,
+               COALESCE(t.is_featured, 0) as is_featured,
+               COALESCE(t.tried_bitcoin, 0) as tried_bitcoin,
+               COALESCE(t.merchant_accepted, 0) as merchant_accepted,
+               t.location_slug
+        FROM tickets t
+        WHERE t.is_valid = 1 AND t.location_slug = ?
+        ORDER BY COALESCE(t.is_featured, 0) DESC, t.submitted_at DESC
+    `, [locationSlug]);
+}
+
+/**
+ * Get the most recently reviewed merchant for a specific location.
+ */
+function getMostRecentlyReviewedMerchantByLocation(locationSlug) {
+    if (!locationSlug) return getMostRecentlyReviewedMerchant();
+    return queryOne(`
+        SELECT merchant_name, review_link, submitted_at
+        FROM tickets
+        WHERE is_valid = 1
+          AND merchant_name IS NOT NULL
+          AND merchant_name != ''
+          AND location_slug = ?
+        ORDER BY submitted_at DESC
+        LIMIT 1
+    `, [locationSlug]);
+}
+
 // Settings functions
 function getSetting(key) {
     const row = queryOne(`SELECT value FROM settings WHERE key = ?`, [key]);
@@ -662,6 +704,7 @@ module.exports = {
     getAllTickets,
     getPublicTickets,
     getApprovedPublicTickets,
+    getApprovedPublicTicketsByLocation,
     featureTicket,
     getPendingTickets,
     getUnvalidatedTickets,
@@ -677,6 +720,7 @@ module.exports = {
     getAllRaffles,
     deleteRaffle,
     getMostRecentlyReviewedMerchant,
+    getMostRecentlyReviewedMerchantByLocation,
     getLatestRaffle,
     
     // Claim functions (LNURL-withdraw)

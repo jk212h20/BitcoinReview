@@ -23,6 +23,8 @@ const telegram = require('./services/telegram');
 const apiRoutes = require('./routes/api');
 const adminRoutes = require('./routes/admin');
 const pageRoutes = require('./routes/pages');
+const locationRoutes = require('./routes/location');
+const locations = require('../locations.config');
 
 // Initialize Express app
 const app = express();
@@ -60,10 +62,19 @@ const registrationLimiter = rateLimit({
 app.use('/api', apiLimiter);
 app.use('/api/register', registrationLimiter);
 
+// Inject default location + allLocations into res.locals for all page renders
+const defaultLocation = locations.find(l => l.isDefault) || locations[0];
+app.use((req, res, next) => {
+    res.locals.location = res.locals.location || defaultLocation;
+    res.locals.allLocations = locations;
+    next();
+});
+
 // Routes
 app.use('/api', apiRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/', pageRoutes);
+app.use('/', locationRoutes);  // /:slug/* location mini-sites (before pageRoutes)
+app.use('/', pageRoutes);      // / root pages (default location)
 
 // Telegram webhook — handles bot messages and invite link flow
 app.post('/telegram/webhook', express.json(), async (req, res) => {

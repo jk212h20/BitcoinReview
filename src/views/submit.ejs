@@ -393,6 +393,7 @@ var timeEst = typeof raffleInfo !== 'undefined' && raffleInfo && raffleInfo.bloc
             reviewLink: '',
             reviewText: '',
             merchantName: '',
+            locationSlug: '<%= (typeof location !== "undefined" && location) ? location.slug : "" %>',
             triedBitcoin: '',
             merchantAccepted: '',
             email: localStorage.getItem('br_email') || '',
@@ -506,7 +507,8 @@ var timeEst = typeof raffleInfo !== 'undefined' && raffleInfo && raffleInfo.bloc
                             email: this.email.trim(),
                             lnurl: this.lnurl.trim(),
                             triedBitcoin: this.triedBitcoin === 'yes',
-                            merchantAccepted: this.merchantAccepted === 'yes'
+                            merchantAccepted: this.merchantAccepted === 'yes',
+                            locationSlug: this.locationSlug || null
                         })
                     });
                     const data = await response.json();
