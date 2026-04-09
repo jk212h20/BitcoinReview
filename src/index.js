@@ -24,7 +24,8 @@ const apiRoutes = require('./routes/api');
 const adminRoutes = require('./routes/admin');
 const pageRoutes = require('./routes/pages');
 const locationRoutes = require('./routes/location');
-const locations = require('../locations.config');
+const allLocationConfigs = require('../locations.config');
+const locations = allLocationConfigs.filter(loc => loc.enabled !== false);
 
 // Initialize Express app
 const app = express();

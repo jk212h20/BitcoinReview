@@ -46,6 +46,7 @@ module.exports = [
     {
         slug: 'austin',
         name: 'Austin',
+        enabled: false,  // Flip to true (or remove this line) to re-enable /austin
         region: 'Texas, USA',
         tagline: 'Keep Austin Bitcoin!',
         emoji: '🤠',

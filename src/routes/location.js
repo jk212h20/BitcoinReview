@@ -14,11 +14,14 @@ const express = require('express');
 const router = express.Router();
 const { bech32 } = require('bech32');
 
-const locations = require('../../locations.config');
+const allLocations = require('../../locations.config');
 const db = require('../services/database');
 const bitcoin = require('../services/bitcoin');
 const btcmap = require('../services/btcmap');
 const lightning = require('../services/lightning');
+
+// Filter to only enabled locations (enabled defaults to true if not specified)
+const locations = allLocations.filter(loc => loc.enabled !== false);
 
 // Build a lookup map: slug → location config
 const locationMap = {};
