@@ -462,10 +462,35 @@ router.post('/raffle/:id/pay', async (req, res) => {
             return res.status(400).json({ error: 'Winner has no Lightning Address' });
         }
         
-        const prizeSats = amountSats || raffle.prize_amount_sats || parseInt(process.env.DEFAULT_PRIZE_SATS) || 0;
-        if (prizeSats <= 0) {
-            return res.status(400).json({ error: 'No prize amount specified' });
+        // Prize amount resolution (NEVER fall back to DEFAULT_PRIZE_SATS — that env var
+        // was a leftover from testing and would cause the advertised prize promise to
+        // silently be replaced by a 100-sat dev value).
+        //
+        // Priority:
+        //   1. Explicit amountSats passed from the client (admin override)
+        //   2. raffle.prize_amount_sats — the value stamped at raffle commit time
+        //      (this IS the advertised prize that was shown when the raffle ran)
+        //   3. 50% of the CURRENT raffle fund — fallback only if the raffle was
+        //      committed with a null/0 prize (e.g. fund was empty at commit time).
+        let prizeSats = 0;
+        let prizeSource = '';
+        if (amountSats && parseInt(amountSats) > 0) {
+            prizeSats = parseInt(amountSats);
+            prizeSource = 'admin-override';
+        } else if (raffle.prize_amount_sats && raffle.prize_amount_sats > 0) {
+            prizeSats = raffle.prize_amount_sats;
+            prizeSource = 'stamped-at-commit';
+        } else {
+            const currentFund = parseInt(db.getSetting('raffle_fund_sats') || '0');
+            prizeSats = Math.floor(currentFund / 2);
+            prizeSource = 'current-half-fund';
         }
+        if (prizeSats <= 0) {
+            return res.status(400).json({
+                error: 'No prize amount available: raffle has no stamped prize and the raffle fund is empty. Donate to the fund or pass an explicit amountSats.'
+            });
+        }
+        console.log(`💰 Pay prize: ${prizeSats} sats (source: ${prizeSource}) for raffle #${id}`);
         
         // Pay via Lightning
         console.log(`⚡ Paying ${prizeSats} sats to ${raffle.lnurl_address} for raffle #${id}...`);

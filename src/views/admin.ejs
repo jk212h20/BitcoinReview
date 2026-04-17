@@ -115,7 +115,7 @@
                         '</div>' +
                     '</div>' +
                     '<div class="flex flex-col gap-2">' +
-                        (unpaid.lnurl_address ? '<button onclick="payUnpaidRaffle(' + unpaid.id + ', ' + (unpaid.prize_amount_sats || 0) + ')" class="bg-yellow-500 text-white px-6 py-3 rounded-lg font-bold hover:bg-yellow-600 transition whitespace-nowrap">⚡ Pay Winner Now</button>' : '') +
+                        (unpaid.lnurl_address ? '<button onclick="payUnpaidRaffle(' + unpaid.id + ', ' + (unpaid.prize_amount_sats || 0) + ')" class="bg-yellow-500 text-white px-6 py-3 rounded-lg font-bold hover:bg-yellow-600 transition whitespace-nowrap">⚡ Pay ' + (unpaid.prize_amount_sats ? unpaid.prize_amount_sats.toLocaleString() + ' sats' : 'Winner') + '</button>' : '') +
                         '<button onclick="markUnpaidRafflePaid(' + unpaid.id + ')" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-300 transition whitespace-nowrap">Mark as Paid Manually</button>' +
                     '</div>' +
                 '</div>' +
@@ -510,24 +510,38 @@ function adminDashboard() {
             this.raffleLoading = false;
         },
         
-        async payWinner(raffleId, amountSats) {
-            const amount = amountSats || prompt('Enter amount in sats:');
-            if (!amount) return;
-            if (!confirm('Pay ' + amount + ' sats via Lightning?')) return;
-            
+        async payWinner(raffleId, stampedAmountSats) {
+            // If the raffle has a stamped prize, pay exactly that (the advertised amount).
+            // Otherwise prompt the admin for an explicit amount. Never use a hardcoded fallback.
+            let body = {};
+            let confirmMsg;
+
+            if (stampedAmountSats && parseInt(stampedAmountSats) > 0) {
+                confirmMsg = 'Pay the advertised prize of ' + parseInt(stampedAmountSats).toLocaleString() + ' sats via Lightning?';
+            } else {
+                const manual = prompt('This raffle has no stamped prize amount. Enter amount in sats to pay:');
+                if (!manual) return;
+                const parsed = parseInt(manual);
+                if (!parsed || parsed <= 0) { alert('Invalid amount'); return; }
+                body.amountSats = parsed;
+                confirmMsg = 'Pay ' + parsed.toLocaleString() + ' sats via Lightning?';
+            }
+
+            if (!confirm(confirmMsg)) return;
+
             try {
                 const response = await fetch('/api/admin/raffle/' + raffleId + '/pay', {
                     method: 'POST',
-                    headers: { 
+                    headers: {
                         'Content-Type': 'application/json',
                         'X-Admin-Password': this.password
                     },
-                    body: JSON.stringify({ amountSats: parseInt(amount) })
+                    body: JSON.stringify(body)
                 });
-                
+
                 const data = await response.json();
                 if (data.success) {
-                    alert('Payment sent! Hash: ' + data.payment.paymentHash);
+                    alert('Payment sent! ' + (data.payment.amountSats || '?').toLocaleString() + ' sats\nHash: ' + data.payment.paymentHash);
                     location.reload();
                 } else {
                     alert('Payment failed: ' + data.error);
@@ -785,21 +799,44 @@ function settingsPanel(pw) {
 }
 
 // Global functions for the unpaid raffle alert buttons
-function payUnpaidRaffle(raffleId, amountSats) {
+//
+// Payment logic:
+//   - If the raffle has a stamped prize (set when the raffle was committed, = 50%
+//     of fund at that moment), pay exactly that amount. This is the "advertised"
+//     prize the winner was promised.
+//   - If the raffle has NO stamped prize (e.g. fund was empty at commit), ask the
+//     admin to confirm an amount manually.
+//   - The backend also computes/validates this; we never fall back to a hardcoded
+//     test value like 100 sats.
+function payUnpaidRaffle(raffleId, stampedAmountSats) {
     var pw = '${typeof password !== "undefined" ? password : ""}';
-    var amount = amountSats || prompt('Enter amount in sats:');
-    if (!amount) return;
-    if (!confirm('Pay ' + amount + ' sats via Lightning?')) return;
-    
+    var body = {};
+    var confirmMsg;
+
+    if (stampedAmountSats && parseInt(stampedAmountSats) > 0) {
+        // Use the advertised prize — don't override it
+        confirmMsg = 'Pay the advertised prize of ' + parseInt(stampedAmountSats).toLocaleString() + ' sats via Lightning?';
+    } else {
+        // No stamped prize — prompt for explicit amount
+        var manual = prompt('This raffle has no stamped prize amount. Enter amount in sats to pay:');
+        if (!manual) return;
+        var parsed = parseInt(manual);
+        if (!parsed || parsed <= 0) { alert('Invalid amount'); return; }
+        body.amountSats = parsed;
+        confirmMsg = 'Pay ' + parsed.toLocaleString() + ' sats via Lightning?';
+    }
+
+    if (!confirm(confirmMsg)) return;
+
     fetch('/api/admin/raffle/' + raffleId + '/pay', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Admin-Password': pw },
-        body: JSON.stringify({ amountSats: parseInt(amount) })
+        body: JSON.stringify(body)
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
         if (data.success) {
-            alert('Payment sent! Hash: ' + data.payment.paymentHash);
+            alert('Payment sent! ' + (data.payment.amountSats || '?').toLocaleString() + ' sats\nHash: ' + data.payment.paymentHash);
             location.reload();
         } else {
             alert('Payment failed: ' + data.error);
