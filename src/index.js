@@ -31,6 +31,10 @@ const locations = allLocationConfigs.filter(loc => loc.enabled !== false);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Trust the first proxy (Railway) so req.protocol, req.ip, and Secure cookies
+// work correctly when TLS is terminated upstream.
+app.set('trust proxy', 1);
+
 // Middleware
 app.use(compression());  // gzip all responses — ~70% smaller HTML/CSS/JS
 app.use(express.json());

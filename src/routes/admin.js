@@ -11,22 +11,30 @@ const email = require('../services/email');
 const lightning = require('../services/lightning');
 const anthropic = require('../services/anthropic');
 const telegram = require('../services/telegram');
+const auth = require('../services/auth');
 
 /**
- * Simple password authentication middleware
+ * Session/password authentication middleware.
+ *
+ * Accepts EITHER:
+ *   - A valid signed session cookie (set via POST /admin/login), OR
+ *   - A raw password via header/body/query (back-compat for existing fetch calls
+ *     that carry X-Admin-Password, and for legacy Telegram links).
+ *
+ * When password auth succeeds, a fresh session cookie is issued so subsequent
+ * requests don't need to keep re-sending the password.
  */
 function adminAuth(req, res, next) {
-    const password = req.query.password || req.body.password || req.headers['x-admin-password'];
-    
-    if (!process.env.ADMIN_PASSWORD) {
+    // Require either a DB-stored hash OR the env var to be configured.
+    const hasConfig = !!(db.getSetting && db.getSetting('admin_password_hash')) || !!process.env.ADMIN_PASSWORD;
+    if (!hasConfig) {
         return res.status(500).json({ error: 'Admin password not configured' });
     }
-    
-    if (password !== process.env.ADMIN_PASSWORD) {
-        return res.status(401).json({ error: 'Unauthorized' });
+
+    if (auth.isAuthenticated(req, res, db)) {
+        return next();
     }
-    
-    next();
+    return res.status(401).json({ error: 'Unauthorized' });
 }
 
 /**
@@ -53,13 +61,86 @@ function minimalPage(title, body, linkHtml) {
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><style>body{font-family:-apple-system,sans-serif;text-align:center;padding:40px 20px}h1{margin-bottom:12px}p{color:#666}a{color:#f7931a}</style></head><body><h1>${title}</h1><p>${body}</p>${linkHtml||''}</body></html>`;
 }
 
-// Apply password auth to all admin routes EXCEPT quick-approve/reject (which use token auth)
+// ── Public admin auth endpoints (no auth required on these paths themselves) ──
+
+/**
+ * POST /api/admin/login
+ * Body: { password }
+ * Sets an HttpOnly signed session cookie and returns { success, redirect }.
+ * Used by the admin login form (which now POSTs instead of GETs).
+ */
+router.post('/login', express.json(), (req, res) => {
+    const { password } = req.body || {};
+    if (!password) {
+        return res.status(400).json({ success: false, error: 'Password required' });
+    }
+    if (!auth.verifyPassword(password, db)) {
+        return res.status(401).json({ success: false, error: 'Invalid password' });
+    }
+    auth.setSessionCookie(res, req);
+    // For classic form POST (Accept: text/html) redirect; otherwise return JSON
+    const accept = (req.headers.accept || '').toLowerCase();
+    if (accept.includes('text/html')) {
+        return res.redirect(303, '/admin');
+    }
+    return res.json({ success: true, redirect: '/admin' });
+});
+
+/**
+ * POST /api/admin/logout
+ * Clears the session cookie and redirects to login.
+ */
+router.post('/logout', (req, res) => {
+    auth.clearSessionCookie(res);
+    const accept = (req.headers.accept || '').toLowerCase();
+    if (accept.includes('text/html')) {
+        return res.redirect(303, '/admin');
+    }
+    return res.json({ success: true });
+});
+// Allow GET for convenience (e.g. direct click from address bar or top-nav link)
+router.get('/logout', (req, res) => {
+    auth.clearSessionCookie(res);
+    return res.redirect(303, '/admin');
+});
+
+// Apply password auth to all OTHER admin routes EXCEPT quick-approve/reject (token auth)
 router.use((req, res, next) => {
     // Skip adminAuth for quick-approve and quick-reject (they use tokenAuth instead)
     if (req.path.match(/^\/tickets\/\d+\/quick-(approve|reject)$/)) {
         return next();
     }
     return adminAuth(req, res, next);
+});
+
+/**
+ * POST /api/admin/change-password
+ * Body: { currentPassword, newPassword }
+ * Stores a scrypt hash in the settings table (overrides ADMIN_PASSWORD env).
+ * Rotates the session cookie so the caller stays logged in.
+ */
+router.post('/change-password', (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body || {};
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ success: false, error: 'currentPassword and newPassword are required' });
+        }
+        if (typeof newPassword !== 'string' || newPassword.length < 8) {
+            return res.status(400).json({ success: false, error: 'New password must be at least 8 characters' });
+        }
+        if (!auth.verifyPassword(currentPassword, db)) {
+            return res.status(401).json({ success: false, error: 'Current password is incorrect' });
+        }
+        auth.setPassword(newPassword, db);
+        // Rotate the session so the cookie is re-signed against the (same) key
+        // and sliding window restarts.
+        auth.setSessionCookie(res, req);
+        console.log('🔑 Admin password changed');
+        return res.json({ success: true, message: 'Password updated. Stored in database; ADMIN_PASSWORD env is no longer used unless the DB value is cleared.' });
+    } catch (error) {
+        console.error('Change password error:', error);
+        return res.status(500).json({ success: false, error: 'Failed to change password' });
+    }
 });
 
 /**

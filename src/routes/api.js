@@ -530,9 +530,10 @@ router.get('/raffle-fund', async (req, res) => {
  */
 router.post('/raffle-fund/add', (req, res) => {
     try {
-        const { password, amount } = req.body;
-        
-        if (!password || password !== process.env.ADMIN_PASSWORD) {
+        const auth = require('../services/auth');
+        const { amount } = req.body;
+
+        if (!auth.isAuthenticated(req, res, db)) {
             return res.status(401).json({ success: false, error: 'Unauthorized' });
         }
         
@@ -567,9 +568,10 @@ router.post('/raffle-fund/add', (req, res) => {
  */
 router.post('/raffle-fund/set', (req, res) => {
     try {
-        const { password, amount } = req.body;
-        
-        if (!password || password !== process.env.ADMIN_PASSWORD) {
+        const auth = require('../services/auth');
+        const { amount } = req.body;
+
+        if (!auth.isAuthenticated(req, res, db)) {
             return res.status(401).json({ success: false, error: 'Unauthorized' });
         }
         

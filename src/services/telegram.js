@@ -378,7 +378,8 @@ async function deliverPendingNotifications(dbModule) {
             let message = `☀️ <b>Good morning!</b>\n\n`;
             message += `${queuedCount} review${queuedCount > 1 ? 's' : ''} submitted overnight.\n`;
             message += `${pendingCount} review${pendingCount !== 1 ? 's' : ''} pending approval.\n\n`;
-            message += `<a href="${BASE_URL}/admin?password=${approveToken || ''}">👉 Review them now</a>`;
+            // Link to the admin dashboard — admin must log in via the form (cookie session).
+            message += `<a href="${BASE_URL}/admin">👉 Review them now</a>`;
 
             console.log(`📬 Sending morning review summary: ${queuedCount} overnight, ${pendingCount} pending`);
             for (const chatId of chatIds) {

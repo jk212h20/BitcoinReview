@@ -10,6 +10,7 @@ const db = require('../services/database');
 const bitcoin = require('../services/bitcoin');
 const btcmap = require('../services/btcmap');
 const lightning = require('../services/lightning');
+const auth = require('../services/auth');
 
 /**
  * Encode a URL as an LNURL (bech32-encoded, uppercase)
@@ -323,36 +324,49 @@ router.get('/claim/:token', (req, res) => {
 /**
  * GET /admin/review/:id
  * Quick-review page for a single ticket (used by Telegram "View" link)
- * Accepts password in query OR TELEGRAM_APPROVE_TOKEN
+ * Auth sources accepted (in order):
+ *   1. Valid admin session cookie (HttpOnly signed)
+ *   2. TELEGRAM_APPROVE_TOKEN via ?token= (legacy Telegram links)
+ *   3. Raw password via ?password= (back-compat; establishes a cookie session
+ *      then redirects to a clean URL without the query string).
  */
 router.get('/admin/review/:id', (req, res) => {
     const { id } = req.params;
     const password = req.query.password;
     const token = req.query.token;
-    
-    // Accept either admin password or Telegram approve token
-    const isAdmin = password && password === process.env.ADMIN_PASSWORD;
-    const isToken = process.env.TELEGRAM_APPROVE_TOKEN && (token === process.env.TELEGRAM_APPROVE_TOKEN || password === process.env.TELEGRAM_APPROVE_TOKEN);
-    
-    if (!isAdmin && !isToken) {
+
+    const hasCookie = auth.hasValidSession(req);
+    const isTokenAuth = !!(process.env.TELEGRAM_APPROVE_TOKEN
+        && (token === process.env.TELEGRAM_APPROVE_TOKEN || password === process.env.TELEGRAM_APPROVE_TOKEN));
+    const isPasswordAuth = !!(password && auth.verifyPassword(password, db));
+
+    // Establish a session on password auth, then redirect to strip the query.
+    if (isPasswordAuth && !hasCookie) {
+        auth.setSessionCookie(res, req);
+        return res.redirect(303, `/admin/review/${encodeURIComponent(id)}`);
+    }
+
+    const isAdmin = hasCookie || isPasswordAuth;
+
+    if (!isAdmin && !isTokenAuth) {
         return res.render('admin-login', {
-            title: 'Admin Login - Reviews Raffle'
+            title: 'Admin Login - Reviews Raffle',
+            next: `/admin/review/${encodeURIComponent(id)}`
         });
     }
-    
+
     try {
         const ticket = db.getTicketById(parseInt(id));
-        
+
         if (!ticket) {
             return res.status(404).render('404', { title: 'Not Found' });
         }
-        
-        // Use the token/password that was passed so approve buttons work
+
+        // No password is embedded anymore — admin-authed fetches use the cookie.
         res.render('admin-review', {
             title: `Review #${id} - Admin`,
             ticket,
-            password: isAdmin ? password : null,
-            approveToken: process.env.TELEGRAM_APPROVE_TOKEN || token || '',
+            approveToken: isTokenAuth ? (process.env.TELEGRAM_APPROVE_TOKEN || token || '') : '',
             isAdminAuth: isAdmin,
             baseUrl: process.env.BASE_URL || ''
         });
@@ -364,27 +378,42 @@ router.get('/admin/review/:id', (req, res) => {
 
 /**
  * GET /admin
- * Admin dashboard page (requires password in query)
+ * Admin dashboard page.
+ *
+ * Auth: prefers a valid session cookie. Falls back to ?password= (legacy),
+ * and when valid we upgrade to a cookie + redirect to a clean URL so the
+ * password never sits in the address bar (or browser history).
  */
 router.get('/admin', async (req, res) => {
-    const password = req.query.password;
-    
-    if (!password || password !== process.env.ADMIN_PASSWORD) {
+    const hasCookie = auth.hasValidSession(req);
+    const queryPassword = req.query.password;
+
+    // Legacy: someone landed on /admin?password=... — establish a session and
+    // redirect to a clean URL so the password is stripped.
+    if (!hasCookie && queryPassword && auth.verifyPassword(queryPassword, db)) {
+        auth.setSessionCookie(res, req);
+        return res.redirect(303, '/admin');
+    }
+
+    if (!hasCookie) {
         return res.render('admin-login', {
-            title: 'Admin Login - Reviews Raffle'
+            title: 'Admin Login - Reviews Raffle',
+            next: '/admin'
         });
     }
-    
+
     try {
         const users = db.getAllUsers();
         const tickets = db.getAllTickets();
         const pendingTickets = db.getPendingTickets();
         const raffles = db.getAllRaffles();
         const raffleInfo = await bitcoin.getRaffleInfo();
-        
+
+        // Sliding refresh
+        auth.setSessionCookie(res, req);
+
         res.render('admin', {
             title: 'Admin Dashboard - Reviews Raffle',
-            password,
             users,
             tickets,
             pendingTickets,
@@ -395,7 +424,6 @@ router.get('/admin', async (req, res) => {
         console.error('Admin page error:', error);
         res.render('admin', {
             title: 'Admin Dashboard - Reviews Raffle',
-            password,
             error: 'Failed to load admin data'
         });
     }

@@ -14,8 +14,8 @@
             <div class="text-xs text-gray-400 uppercase tracking-wide">Admin Review</div>
             <div class="font-bold">Ticket #<%= ticket.id %></div>
         </div>
-        <% if (typeof isAdminAuth !== 'undefined' && isAdminAuth && typeof password !== 'undefined' && password) { %>
-        <a href="/admin?password=<%= password %>" class="text-xs text-gray-300 hover:text-white underline">
+        <% if (typeof isAdminAuth !== 'undefined' && isAdminAuth) { %>
+        <a href="/admin" class="text-xs text-gray-300 hover:text-white underline">
             Dashboard →
         </a>
         <% } %>
@@ -148,7 +148,9 @@
 <script>
     const ticketId = <%= ticket.id %>;
     const approveToken = '<%= typeof approveToken !== "undefined" ? approveToken : "" %>';
-    const adminPassword = '<%= typeof password !== "undefined" && password ? password : "" %>';
+    // Admin-authed requests rely on the session cookie (HttpOnly). The cookie is
+    // sent automatically by same-origin fetch, so we no longer embed the password.
+    const isAdminAuth = <%= typeof isAdminAuth !== 'undefined' && isAdminAuth ? 'true' : 'false' %>;
     const baseUrl = '<%= typeof baseUrl !== "undefined" ? baseUrl : "" %>';
 
     async function doAction(action) {
@@ -179,14 +181,11 @@
                 }
             }
 
-            // Fall back to admin password validate endpoint
-            if (adminPassword) {
+            // Fall back to admin-session cookie flow
+            if (isAdminAuth) {
                 const resp = await fetch(`${baseUrl}/api/admin/tickets/${ticketId}/validate`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Admin-Password': adminPassword
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         isValid: action === 'approve',
                         reason: reason || (action === 'approve' ? 'Approved via admin review page' : 'Rejected via admin review page')

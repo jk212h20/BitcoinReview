@@ -1,8 +1,9 @@
 <%- include('layout', { body: ` 
 <!-- Header -->
 <section class="bg-gray-800 text-white py-8">
-    <div class="max-w-6xl mx-auto px-4">
+    <div class="max-w-6xl mx-auto px-4 flex items-center justify-between">
         <h1 class="text-2xl font-bold">Admin Dashboard</h1>
+        <a href="/api/admin/logout" class="text-sm text-gray-300 hover:text-white underline">Log out</a>
     </div>
 </section>
 
@@ -36,7 +37,7 @@
         
         <!-- Lightning Node Status -->
         <div class="bg-white rounded-lg p-6 shadow-sm mb-8" x-data="{ lnd: null, loading: true }" x-init="
-            fetch('/api/admin/lightning/status', { headers: { 'X-Admin-Password': password } })
+            fetch('/api/admin/lightning/status')
                 .then(r => r.json())
                 .then(d => { lnd = d.lightning; loading = false; })
                 .catch(() => { lnd = { configured: false, reason: 'Failed to connect' }; loading = false; })
@@ -123,7 +124,7 @@
         })() : ''}
 
         <!-- Settings Panel -->
-        <div class="bg-white rounded-lg p-6 shadow-sm mb-8" x-data="settingsPanel('${typeof password !== 'undefined' ? password : ''}')">
+        <div class="bg-white rounded-lg p-6 shadow-sm mb-8" x-data="settingsPanel()">
             <h2 class="text-xl font-bold mb-4">⚙️ Settings</h2>
             <div class="grid md:grid-cols-2 gap-6">
                 <div>
@@ -177,9 +178,41 @@
 
             <div x-show="settingsMsg" x-cloak class="mt-3 text-sm text-green-600" x-text="settingsMsg"></div>
         </div>
-        
+
+        <!-- Change Password -->
+        <div class="bg-white rounded-lg p-6 shadow-sm mb-8" x-data="passwordPanel()">
+            <h2 class="text-xl font-bold mb-1">🔑 Admin Password</h2>
+            <p class="text-sm text-gray-500 mb-4">Stored as a salted scrypt hash in the database. Overrides the <code>ADMIN_PASSWORD</code> env var once set.</p>
+            <div class="grid md:grid-cols-3 gap-4 items-end">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Current password</label>
+                    <input type="password" x-model="currentPassword" autocomplete="current-password"
+                        class="w-full px-4 py-2 border rounded-lg" placeholder="••••••••">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">New password</label>
+                    <input type="password" x-model="newPassword" autocomplete="new-password"
+                        class="w-full px-4 py-2 border rounded-lg" placeholder="Min 8 characters">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Confirm new</label>
+                    <input type="password" x-model="confirmPassword" autocomplete="new-password"
+                        class="w-full px-4 py-2 border rounded-lg" placeholder="Repeat new password"
+                        @keydown.enter="changePassword()">
+                </div>
+            </div>
+            <div class="mt-4 flex items-center gap-3">
+                <button @click="changePassword()" :disabled="pwLoading"
+                    class="bg-bitcoin text-white px-5 py-2 rounded-lg font-semibold hover:bg-bitcoin-dark transition disabled:opacity-50">
+                    <span x-show="!pwLoading">Change Password</span>
+                    <span x-show="pwLoading" x-cloak>Saving...</span>
+                </button>
+                <span x-show="pwMsg" x-cloak class="text-sm" :class="pwOk ? 'text-green-600' : 'text-red-600'" x-text="pwMsg"></span>
+            </div>
+        </div>
+
         <!-- Telegram Setup -->
-        <div class="bg-white rounded-lg p-6 shadow-sm mb-8" x-data="telegramPanel('${typeof password !== 'undefined' ? password : ''}')">
+        <div class="bg-white rounded-lg p-6 shadow-sm mb-8" x-data="telegramPanel()">
             <h2 class="text-xl font-bold mb-1">📱 Telegram Notifications</h2>
             <p class="text-sm text-gray-500 mb-4">Admin Telegram chat IDs receive new review alerts and raffle notifications.</p>
             
@@ -205,7 +238,7 @@
             <div class="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
                 <div class="text-sm font-medium text-gray-700 mb-2">🔗 Invite a new admin</div>
                 <p class="text-xs text-gray-500 mb-2">One click → Telegram opens → they tap Start → auto-registered. No chat ID needed.</p>
-                <a href="/api/admin/telegram/invite?password=${typeof password !== 'undefined' ? password : ''}" target="_blank"
+                <a href="/api/admin/telegram/invite" target="_blank"
                     class="inline-flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-600">
                     📲 Add New Admin via Telegram
                 </a>
@@ -240,7 +273,7 @@
                     <p class="text-blue-600 text-sm mt-1">Picks a winner from all approved tickets, <strong>generates a claim link (100 sats)</strong>, and emails it to the winner. Creates a real raffle record visible in the public history. Winner scans QR with any Lightning wallet to claim. Use 🗑️ Delete in the Raffles tab to clean up afterwards.</p>
                 </div>
                 <button 
-                    @click="if(!confirm('This will create a 100-sat raffle with a claim link and email the winner. Continue?')) return; testLoading = true; testResult = null; fetch('/api/admin/raffle/test', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Password': password } }).then(r => r.json()).then(d => { testResult = d; testSuccess = d.success; testLoading = false; if(d.success) setTimeout(() => location.reload(), 3000); }).catch(e => { testResult = { error: e.message }; testSuccess = false; testLoading = false; })"
+                    @click="if(!confirm('This will create a 100-sat raffle with a claim link and email the winner. Continue?')) return; testLoading = true; testResult = null; fetch('/api/admin/raffle/test', { method: 'POST', headers: { 'Content-Type': 'application/json' } }).then(r => r.json()).then(d => { testResult = d; testSuccess = d.success; testLoading = false; if(d.success) setTimeout(() => location.reload(), 3000); }).catch(e => { testResult = { error: e.message }; testSuccess = false; testLoading = false; })"
                     :disabled="testLoading"
                     class="bg-blue-500 text-white px-6 py-3 rounded-lg font-bold hover:bg-blue-600 disabled:opacity-50 transition whitespace-nowrap"
                 >
@@ -471,8 +504,7 @@ function adminDashboard() {
         raffleLoading: false,
         raffleResult: null,
         raffleSuccess: false,
-        password: '${typeof password !== 'undefined' ? password : ''}',
-        
+
         async runRaffle() {
             if (!this.raffleBlockHeight) {
                 alert('Please enter a block height');
@@ -486,9 +518,7 @@ function adminDashboard() {
                 const response = await fetch('/api/admin/raffle/run', {
                     method: 'POST',
                     headers: { 
-                        'Content-Type': 'application/json',
-                        'X-Admin-Password': this.password
-                    },
+                        'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         blockHeight: parseInt(this.raffleBlockHeight),
                         prizeAmountSats: this.prizeAmount ? parseInt(this.prizeAmount) : null
@@ -533,9 +563,7 @@ function adminDashboard() {
                 const response = await fetch('/api/admin/raffle/' + raffleId + '/pay', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-Admin-Password': this.password
-                    },
+                        'Content-Type': 'application/json'},
                     body: JSON.stringify(body)
                 });
 
@@ -558,9 +586,7 @@ function adminDashboard() {
                 const response = await fetch('/api/admin/raffle/' + raffleId + '/mark-paid', {
                     method: 'POST',
                     headers: { 
-                        'Content-Type': 'application/json',
-                        'X-Admin-Password': this.password
-                    }
+                        'Content-Type': 'application/json'}
                 });
                 
                 const data = await response.json();
@@ -578,7 +604,7 @@ function adminDashboard() {
             try {
                 const response = await fetch('/api/admin/tickets/' + ticketId + '/validate', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-Admin-Password': this.password },
+                    headers: { 'Content-Type': 'application/json'},
                     body: JSON.stringify({ isValid: true, reason: 'Manually approved by admin' })
                 });
                 const data = await response.json();
@@ -592,7 +618,7 @@ function adminDashboard() {
             try {
                 const response = await fetch('/api/admin/tickets/' + ticketId + '/validate', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-Admin-Password': this.password },
+                    headers: { 'Content-Type': 'application/json'},
                     body: JSON.stringify({ isValid: false, reason })
                 });
                 const data = await response.json();
@@ -614,9 +640,7 @@ function adminDashboard() {
                 const response = await fetch('/api/admin/raffle/' + raffleId, {
                     method: 'DELETE',
                     headers: { 
-                        'Content-Type': 'application/json',
-                        'X-Admin-Password': this.password
-                    },
+                        'Content-Type': 'application/json'},
                     body: JSON.stringify({ refund: refund })
                 });
                 
@@ -636,7 +660,7 @@ function adminDashboard() {
             try {
                 const response = await fetch('/api/admin/tickets/' + ticketId + '/ai-check', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-Admin-Password': this.password }
+                    headers: { 'Content-Type': 'application/json'}
                 });
                 const data = await response.json();
                 if (data.success) return data.validation;
@@ -646,7 +670,7 @@ function adminDashboard() {
     }
 }
 
-function telegramPanel(pw) {
+function telegramPanel() {
     return {
         allChats: [],
         primaryChat: '',
@@ -658,7 +682,7 @@ function telegramPanel(pw) {
         inviteLink: '',
         copied: false,
         init() {
-            fetch('/api/admin/telegram/chats', { headers: { 'X-Admin-Password': pw } })
+            fetch('/api/admin/telegram/chats', { headers: {} })
                 .then(r => r.json())
                 .then(d => {
                     if (d.success) {
@@ -677,7 +701,7 @@ function telegramPanel(pw) {
             try {
                 const r = await fetch('/api/admin/telegram/chats', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-Admin-Password': pw },
+                    headers: { 'Content-Type': 'application/json'},
                     body: JSON.stringify({ chatId: id })
                 });
                 const d = await r.json();
@@ -701,7 +725,7 @@ function telegramPanel(pw) {
             try {
                 const r = await fetch('/api/admin/telegram/chats/' + chatId, {
                     method: 'DELETE',
-                    headers: { 'X-Admin-Password': pw }
+                    headers: {}
                 });
                 const d = await r.json();
                 if (d.success) {
@@ -725,7 +749,7 @@ function telegramPanel(pw) {
             try {
                 const r = await fetch('/api/admin/telegram/invite', {
                     method: 'POST',
-                    headers: { 'X-Admin-Password': pw }
+                    headers: {}
                 });
                 const d = await r.json();
                 if (d.success) {
@@ -753,7 +777,7 @@ function telegramPanel(pw) {
     }
 }
 
-function settingsPanel(pw) {
+function settingsPanel() {
     return {
         reviewMode: 'manual_review',
         reviewLinkMode: 'google',
@@ -762,7 +786,7 @@ function settingsPanel(pw) {
         contactEmail: '',
         settingsMsg: '',
         init() {
-            fetch('/api/admin/settings', { headers: { 'X-Admin-Password': pw } })
+            fetch('/api/admin/settings', { headers: {} })
                 .then(r => r.json())
                 .then(d => {
                     if (d.success && d.settings) {
@@ -780,7 +804,7 @@ function settingsPanel(pw) {
             try {
                 const response = await fetch('/api/admin/settings', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-Admin-Password': pw },
+                    headers: { 'Content-Type': 'application/json'},
                     body: JSON.stringify({ settings: {
                         review_mode: this.reviewMode,
                         review_link_mode: this.reviewLinkMode,
@@ -798,6 +822,58 @@ function settingsPanel(pw) {
     }
 }
 
+function passwordPanel() {
+    return {
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+        pwLoading: false,
+        pwMsg: '',
+        pwOk: false,
+        async changePassword() {
+            this.pwMsg = '';
+            this.pwOk = false;
+            if (!this.currentPassword || !this.newPassword) {
+                this.pwMsg = 'Please fill in all fields'; return;
+            }
+            if (this.newPassword.length < 8) {
+                this.pwMsg = 'New password must be at least 8 characters'; return;
+            }
+            if (this.newPassword !== this.confirmPassword) {
+                this.pwMsg = 'New passwords do not match'; return;
+            }
+            this.pwLoading = true;
+            try {
+                const resp = await fetch('/api/admin/change-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        currentPassword: this.currentPassword,
+                        newPassword: this.newPassword
+                    })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    this.pwOk = true;
+                    this.pwMsg = 'Password updated ✓';
+                    this.currentPassword = '';
+                    this.newPassword = '';
+                    this.confirmPassword = '';
+                } else {
+                    this.pwOk = false;
+                    this.pwMsg = data.error || 'Failed to change password';
+                }
+            } catch (e) {
+                this.pwOk = false;
+                this.pwMsg = 'Network error: ' + e.message;
+            } finally {
+                this.pwLoading = false;
+                setTimeout(() => { this.pwMsg = ''; }, 5000);
+            }
+        }
+    }
+}
+
 // Global functions for the unpaid raffle alert buttons
 //
 // Payment logic:
@@ -809,7 +885,6 @@ function settingsPanel(pw) {
 //   - The backend also computes/validates this; we never fall back to a hardcoded
 //     test value like 100 sats.
 function payUnpaidRaffle(raffleId, stampedAmountSats) {
-    var pw = '${typeof password !== "undefined" ? password : ""}';
     var body = {};
     var confirmMsg;
 
@@ -830,7 +905,7 @@ function payUnpaidRaffle(raffleId, stampedAmountSats) {
 
     fetch('/api/admin/raffle/' + raffleId + '/pay', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Admin-Password': pw },
+        headers: { 'Content-Type': 'application/json'},
         body: JSON.stringify(body)
     })
     .then(function(r) { return r.json(); })
@@ -846,12 +921,11 @@ function payUnpaidRaffle(raffleId, stampedAmountSats) {
 }
 
 function markUnpaidRafflePaid(raffleId) {
-    var pw = '${typeof password !== "undefined" ? password : ""}';
     if (!confirm('Mark this raffle as paid?')) return;
     
     fetch('/api/admin/raffle/' + raffleId + '/mark-paid', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Admin-Password': pw }
+        headers: { 'Content-Type': 'application/json'}
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
