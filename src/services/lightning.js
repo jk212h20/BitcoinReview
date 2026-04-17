@@ -319,7 +319,7 @@ async function generateOnChainAddress() {
  * Zero-amount donation invoices get 30-day expiry (no volatility concern for donations).
  * Custom-amount invoices get 7-day expiry.
  */
-async function createDonationInvoice(amountSats = 0, memo = 'Donation to Bitcoin Review Raffle') {
+async function createDonationInvoice(amountSats = 0, memo = 'Donation to Reviews Raffle') {
     const expiry = amountSats === 0 ? '2592000' : '604800'; // 30 days for zero-amount, 7 days for custom
     const body = { memo, expiry };
     if (amountSats > 0) {

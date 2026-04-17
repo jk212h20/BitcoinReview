@@ -431,7 +431,7 @@ async function notifyWinner(chatId, prizeSats, claimToken, blockHeight) {
     const baseUrl = BASE_URL;
     const claimLink = `${baseUrl}/claim/${claimToken}`;
 
-    let message = `🎉 <b>You won the Bitcoin Review Raffle!</b>\n\n`;
+    let message = `🎉 <b>You won the Reviews Raffle!</b>\n\n`;
     message += `Block #${blockHeight.toLocaleString()}\n`;
     message += `Prize: <b>${prizeSats.toLocaleString()} sats</b>\n\n`;
     message += `👉 <a href="${claimLink}">Claim Your Prize</a>\n\n`;

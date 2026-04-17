@@ -68,9 +68,9 @@ Winner clicks email link → /claim/abc123
 
 #### Email Template:
 ```
-Subject: 🎉 You won the Bitcoin Review Raffle!
+Subject: 🎉 You won the Reviews Raffle!
 
-Congratulations! You were selected as the winner of the Bitcoin Review raffle.
+Congratulations! You were selected as the winner of the Reviews Raffle.
 
 Your prize: 53,500 sats (~$XX.XX)
 
@@ -80,7 +80,7 @@ https://bitcoinreview.app/claim/abc123def456
 You'll see a QR code — just scan it with any Lightning wallet to receive your sats.
 This link expires in 30 days.
 
-— Bitcoin Review
+— Reviews Raffle
 ```
 
 #### Changes to Existing Code:

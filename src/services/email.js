@@ -44,10 +44,10 @@ async function sendRegistrationEmail(email, optOutToken) {
         <body>
             <div class="container">
                 <div class="header">
-                    <h1>🎉 Welcome to Bitcoin Review Raffle!</h1>
+                    <h1>🎉 Welcome to Reviews Raffle!</h1>
                 </div>
                 <div class="content">
-                    <p>Thanks for registering for the Bitcoin Review Raffle in Roatan!</p>
+                    <p>Thanks for registering for the Reviews Raffle in Roatan!</p>
                     
                     <h2>How it works:</h2>
                     <ol>
@@ -75,9 +75,9 @@ async function sendRegistrationEmail(email, optOutToken) {
     `;
     
     const text = `
-Welcome to Bitcoin Review Raffle!
+Welcome to Reviews Raffle!
 
-Thanks for registering for the Bitcoin Review Raffle in Roatan!
+Thanks for registering for the Reviews Raffle in Roatan!
 
 How it works:
 1. Visit a Bitcoin-accepting merchant in Roatan
@@ -94,7 +94,7 @@ Submit a review: ${baseUrl}/submit
 Didn't sign up for this? Remove your email: ${optOutLink}
     `;
     
-    return sendEmail(email, 'Welcome to Bitcoin Review Raffle! 🎉', html, text);
+    return sendEmail(email, 'Welcome to Reviews Raffle! 🎉', html, text);
 }
 
 /**
@@ -125,7 +125,7 @@ async function sendWinnerEmail(emailAddr, prizeAmount, claimToken, blockHeight) 
                     <h1>🎊 Congratulations! You Won! 🎊</h1>
                 </div>
                 <div class="content">
-                    <p>Great news! You've been selected as the winner of the Bitcoin Review Raffle!</p>
+                    <p>Great news! You've been selected as the winner of the Reviews Raffle!</p>
                     
                     <div class="prize">
                         ${prizeAmount ? prizeAmount.toLocaleString() + ' sats' : 'Prize'}
@@ -157,7 +157,7 @@ async function sendWinnerEmail(emailAddr, prizeAmount, claimToken, blockHeight) 
     `;
     
     const text = `
-🎊 Congratulations! You Won the Bitcoin Review Raffle! 🎊
+🎊 Congratulations! You Won the Reviews Raffle! 🎊
 
 Your prize: ${prizeAmount ? prizeAmount.toLocaleString() + ' sats' : 'TBD'}
 
@@ -172,10 +172,10 @@ This link expires in 30 days.
 
 Thank you for supporting Bitcoin adoption in Roatan! 🌴⚡
 
-— Bitcoin Review
+— Reviews Raffle
     `;
     
-    return sendEmail(emailAddr, '🎊 You Won the Bitcoin Review Raffle! Claim your sats →', html, text);
+    return sendEmail(emailAddr, '🎊 You Won the Reviews Raffle! Claim your sats →', html, text);
 }
 
 /**
@@ -190,7 +190,7 @@ async function sendEmail(to, subject, html, text) {
     try {
         // EMAIL_FROM should be your verified domain address once you have one.
         // Before domain verification, use 'onboarding@resend.dev' for testing.
-        const from = process.env.EMAIL_FROM || 'Bitcoin Review Raffle <onboarding@resend.dev>';
+        const from = process.env.EMAIL_FROM || 'Reviews Raffle <onboarding@resend.dev>';
         
         const { data, error } = await resend.emails.send({
             from,

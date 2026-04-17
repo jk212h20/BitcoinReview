@@ -79,7 +79,7 @@ router.get('/:slug', resolveLocation, async (req, res) => {
         const recentlyReviewedMerchant = db.getMostRecentlyReviewedMerchantByLocation(loc.slug);
 
         res.render('index', {
-            title: `Bitcoin Review Raffle - ${loc.name}`,
+            title: `Reviews Raffle - ${loc.name}`,
             raffleInfo,
             userCount,
             ticketCount,
@@ -96,7 +96,7 @@ router.get('/:slug', resolveLocation, async (req, res) => {
     } catch (error) {
         console.error(`Location landing page error (${loc.slug}):`, error);
         res.render('index', {
-            title: `Bitcoin Review Raffle - ${loc.name}`,
+            title: `Reviews Raffle - ${loc.name}`,
             error: 'Failed to load raffle info',
             raffleInfo: null, userCount: 0, ticketCount: 0,
             latestRaffle: null, totalRaffles: 0,
@@ -129,7 +129,7 @@ router.get('/:slug/submit', resolveLocation, async (req, res) => {
         }
 
         res.render('submit', {
-            title: `Submit Review - ${loc.name} - Bitcoin Review Raffle`,
+            title: `Submit Review - ${loc.name} - Reviews Raffle`,
             raffleInfo,
             merchants,
             donationAddress: depositInfo.onchainAddress || process.env.DONATION_ADDRESS || 'Not configured',
@@ -139,7 +139,7 @@ router.get('/:slug/submit', resolveLocation, async (req, res) => {
     } catch (error) {
         console.error(`Submit page error (${loc.slug}):`, error);
         res.render('submit', {
-            title: `Submit Review - ${loc.name} - Bitcoin Review Raffle`,
+            title: `Submit Review - ${loc.name} - Reviews Raffle`,
             error: 'Failed to load page data',
             merchants: [],
             donationAddress: process.env.DONATION_ADDRESS || 'Not configured',
@@ -215,7 +215,7 @@ router.get('/:slug/reviews', resolveLocation, (req, res) => {
         const depositInfo = lightning.getDepositInfoCached();
 
         res.render('reviews', {
-            title: `Reviews - ${loc.name} - Bitcoin Review Raffle`,
+            title: `Reviews - ${loc.name} - Reviews Raffle`,
             reviews,
             featuredReviews,
             regularReviews,
@@ -226,7 +226,7 @@ router.get('/:slug/reviews', resolveLocation, (req, res) => {
     } catch (error) {
         console.error(`Reviews page error (${loc.slug}):`, error);
         res.render('reviews', {
-            title: `Reviews - ${loc.name} - Bitcoin Review Raffle`,
+            title: `Reviews - ${loc.name} - Reviews Raffle`,
             error: 'Failed to load reviews',
             reviews: [], featuredReviews: [], regularReviews: [],
             donationAddress: process.env.DONATION_ADDRESS || 'Not configured',
@@ -247,7 +247,7 @@ router.get('/:slug/raffles', resolveLocation, (req, res) => {
         const depositInfo = lightning.getDepositInfoCached();
 
         res.render('raffles', {
-            title: `Raffle History - ${loc.name} - Bitcoin Review Raffle`,
+            title: `Raffle History - ${loc.name} - Reviews Raffle`,
             raffles,
             donationAddress: depositInfo.onchainAddress || process.env.DONATION_ADDRESS || 'Not configured',
             location: loc,
@@ -256,7 +256,7 @@ router.get('/:slug/raffles', resolveLocation, (req, res) => {
     } catch (error) {
         console.error(`Raffles page error (${loc.slug}):`, error);
         res.render('raffles', {
-            title: `Raffle History - ${loc.name} - Bitcoin Review Raffle`,
+            title: `Raffle History - ${loc.name} - Reviews Raffle`,
             error: 'Failed to load raffle history',
             raffles: [],
             donationAddress: process.env.DONATION_ADDRESS || 'Not configured',
@@ -277,7 +277,7 @@ router.get('/:slug/how-it-works', resolveLocation, async (req, res) => {
         const depositInfo = lightning.getDepositInfoCached();
 
         res.render('how-it-works', {
-            title: `How It Works - ${loc.name} - Bitcoin Review Raffle`,
+            title: `How It Works - ${loc.name} - Reviews Raffle`,
             raffleInfo,
             donationAddress: depositInfo.onchainAddress || process.env.DONATION_ADDRESS || 'Not configured',
             location: loc,
@@ -285,7 +285,7 @@ router.get('/:slug/how-it-works', resolveLocation, async (req, res) => {
         });
     } catch (error) {
         res.render('how-it-works', {
-            title: `How It Works - ${loc.name} - Bitcoin Review Raffle`,
+            title: `How It Works - ${loc.name} - Reviews Raffle`,
             donationAddress: process.env.DONATION_ADDRESS || 'Not configured',
             location: loc,
             allLocations: locations

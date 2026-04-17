@@ -1,4 +1,4 @@
-# Bitcoin Review Raffle 🌴⚡
+# Reviews Raffle 🌴⚡
 
 A raffle system to incentivize Bitcoin adoption in Roatan by rewarding people who write Google reviews mentioning their Bitcoin purchases at local merchants.
 

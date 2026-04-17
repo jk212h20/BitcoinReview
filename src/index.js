@@ -1,5 +1,5 @@
 /**
- * Bitcoin Review Raffle - Main Application
+ * Reviews Raffle - Main Application
  * Build: 2026-02-22a
  */
 
@@ -68,6 +68,34 @@ const defaultLocation = locations.find(l => l.isDefault) || locations[0];
 app.use((req, res, next) => {
     res.locals.location = res.locals.location || defaultLocation;
     res.locals.allLocations = locations;
+
+    // Public contact info (admin-configurable via /admin settings panel)
+    try {
+        const rawTg = (db.getSetting('contact_telegram') || '').trim();
+        const rawMail = (db.getSetting('contact_email') || '').trim();
+        let tgUrl = '';
+        let tgLabel = '';
+        if (rawTg) {
+            if (/^https?:\/\//i.test(rawTg)) {
+                tgUrl = rawTg;
+                const m = rawTg.match(/(?:t\.me|telegram\.me)\/([^\/?#]+)/i);
+                tgLabel = m ? '@' + m[1] : rawTg;
+            } else {
+                const handle = rawTg.replace(/^@+/, '');
+                tgUrl = 'https://t.me/' + handle;
+                tgLabel = '@' + handle;
+            }
+        }
+        res.locals.contact = {
+            telegramUrl: tgUrl,
+            telegramLabel: tgLabel,
+            email: rawMail,
+            hasAny: !!(tgUrl || rawMail)
+        };
+    } catch (e) {
+        res.locals.contact = { telegramUrl: '', telegramLabel: '', email: '', hasAny: false };
+    }
+
     next();
 });
 
@@ -112,7 +140,7 @@ app.post('/telegram/webhook', express.json(), async (req, res) => {
                         body: JSON.stringify({
                             chat_id: cbChatId,
                             message_id: cb.message.message_id,
-                            text: `🔕 *Done* — you've been removed from Bitcoin Review admin notifications.\n\nYou can be re-added by the admin at any time.`,
+                            text: `🔕 *Done* — you've been removed from Reviews Raffle admin notifications.\n\nYou can be re-added by the admin at any time.`,
                             parse_mode: 'Markdown'
                         })
                     });
@@ -202,7 +230,7 @@ app.post('/telegram/webhook', express.json(), async (req, res) => {
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 chat_id: chatId,
-                                text: `ℹ️ *You're already signed up for admin alerts${firstName ? ', ' + firstName : ''}!*\n\nYou currently receive Bitcoin Review notifications.\n\nWould you like to stop receiving them?`,
+                                text: `ℹ️ *You're already signed up for admin alerts${firstName ? ', ' + firstName : ''}!*\n\nYou currently receive Reviews Raffle notifications.\n\nWould you like to stop receiving them?`,
                                 parse_mode: 'Markdown',
                                 reply_markup: {
                                     inline_keyboard: [[
@@ -222,7 +250,7 @@ app.post('/telegram/webhook', express.json(), async (req, res) => {
                     db.setSetting('telegram_invite_pins', JSON.stringify(pending));
 
                     await telegram.sendMessage(chatId,
-                        `✅ <b>Welcome${firstName ? ', ' + firstName : ''}!</b>\n\nYou've been added as a Bitcoin Review admin.\n\nYou'll now receive notifications for new reviews and raffle events.\n\nYour chat ID: <code>${chatId}</code>`
+                        `✅ <b>Welcome${firstName ? ', ' + firstName : ''}!</b>\n\nYou've been added as a Reviews Raffle admin.\n\nYou'll now receive notifications for new reviews and raffle events.\n\nYour chat ID: <code>${chatId}</code>`
                     );
                 } else {
                     // Invalid or expired PIN — just reply with chat ID
@@ -233,13 +261,13 @@ app.post('/telegram/webhook', express.json(), async (req, res) => {
             } else {
                 // Plain /start with no PIN — reply with chat ID
                 await telegram.sendMessage(chatId,
-                    `👋 Hi${firstName ? ' ' + firstName : ''}!\n\nYour Telegram chat ID is:\n<code>${chatId}</code>\n\nShare this with the Bitcoin Review admin to receive notifications.`
+                    `👋 Hi${firstName ? ' ' + firstName : ''}!\n\nYour Telegram chat ID is:\n<code>${chatId}</code>\n\nShare this with the Reviews Raffle admin to receive notifications.`
                 );
             }
         } else {
             // Any other message — reply with chat ID
             await telegram.sendMessage(chatId,
-                `👋 Hi${firstName ? ' ' + firstName : ''}!\n\nYour Telegram chat ID is:\n<code>${chatId}</code>\n\nShare this with the Bitcoin Review admin to receive notifications.`
+                `👋 Hi${firstName ? ' ' + firstName : ''}!\n\nYour Telegram chat ID is:\n<code>${chatId}</code>\n\nShare this with the Reviews Raffle admin to receive notifications.`
             );
         }
     } catch (e) {
@@ -256,7 +284,7 @@ app.use((err, req, res, next) => {
     }
     
     res.status(500).render('error', {
-        title: 'Error - Bitcoin Review Raffle',
+        title: 'Error - Reviews Raffle',
         error: 'Something went wrong. Please try again.'
     });
 });
@@ -268,13 +296,13 @@ app.use((req, res) => {
     }
     
     res.status(404).render('404', {
-        title: 'Not Found - Bitcoin Review Raffle'
+        title: 'Not Found - Reviews Raffle'
     });
 });
 
 // Initialize services and start server
 async function startServer() {
-    console.log('🚀 Starting Bitcoin Review Raffle...');
+    console.log('🚀 Starting Reviews Raffle...');
     
     await db.initializeDatabase();
     email.initializeEmail();

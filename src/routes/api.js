@@ -13,6 +13,7 @@ const btcmap = require('../services/btcmap');
 const lightning = require('../services/lightning');
 const anthropic = require('../services/anthropic');
 const telegram = require('../services/telegram');
+const price = require('../services/price');
 
 /**
  * POST /api/submit
@@ -475,7 +476,7 @@ router.post('/generate-invoice', async (req, res) => {
             });
         }
         
-        const result = await lightning.createDonationInvoice(amountSats, `Donation to Bitcoin Review Raffle - ${amountSats} sats`);
+        const result = await lightning.createDonationInvoice(amountSats, `Donation to Reviews Raffle - ${amountSats} sats`);
         
         res.json({
             success: true,
@@ -503,10 +504,18 @@ router.get('/raffle-fund', async (req, res) => {
         const fundSats = parseInt(db.getSetting('raffle_fund_sats') || '0');
         const nextPrizeSats = Math.floor(fundSats / 2);
 
+        // BTC/USD (cached 5 min; may be null if upstream down)
+        const usdPerBtc = await price.getBtcUsdPrice();
+        const totalFundUsd = usdPerBtc ? (fundSats / 100_000_000) * usdPerBtc : null;
+        const nextPrizeUsd = usdPerBtc ? (nextPrizeSats / 100_000_000) * usdPerBtc : null;
+
         res.json({
             success: true,
             totalFundSats: fundSats,
-            nextPrizeSats: nextPrizeSats
+            nextPrizeSats: nextPrizeSats,
+            btcUsd: usdPerBtc,
+            totalFundUsd: totalFundUsd,
+            nextPrizeUsd: nextPrizeUsd
         });
     } catch (error) {
         console.error('Raffle fund error:', error);

@@ -25,7 +25,7 @@
             <div class="flex justify-between items-center">
                 <a href="/" class="flex items-center space-x-2">
                     <span class="text-2xl">₿</span>
-                    <span class="font-bold text-xl">Bitcoin Review Raffle</span>
+                    <span class="font-bold text-xl">Reviews Raffle</span>
                 </a>
                 <div class="hidden md:flex items-center space-x-6">
                     <a href="<%= locBase %>/" class="text-gray-600 hover:text-bitcoin">Home</a>
@@ -54,9 +54,17 @@
                         <span>Next Prize:</span>
                         <span id="raffle-fund-amount">0</span>
                         <span class="text-xs opacity-80">sats</span>
+                        <span id="raffle-fund-usd-nav" class="hidden text-xs opacity-90 ml-1"></span>
                     </a>
                 </div>
-                <div class="md:hidden">
+                <div class="md:hidden flex items-center gap-2">
+                    <!-- Mobile prize badge — ALWAYS visible next to hamburger, not inside collapsed menu -->
+                    <a href="/#donate" id="raffle-fund-badge-mobile-top" class="hidden items-center gap-1 bg-gradient-to-r from-orange-500 to-yellow-500 text-white px-2.5 py-1 rounded-full text-xs font-bold shadow-sm" title="Next raffle prize">
+                        <span>⚡</span>
+                        <span id="raffle-fund-usd-mobile-top" class="hidden">$0</span>
+                        <span id="raffle-fund-amount-mobile-top">0</span>
+                        <span class="opacity-80">sats</span>
+                    </a>
                     <button id="mobile-menu-btn" class="text-gray-600">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
@@ -99,7 +107,7 @@
         <div class="max-w-6xl mx-auto px-4 py-8">
             <div class="grid md:grid-cols-3 gap-8">
                 <div>
-                    <h3 class="font-bold text-lg mb-4">Bitcoin Review Raffle</h3>
+                    <h3 class="font-bold text-lg mb-4">Reviews Raffle</h3>
                     <p class="text-gray-400"><%= (typeof location !== 'undefined' && location) ? location.description : 'Incentivizing Bitcoin adoption through community reviews.' %></p>
                     <% if (typeof allLocations !== 'undefined' && allLocations && allLocations.length > 1) { %>
                     <div class="mt-4">
@@ -126,6 +134,24 @@
                     <a href="/#donate" class="inline-flex items-center gap-2 bg-bitcoin hover:bg-bitcoin-dark text-white px-4 py-2 rounded-lg text-sm font-medium transition">
                         ⚡ Donate (On-chain or Lightning)
                     </a>
+                    <% if (typeof contact !== 'undefined' && contact && contact.hasAny) { %>
+                    <div class="mt-5 pt-4 border-t border-gray-700">
+                        <h4 class="text-sm font-semibold text-gray-300 mb-2">Contact / Feedback</h4>
+                        <p class="text-gray-400 text-xs mb-2">Missing a merchant? Found a bug? Reach out:</p>
+                        <div class="flex flex-wrap gap-3 text-sm">
+                            <% if (contact.telegramUrl) { %>
+                            <a href="<%= contact.telegramUrl %>" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300">
+                                <span>📱</span> <span><%= contact.telegramLabel || 'Telegram' %></span>
+                            </a>
+                            <% } %>
+                            <% if (contact.email) { %>
+                            <a href="mailto:<%= contact.email %>?subject=Reviews%20Raffle%20feedback" class="inline-flex items-center gap-1 text-orange-300 hover:text-orange-200">
+                                <span>✉️</span> <span><%= contact.email %></span>
+                            </a>
+                            <% } %>
+                        </div>
+                    </div>
+                    <% } %>
                 </div>
             </div>
             <div class="border-t border-gray-700 mt-8 pt-8 text-center text-gray-400">
@@ -144,8 +170,12 @@
         (function() {
             var fundBadge = document.getElementById('raffle-fund-badge');
             var fundAmount = document.getElementById('raffle-fund-amount');
+            var fundUsdNav = document.getElementById('raffle-fund-usd-nav');
             var fundBadgeMobile = document.getElementById('raffle-fund-badge-mobile');
             var fundAmountMobile = document.getElementById('raffle-fund-amount-mobile');
+            var fundBadgeMobileTop = document.getElementById('raffle-fund-badge-mobile-top');
+            var fundAmountMobileTop = document.getElementById('raffle-fund-amount-mobile-top');
+            var fundUsdMobileTop = document.getElementById('raffle-fund-usd-mobile-top');
             var homepageFund = document.getElementById('homepage-fund-amount');
             var lastAmount = -1;
 
@@ -153,8 +183,15 @@
                 return Number(n).toLocaleString();
             }
 
-            function updateFundDisplay(sats) {
-                if (sats === lastAmount) return;
+            function formatUsd(n) {
+                if (n == null) return '';
+                if (n >= 100) return '$' + Math.round(n).toLocaleString();
+                if (n >= 1)   return '$' + n.toFixed(2);
+                return '$' + n.toFixed(3);
+            }
+
+            function updateFundDisplay(sats, usd) {
+                var sameSats = sats === lastAmount;
                 lastAmount = sats;
 
                 // Desktop nav badge
@@ -165,8 +202,33 @@
                         fundBadge.classList.add('inline-flex');
                     }
                 }
+                if (fundUsdNav) {
+                    if (usd != null && sats > 0) {
+                        fundUsdNav.textContent = '(≈ ' + formatUsd(usd) + ')';
+                        fundUsdNav.classList.remove('hidden');
+                    } else {
+                        fundUsdNav.classList.add('hidden');
+                    }
+                }
 
-                // Mobile nav badge
+                // Mobile top-of-page badge (next to hamburger, always visible)
+                if (fundBadgeMobileTop && fundAmountMobileTop) {
+                    fundAmountMobileTop.textContent = formatSats(sats);
+                    if (sats > 0) {
+                        fundBadgeMobileTop.classList.remove('hidden');
+                        fundBadgeMobileTop.classList.add('inline-flex');
+                    }
+                }
+                if (fundUsdMobileTop) {
+                    if (usd != null && sats > 0) {
+                        fundUsdMobileTop.textContent = '≈ ' + formatUsd(usd);
+                        fundUsdMobileTop.classList.remove('hidden');
+                    } else {
+                        fundUsdMobileTop.classList.add('hidden');
+                    }
+                }
+
+                // Mobile nav badge (inside expanded menu — legacy)
                 if (fundBadgeMobile && fundAmountMobile) {
                     fundAmountMobile.textContent = formatSats(sats);
                     if (sats > 0) {
@@ -183,6 +245,18 @@
                         wrapper.classList.remove('hidden');
                     }
                 }
+
+                // Homepage hero prize-pool widget (if present)
+                var heroSats = document.getElementById('hero-prize-sats');
+                var heroUsd = document.getElementById('hero-prize-usd');
+                var heroTotal = document.getElementById('hero-prize-total');
+                var heroWrapper = document.getElementById('hero-prize-wrapper');
+                if (heroSats) heroSats.textContent = formatSats(sats);
+                if (heroUsd) {
+                    heroUsd.textContent = usd != null ? '≈ ' + formatUsd(usd) : '';
+                }
+                if (heroWrapper && sats > 0) heroWrapper.classList.remove('hidden');
+                // heroTotal is set from data.totalFundSats/Usd in fetchFund()
             }
 
             function fetchFund() {
@@ -190,11 +264,26 @@
                     .then(function(res) { return res.json(); })
                     .then(function(data) {
                         if (data.success && typeof data.nextPrizeSats === 'number') {
-                            updateFundDisplay(data.nextPrizeSats);
-                            // Also update the full fund display on homepage if present
+                            updateFundDisplay(data.nextPrizeSats, data.nextPrizeUsd);
+                            // Full fund display on homepage
                             var totalEl = document.getElementById('homepage-total-fund');
                             if (totalEl && typeof data.totalFundSats === 'number') {
                                 totalEl.textContent = formatSats(data.totalFundSats);
+                            }
+                            var totalUsdEl = document.getElementById('homepage-total-fund-usd');
+                            if (totalUsdEl) {
+                                totalUsdEl.textContent = data.totalFundUsd != null
+                                    ? '≈ ' + formatUsd(data.totalFundUsd)
+                                    : '';
+                            }
+                            // Hero totals
+                            var heroTotalSats = document.getElementById('hero-total-sats');
+                            var heroTotalUsd = document.getElementById('hero-total-usd');
+                            if (heroTotalSats) heroTotalSats.textContent = formatSats(data.totalFundSats);
+                            if (heroTotalUsd) {
+                                heroTotalUsd.textContent = data.totalFundUsd != null
+                                    ? '≈ ' + formatUsd(data.totalFundUsd)
+                                    : '';
                             }
                         }
                     })

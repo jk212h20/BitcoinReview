@@ -1,20 +1,37 @@
 <%- include('layout', { body: `
 <!-- Hero Section -->
-<section class="bg-gradient-to-br from-orange-500 to-yellow-500 text-white py-16">
+<section class="bg-gradient-to-br from-orange-500 to-yellow-500 text-white py-12 md:py-16">
     <div class="max-w-6xl mx-auto px-4 text-center">
-        <h1 class="text-4xl md:text-6xl font-bold mb-6">
-            🌴 Bitcoin Review Raffle
+        <h1 class="text-4xl md:text-6xl font-bold mb-4">
+            🌴 Reviews Raffle
         </h1>
-        <p class="text-xl md:text-2xl mb-8 opacity-90">
+        <p class="text-lg md:text-2xl mb-6 opacity-90">
             Write a review, win Bitcoin! Supporting Bitcoin adoption in Roatan.
         </p>
-        
-        <!-- Raffle Countdown -->
-        <div class="bg-white/20 backdrop-blur rounded-lg p-6 max-w-md mx-auto mb-8">
-            <h2 class="text-lg font-semibold mb-2">Next Raffle</h2>
-            ${typeof raffleInfo !== 'undefined' && raffleInfo ? '<div class="text-3xl font-bold mb-2">Block #' + raffleInfo.nextRaffleBlock.toLocaleString() + '</div><div class="text-lg">' + raffleInfo.blocksUntilNext.toLocaleString() + ' blocks away</div><div class="text-sm opacity-75">' + raffleInfo.timeEstimate + '</div>' : '<div class="text-lg">Loading...</div>'}
+
+        <!-- 🎯 PRIZE POOL — Front and center, USD + sats -->
+        <div id="hero-prize-wrapper" class="hidden bg-white text-gray-900 rounded-2xl shadow-2xl p-6 md:p-8 max-w-2xl mx-auto mb-6 ring-4 ring-white/30">
+            <div class="text-xs md:text-sm font-bold uppercase tracking-widest text-orange-500 mb-1">⚡ Next Raffle Prize</div>
+            <div class="flex items-baseline justify-center gap-2 md:gap-3 flex-wrap mb-2">
+                <span id="hero-prize-usd" class="text-4xl md:text-6xl font-extrabold text-green-600"></span>
+                <span class="text-lg md:text-2xl text-gray-500 font-semibold">
+                    <span id="hero-prize-sats">0</span> sats
+                </span>
+            </div>
+            <div class="text-xs md:text-sm text-gray-500 border-t pt-3 mt-3 flex flex-wrap justify-center gap-x-4 gap-y-1">
+                <span>🏆 <strong>50%</strong> awarded per raffle</span>
+                <span>·</span>
+                <span>💰 Total fund: <strong id="hero-total-sats">0</strong> sats <span id="hero-total-usd" class="text-green-600"></span></span>
+            </div>
+            <p class="text-xs text-gray-400 mt-2">The more people submit, the bigger the pot grows. Submit a review to enter!</p>
         </div>
-        
+
+        <!-- Raffle Countdown -->
+        <div class="bg-white/20 backdrop-blur rounded-lg p-4 md:p-5 max-w-md mx-auto mb-8">
+            <h2 class="text-sm font-semibold mb-1 opacity-90 uppercase tracking-wider">Next Raffle</h2>
+            ${typeof raffleInfo !== 'undefined' && raffleInfo ? '<div class="text-2xl md:text-3xl font-bold mb-1">Block #' + raffleInfo.nextRaffleBlock.toLocaleString() + '</div><div class="text-base md:text-lg">' + raffleInfo.blocksUntilNext.toLocaleString() + ' blocks away</div><div class="text-xs md:text-sm opacity-75">' + raffleInfo.timeEstimate + '</div>' : '<div class="text-lg">Loading...</div>'}
+        </div>
+
         <div class="flex flex-col sm:flex-row gap-4 justify-center">
             <a href="/submit" class="bg-white text-orange-600 px-8 py-3 rounded-lg font-bold hover:bg-gray-100 transition">
                 Submit a Review
@@ -73,12 +90,12 @@ ${typeof recentlyReviewedMerchant !== 'undefined' && recentlyReviewedMerchant ? 
             <div class="text-center">
                 <div class="w-16 h-16 bg-bitcoin text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">1</div>
                 <h3 class="font-bold mb-2">Pay with Bitcoin</h3>
-                <p class="text-gray-600">Visit a merchant in Roatan and pay with Bitcoin or Lightning</p>
+                <p class="text-gray-600">Visit a merchant in Roatan and pay with Bitcoin (Onchain or Lightning)</p>
             </div>
             <div class="text-center">
                 <div class="w-16 h-16 bg-bitcoin text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">2</div>
                 <h3 class="font-bold mb-2">Write a Review</h3>
-                <p class="text-gray-600">Leave a Google review mentioning your Bitcoin experience</p>
+                <p class="text-gray-600">Leave a Google or Tripadvisor review mentioning your Bitcoin experience</p>
             </div>
             <div class="text-center">
                 <div class="w-16 h-16 bg-bitcoin text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">3</div>
@@ -149,7 +166,7 @@ ${typeof latestRaffle !== 'undefined' && latestRaffle ? `
                 ⚡ Next Prize: <span id="homepage-fund-amount">0</span> sats
             </div>
             <div class="text-sm text-gray-500 mt-2">
-                Total fund: <span id="homepage-total-fund">0</span> sats · 50% awarded per raffle
+                Total fund: <span id="homepage-total-fund">0</span> sats <span id="homepage-total-fund-usd" class="text-green-600"></span> · 50% awarded per raffle
             </div>
         </div>
 

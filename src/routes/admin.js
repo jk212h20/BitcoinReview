@@ -472,7 +472,7 @@ router.post('/raffle/:id/pay', async (req, res) => {
         const paymentResult = await lightning.payLightningAddress(
             raffle.lnurl_address,
             prizeSats,
-            `Bitcoin Review Raffle winner! Block #${raffle.block_height}`
+            `Reviews Raffle winner! Block #${raffle.block_height}`
         );
         
         db.markRafflePaid(parseInt(id), paymentResult.paymentHash);
@@ -670,7 +670,8 @@ router.post('/settings', (req, res) => {
         
         const allowedKeys = [
             'review_mode', 'review_link_mode', 'google_api_key',
-            'raffle_auto_trigger'
+            'raffle_auto_trigger',
+            'contact_telegram', 'contact_email'
         ];
         
         for (const [key, value] of Object.entries(settings)) {
@@ -822,7 +823,7 @@ router.post('/telegram/chats', (req, res) => {
         db.setSetting('extra_telegram_chats', extra.join(','));
 
         // Send a confirmation message to the new chat
-        telegram.sendMessage(String(chatId).trim(), `✅ You've been added as a Bitcoin Review Raffle admin. You'll receive notifications for new reviews, raffle events, and more.`).catch(() => {});
+        telegram.sendMessage(String(chatId).trim(), `✅ You've been added as a Reviews Raffle admin. You'll receive notifications for new reviews, raffle events, and more.`).catch(() => {});
 
         res.json({
             success: true,
