@@ -585,7 +585,7 @@ function adminDashboard() {
 
                 const data = await response.json();
                 if (data.success) {
-                    alert('Payment sent! ' + (data.payment.amountSats || '?').toLocaleString() + ' sats\nHash: ' + data.payment.paymentHash);
+                    alert('Payment sent! ' + (data.payment.amountSats || '?').toLocaleString() + ' sats\\nHash: ' + data.payment.paymentHash);
                     location.reload();
                 } else {
                     alert('Payment failed: ' + data.error);
@@ -885,31 +885,6 @@ function settingsPanel() {
         }
     }
 }
-                })
-                .catch(() => {});
-        },
-        async saveSettings() {
-            this.settingsMsg = '';
-            try {
-                const response = await fetch('/api/admin/settings', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json'},
-                    body: JSON.stringify({ settings: {
-                        review_mode: this.reviewMode,
-                        review_link_mode: this.reviewLinkMode,
-                        raffle_auto_trigger: this.autoPayMode,
-                        contact_telegram: (this.contactTelegram || '').trim(),
-                        contact_email: (this.contactEmail || '').trim()
-                    } })
-                });
-                const data = await response.json();
-                if (data.success) this.settingsMsg = 'Settings saved!';
-                else this.settingsMsg = 'Error: ' + data.error;
-                setTimeout(() => this.settingsMsg = '', 3000);
-            } catch (error) { this.settingsMsg = 'Error: ' + error.message; }
-        }
-    }
-}
 
 function passwordPanel() {
     return {
@@ -1000,7 +975,7 @@ function payUnpaidRaffle(raffleId, stampedAmountSats) {
     .then(function(r) { return r.json(); })
     .then(function(data) {
         if (data.success) {
-            alert('Payment sent! ' + (data.payment.amountSats || '?').toLocaleString() + ' sats\nHash: ' + data.payment.paymentHash);
+            alert('Payment sent! ' + (data.payment.amountSats || '?').toLocaleString() + ' sats\\nHash: ' + data.payment.paymentHash);
             location.reload();
         } else {
             alert('Payment failed: ' + data.error);
