@@ -1048,13 +1048,21 @@ router.get('/raffle/next', async (req, res) => {
  * Query params:
  *   format=csv|json   (default json)
  *   direction=in|out  (optional filter)
- *   limit=N           (default 500, max 5000)
+ *   page=N            (1-based, default 1; ignored for CSV)
+ *   perPage=N         (default 15, max 200; ignored for CSV)
+ *   limit=N           (legacy: hard cap on total entries returned; default
+ *                      500 for paginated views, 5000 for CSV)
  */
 router.get('/treasury', (req, res) => {
     try {
         const format = (req.query.format || 'json').toLowerCase();
         const directionFilter = req.query.direction;
-        const limit = Math.min(parseInt(req.query.limit) || 500, 5000);
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const perPage = Math.min(200, Math.max(1, parseInt(req.query.perPage) || 15));
+        // CSV export should give the admin everything; JSON paginates.
+        const limit = format === 'csv'
+            ? Math.min(parseInt(req.query.limit) || 5000, 5000)
+            : Math.min(parseInt(req.query.limit) || 500, 5000);
 
         // ── Donations: every row from deposit_addresses with received_at set ──
         // Also include unfilled invoices/addresses if you want a full picture; we
@@ -1121,6 +1129,24 @@ router.get('/treasury', (req, res) => {
         entries.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
         entries = entries.slice(0, limit);
 
+        // Pagination is applied AFTER sort/filter so newest entries are on page 1.
+        // CSV export ignores pagination — admins exporting want the full set.
+        const totalEntries = entries.length;
+        const totalPages = Math.max(1, Math.ceil(totalEntries / perPage));
+        const safePage = Math.min(page, totalPages);
+        const pagination = {
+            page: safePage,
+            perPage,
+            totalPages,
+            totalEntries,
+            hasPrev: safePage > 1,
+            hasNext: safePage < totalPages
+        };
+        if (format !== 'csv') {
+            const start = (safePage - 1) * perPage;
+            entries = entries.slice(start, start + perPage);
+        }
+
         // Summary totals (computed across UNFILTERED entries — admins want totals
         // even if they're viewing a filtered slice)
         const totalIn = donations.reduce((s, e) => s + (e.amountSats || 0), 0);
@@ -1180,7 +1206,7 @@ router.get('/treasury', (req, res) => {
             return res.send(lines.join('\n') + '\n');
         }
 
-        res.json({ success: true, summary, entries });
+        res.json({ success: true, summary, entries, pagination });
     } catch (error) {
         console.error('Treasury endpoint error:', error);
         res.status(500).json({ success: false, error: 'Failed to load treasury log: ' + error.message });

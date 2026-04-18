@@ -130,7 +130,7 @@
                     <p class="text-sm text-gray-500">All donations received and prizes paid out, newest first.</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
-                    <select x-model="filter" @change="load()" class="px-3 py-1.5 border rounded-lg text-sm">
+                    <select x-model="filter" @change="onFilterChange()" class="px-3 py-1.5 border rounded-lg text-sm">
                         <option value="">All entries</option>
                         <option value="in">Donations only</option>
                         <option value="out">Payouts only</option>
@@ -247,6 +247,35 @@
                         </template>
                     </tbody>
                 </table>
+            </div>
+
+            <!-- Pagination controls — shown when there's more than one page -->
+            <div x-show="pagination.totalPages > 1" x-cloak
+                class="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
+                <div class="text-gray-500">
+                    Showing
+                    <strong x-text="((pagination.page - 1) * pagination.perPage) + 1"></strong>–<strong x-text="Math.min(pagination.page * pagination.perPage, pagination.totalEntries)"></strong>
+                    of <strong x-text="pagination.totalEntries"></strong>
+                </div>
+                <div class="flex items-center gap-1">
+                    <button type="button" @click="goToPage(page - 1)" :disabled="!pagination.hasPrev || loading"
+                        class="px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                        ← Prev
+                    </button>
+                    <template x-for="(p, i) in pageNumbers()" :key="i">
+                        <span>
+                            <span x-show="p === '…'" class="px-2 text-gray-400">…</span>
+                            <button x-show="p !== '…'" type="button" @click="goToPage(p)" :disabled="loading"
+                                class="min-w-[32px] px-2 py-1.5 rounded-lg border text-sm"
+                                :class="p === page ? 'bg-bitcoin text-white border-bitcoin font-bold' : 'border-gray-300 hover:bg-gray-50'"
+                                x-text="p"></button>
+                        </span>
+                    </template>
+                    <button type="button" @click="goToPage(page + 1)" :disabled="!pagination.hasNext || loading"
+                        class="px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                        Next →
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -1083,11 +1112,21 @@ function treasuryPanel() {
         loading: false,
         error: '',
 
+        // Pagination — newest 15 by default; admin clicks page numbers / Prev / Next
+        // for older entries. CSV export still gives the full filtered set.
+        page: 1,
+        perPage: 15,
+        pagination: { page: 1, perPage: 15, totalPages: 1, totalEntries: 0, hasPrev: false, hasNext: false },
+
         async load() {
             this.loading = true;
             this.error = '';
             try {
-                const url = '/api/admin/treasury' + (this.filter ? '?direction=' + this.filter : '');
+                const params = new URLSearchParams();
+                if (this.filter) params.set('direction', this.filter);
+                params.set('page', String(this.page));
+                params.set('perPage', String(this.perPage));
+                const url = '/api/admin/treasury?' + params.toString();
                 const r = await fetch(url);
 
                 if (r.status === 429) {
@@ -1112,6 +1151,12 @@ function treasuryPanel() {
                 if (d.success) {
                     this.entries = d.entries || [];
                     this.summary = d.summary || null;
+                    if (d.pagination) {
+                        this.pagination = d.pagination;
+                        // Server may have clamped our requested page (e.g. filter
+                        // change reduced totalPages). Sync local state.
+                        this.page = d.pagination.page;
+                    }
                 } else {
                     this.error = d.error || ('Failed to load treasury log (HTTP ' + r.status + ')');
                 }
@@ -1123,7 +1168,39 @@ function treasuryPanel() {
             }
         },
 
+        // Filter changed — reset to page 1, then reload.
+        onFilterChange() {
+            this.page = 1;
+            this.load();
+        },
+
+        goToPage(n) {
+            const p = Math.max(1, Math.min(this.pagination.totalPages || 1, parseInt(n) || 1));
+            if (p === this.page) return;
+            this.page = p;
+            this.load();
+        },
+
+        // Pages to render in the pager: always 1, current ± 2, last, with ellipses.
+        // Returns array of either numbers or the string '…'.
+        pageNumbers() {
+            const total = this.pagination.totalPages || 1;
+            const cur = this.page;
+            if (total <= 7) {
+                return Array.from({ length: total }, (_, i) => i + 1);
+            }
+            const out = new Set([1, total, cur, cur - 1, cur + 1, cur - 2, cur + 2]);
+            const sorted = [...out].filter(n => n >= 1 && n <= total).sort((a, b) => a - b);
+            const result = [];
+            for (let i = 0; i < sorted.length; i++) {
+                if (i > 0 && sorted[i] - sorted[i - 1] > 1) result.push('…');
+                result.push(sorted[i]);
+            }
+            return result;
+        },
+
         exportUrl() {
+            // CSV ignores pagination — gives the full filtered set.
             return '/api/admin/treasury?format=csv' + (this.filter ? '&direction=' + this.filter : '');
         },
 
