@@ -995,4 +995,135 @@ router.get('/raffle/next', async (req, res) => {
     }
 });
 
+/**
+ * GET /api/admin/treasury
+ * Returns a unified, time-sorted list of donations (incoming) and payouts
+ * (outgoing — raffle prizes). Default JSON; pass ?format=csv for download.
+ *
+ * Query params:
+ *   format=csv|json   (default json)
+ *   direction=in|out  (optional filter)
+ *   limit=N           (default 500, max 5000)
+ */
+router.get('/treasury', (req, res) => {
+    try {
+        const format = (req.query.format || 'json').toLowerCase();
+        const directionFilter = req.query.direction;
+        const limit = Math.min(parseInt(req.query.limit) || 500, 5000);
+
+        // ── Donations: every row from deposit_addresses with received_at set ──
+        // Also include unfilled invoices/addresses if you want a full picture; we
+        // only return CONFIRMED received donations here for the financial log.
+        const allDeposits = db.getAllDepositAddresses() || [];
+        const donations = allDeposits
+            .filter(d => d.received_at && d.amount_received_sats > 0)
+            .map(d => ({
+                timestamp: d.received_at,
+                direction: 'in',
+                type: d.type === 'lightning' ? 'Lightning donation' : 'On-chain donation',
+                channel: d.type, // 'lightning' or 'onchain'
+                amountSats: d.amount_received_sats,
+                address: d.type === 'onchain' ? d.address : null,
+                invoice: d.type === 'lightning' ? d.invoice : null,
+                paymentHash: d.payment_hash || null,
+                memo: d.memo || null,
+                status: 'received',
+                refId: 'deposit#' + d.id
+            }));
+
+        // ── Payouts: raffles that have been paid ──
+        const allRaffles = db.getAllRaffles() || [];
+        const payouts = allRaffles
+            .filter(r => r.paid_at && r.prize_amount_sats > 0)
+            .map(r => ({
+                timestamp: r.paid_at,
+                direction: 'out',
+                type: 'Raffle prize payout',
+                channel: 'lightning',
+                amountSats: r.prize_amount_sats,
+                address: r.lnurl_address || null,    // winner LN address
+                invoice: null,
+                paymentHash: r.payment_hash || r.claim_payment_hash || null,
+                memo: `Block #${r.block_height} winner (raffle #${r.id})`,
+                status: r.payment_status || 'paid',
+                refId: 'raffle#' + r.id
+            }));
+
+        // ── Failed/in-flight payouts (committed raffles awaiting pay) ──
+        const pendingPayouts = allRaffles
+            .filter(r => !r.paid_at && r.prize_amount_sats > 0)
+            .map(r => ({
+                timestamp: r.created_at,
+                direction: 'out',
+                type: 'Raffle prize (pending)',
+                channel: 'lightning',
+                amountSats: r.prize_amount_sats,
+                address: r.lnurl_address || null,
+                invoice: null,
+                paymentHash: null,
+                memo: `Block #${r.block_height} winner (raffle #${r.id})${r.payment_error ? ' — error: ' + r.payment_error : ''}`,
+                status: r.payment_error ? 'failed' : 'pending',
+                refId: 'raffle#' + r.id
+            }));
+
+        let entries = [...donations, ...payouts, ...pendingPayouts];
+
+        if (directionFilter === 'in' || directionFilter === 'out') {
+            entries = entries.filter(e => e.direction === directionFilter);
+        }
+
+        // Newest first
+        entries.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+        entries = entries.slice(0, limit);
+
+        // Summary totals (computed across UNFILTERED entries — admins want totals
+        // even if they're viewing a filtered slice)
+        const totalIn = donations.reduce((s, e) => s + (e.amountSats || 0), 0);
+        const totalOut = payouts.reduce((s, e) => s + (e.amountSats || 0), 0);
+        const summary = {
+            totalDonations: donations.length,
+            totalDonatedSats: totalIn,
+            totalPayouts: payouts.length,
+            totalPaidOutSats: totalOut,
+            netSats: totalIn - totalOut,
+            currentFundSats: parseInt(db.getSetting('raffle_fund_sats') || '0')
+        };
+
+        if (format === 'csv') {
+            // Compact CSV with quoted fields where needed
+            const escape = (v) => {
+                if (v == null) return '';
+                const s = String(v);
+                return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+            };
+            const header = ['timestamp', 'direction', 'type', 'channel', 'amount_sats', 'address', 'invoice', 'payment_hash', 'memo', 'status', 'ref'];
+            const lines = [header.join(',')];
+            for (const e of entries) {
+                lines.push([
+                    e.timestamp,
+                    e.direction,
+                    e.type,
+                    e.channel,
+                    e.amountSats,
+                    e.address || '',
+                    e.invoice || '',
+                    e.paymentHash || '',
+                    e.memo || '',
+                    e.status,
+                    e.refId
+                ].map(escape).join(','));
+            }
+            const filename = `reviews-raffle-treasury-${new Date().toISOString().slice(0,10)}.csv`;
+            res.set('Content-Type', 'text/csv; charset=utf-8');
+            res.set('Content-Disposition', `attachment; filename="${filename}"`);
+            return res.send(lines.join('\n') + '\n');
+        }
+
+        res.json({ success: true, summary, entries });
+    } catch (error) {
+        console.error('Treasury endpoint error:', error);
+        res.status(500).json({ success: false, error: 'Failed to load treasury log: ' + error.message });
+    }
+});
+
 module.exports = router;

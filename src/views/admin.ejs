@@ -123,6 +123,110 @@
             '</div>';
         })() : ''}
 
+        <!-- Treasury Log: donations + payouts, with CSV export -->
+        <div class="bg-white rounded-lg p-6 shadow-sm mb-8" x-data="treasuryPanel()" x-init="load()">
+            <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+                <div>
+                    <h2 class="text-xl font-bold">💰 Treasury Log</h2>
+                    <p class="text-sm text-gray-500">All donations received and prizes paid out, newest first.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <select x-model="filter" @change="load()" class="px-3 py-1.5 border rounded-lg text-sm">
+                        <option value="">All entries</option>
+                        <option value="in">Donations only</option>
+                        <option value="out">Payouts only</option>
+                    </select>
+                    <button type="button" @click="load()" :disabled="loading"
+                        class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium disabled:opacity-50">
+                        <span x-text="loading ? 'Loading...' : '↻ Refresh'">↻ Refresh</span>
+                    </button>
+                    <a :href="exportUrl()"
+                        class="bg-bitcoin hover:bg-bitcoin-dark text-white px-3 py-1.5 rounded-lg text-sm font-semibold">
+                        ⬇ Export CSV
+                    </a>
+                </div>
+            </div>
+
+            <!-- Summary cards -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4" x-show="summary" x-cloak>
+                <div class="bg-green-50 border border-green-200 rounded-lg p-3">
+                    <div class="text-xs uppercase tracking-wide text-green-700">Total donated</div>
+                    <div class="text-lg font-bold text-green-700"><span x-text="(summary.totalDonatedSats || 0).toLocaleString()"></span> sats</div>
+                    <div class="text-xs text-gray-500"><span x-text="summary.totalDonations || 0"></span> donation<span x-show="(summary.totalDonations||0) !== 1">s</span></div>
+                </div>
+                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                    <div class="text-xs uppercase tracking-wide text-yellow-700">Total paid out</div>
+                    <div class="text-lg font-bold text-yellow-700"><span x-text="(summary.totalPaidOutSats || 0).toLocaleString()"></span> sats</div>
+                    <div class="text-xs text-gray-500"><span x-text="summary.totalPayouts || 0"></span> payout<span x-show="(summary.totalPayouts||0) !== 1">s</span></div>
+                </div>
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <div class="text-xs uppercase tracking-wide text-blue-700">Net (in − out)</div>
+                    <div class="text-lg font-bold text-blue-700"><span x-text="(summary.netSats || 0).toLocaleString()"></span> sats</div>
+                </div>
+                <div class="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                    <div class="text-xs uppercase tracking-wide text-orange-700">Current fund</div>
+                    <div class="text-lg font-bold text-orange-700"><span x-text="(summary.currentFundSats || 0).toLocaleString()"></span> sats</div>
+                </div>
+            </div>
+
+            <div x-show="error" x-cloak class="bg-red-50 text-red-700 text-sm rounded p-3 mb-3" x-text="error"></div>
+
+            <!-- Table -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50 text-gray-600 text-xs uppercase tracking-wide">
+                        <tr>
+                            <th class="text-left py-2 px-3">Time (UTC)</th>
+                            <th class="text-left py-2 px-3">Direction</th>
+                            <th class="text-left py-2 px-3">Type</th>
+                            <th class="text-right py-2 px-3">Amount</th>
+                            <th class="text-left py-2 px-3">Address / Invoice</th>
+                            <th class="text-left py-2 px-3">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        <template x-for="e in entries" :key="e.refId + ':' + e.timestamp">
+                            <tr>
+                                <td class="py-2 px-3 font-mono text-xs whitespace-nowrap text-gray-700" x-text="formatTime(e.timestamp)"></td>
+                                <td class="py-2 px-3">
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium"
+                                        :class="e.direction === 'in' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'"
+                                        x-text="e.direction === 'in' ? '↓ IN' : '↑ OUT'"></span>
+                                </td>
+                                <td class="py-2 px-3 text-gray-700" x-text="e.type"></td>
+                                <td class="py-2 px-3 text-right font-bold"
+                                    :class="e.direction === 'in' ? 'text-green-700' : 'text-yellow-700'">
+                                    <span x-text="(e.direction === 'in' ? '+' : '−') + (e.amountSats || 0).toLocaleString()"></span>
+                                    <span class="text-gray-400 text-xs font-normal">sats</span>
+                                </td>
+                                <td class="py-2 px-3 font-mono text-xs text-gray-600 max-w-xs">
+                                    <div class="truncate" :title="e.address || e.invoice || e.paymentHash || ''">
+                                        <span x-text="e.address || e.invoice || e.paymentHash || '—'"></span>
+                                    </div>
+                                    <div x-show="e.memo" class="text-gray-400 italic truncate" :title="e.memo" x-text="e.memo"></div>
+                                </td>
+                                <td class="py-2 px-3">
+                                    <span class="px-2 py-0.5 rounded text-xs font-medium"
+                                        :class="{
+                                            'bg-green-100 text-green-700': e.status === 'received' || e.status === 'paid',
+                                            'bg-yellow-100 text-yellow-700': e.status === 'pending',
+                                            'bg-red-100 text-red-700': e.status === 'failed'
+                                        }"
+                                        x-text="e.status"></span>
+                                </td>
+                            </tr>
+                        </template>
+                        <template x-if="!loading && entries.length === 0">
+                            <tr><td colspan="6" class="py-6 text-center text-gray-400 italic">No treasury activity yet.</td></tr>
+                        </template>
+                        <template x-if="loading && entries.length === 0">
+                            <tr><td colspan="6" class="py-6 text-center text-gray-400">Loading...</td></tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <!-- Settings Panel -->
         <div class="bg-white rounded-lg p-6 shadow-sm mb-8" x-data="settingsPanel()">
             <h2 class="text-xl font-bold mb-4">⚙️ Settings</h2>
@@ -944,6 +1048,47 @@ function passwordPanel() {
                 this.pwLoading = false;
                 setTimeout(() => { this.pwMsg = ''; }, 5000);
             }
+        }
+    }
+}
+
+function treasuryPanel() {
+    return {
+        entries: [],
+        summary: null,
+        filter: '',     // '', 'in', or 'out'
+        loading: false,
+        error: '',
+
+        async load() {
+            this.loading = true;
+            this.error = '';
+            try {
+                const url = '/api/admin/treasury' + (this.filter ? '?direction=' + this.filter : '');
+                const r = await fetch(url);
+                const d = await r.json();
+                if (d.success) {
+                    this.entries = d.entries || [];
+                    this.summary = d.summary || null;
+                } else {
+                    this.error = d.error || 'Failed to load treasury log';
+                }
+            } catch (e) {
+                this.error = 'Network error: ' + e.message;
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        exportUrl() {
+            return '/api/admin/treasury?format=csv' + (this.filter ? '&direction=' + this.filter : '');
+        },
+
+        formatTime(ts) {
+            if (!ts) return '';
+            // SQLite returns 'YYYY-MM-DD HH:MM:SS' (UTC). Show as 'YYYY-MM-DD HH:MM'.
+            const s = String(ts).replace('T', ' ').slice(0, 16);
+            return s;
         }
     }
 }
