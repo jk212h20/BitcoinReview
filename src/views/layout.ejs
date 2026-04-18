@@ -144,6 +144,11 @@
                                 <span>📱</span> <span><%= contact.telegramLabel || 'Telegram' %></span>
                             </a>
                             <% } %>
+                            <% if (contact.whatsappUrl) { %>
+                            <a href="<%= contact.whatsappUrl %>" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-green-400 hover:text-green-300">
+                                <span>💬</span> <span>WhatsApp <%= contact.whatsappLabel %></span>
+                            </a>
+                            <% } %>
                             <% if (contact.email) { %>
                             <a href="mailto:<%= contact.email %>?subject=Reviews%20Raffle%20feedback" class="inline-flex items-center gap-1 text-orange-300 hover:text-orange-200">
                                 <span>✉️</span> <span><%= contact.email %></span>

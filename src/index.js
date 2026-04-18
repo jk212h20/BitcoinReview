@@ -77,6 +77,9 @@ app.use((req, res, next) => {
     try {
         const rawTg = (db.getSetting('contact_telegram') || '').trim();
         const rawMail = (db.getSetting('contact_email') || '').trim();
+        const rawWa = (db.getSetting('contact_whatsapp') || '').trim();
+
+        // Telegram normalization: accept @handle, handle, or full t.me URL
         let tgUrl = '';
         let tgLabel = '';
         if (rawTg) {
@@ -90,14 +93,35 @@ app.use((req, res, next) => {
                 tgLabel = '@' + handle;
             }
         }
+
+        // WhatsApp normalization: accept any phone format with or without +,
+        // spaces, dashes, parens. wa.me requires digits only (with country code,
+        // no leading +). The displayed label keeps a leading + for clarity.
+        let waUrl = '';
+        let waLabel = '';
+        if (rawWa) {
+            const digits = rawWa.replace(/\D+/g, '');
+            if (digits.length >= 7) {
+                waUrl = 'https://wa.me/' + digits;
+                waLabel = '+' + digits;
+            }
+        }
+
         res.locals.contact = {
             telegramUrl: tgUrl,
             telegramLabel: tgLabel,
             email: rawMail,
-            hasAny: !!(tgUrl || rawMail)
+            whatsappUrl: waUrl,
+            whatsappLabel: waLabel,
+            hasAny: !!(tgUrl || rawMail || waUrl)
         };
     } catch (e) {
-        res.locals.contact = { telegramUrl: '', telegramLabel: '', email: '', hasAny: false };
+        res.locals.contact = {
+            telegramUrl: '', telegramLabel: '',
+            email: '',
+            whatsappUrl: '', whatsappLabel: '',
+            hasAny: false
+        };
     }
 
     next();

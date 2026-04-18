@@ -273,6 +273,11 @@ var timeEst = typeof raffleInfo !== 'undefined' && raffleInfo && raffleInfo.bloc
                     <span>📱</span> <span>Telegram: <%= contact.telegramLabel %></span>
                 </a>
                 <% } %>
+                <% if (contact.whatsappUrl) { %>
+                <a href="<%= contact.whatsappUrl %>" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 bg-[#25D366] text-white px-3 py-1.5 rounded-lg hover:bg-[#1EBE57] transition">
+                    <span>💬</span> <span>WhatsApp: <%= contact.whatsappLabel %></span>
+                </a>
+                <% } %>
                 <% if (contact.email) { %>
                 <a href="mailto:<%= contact.email %>?subject=Reviews%20Raffle%20-%20missing%20merchant%20or%20bug" class="inline-flex items-center gap-1.5 bg-bitcoin text-white px-3 py-1.5 rounded-lg hover:bg-bitcoin-dark transition">
                     <span>✉️</span> <span><%= contact.email %></span>
@@ -312,6 +317,9 @@ var timeEst = typeof raffleInfo !== 'undefined' && raffleInfo && raffleInfo.bloc
                         <div class="flex flex-wrap gap-3 text-sm">
                             <% if (contact.telegramUrl) { %>
                             <a href="<%= contact.telegramUrl %>" target="_blank" rel="noopener" class="text-blue-400 hover:text-blue-300">📱 <%= contact.telegramLabel %></a>
+                            <% } %>
+                            <% if (contact.whatsappUrl) { %>
+                            <a href="<%= contact.whatsappUrl %>" target="_blank" rel="noopener" class="text-green-400 hover:text-green-300">💬 <%= contact.whatsappLabel %></a>
                             <% } %>
                             <% if (contact.email) { %>
                             <a href="mailto:<%= contact.email %>?subject=Reviews%20Raffle%20feedback" class="text-orange-300 hover:text-orange-200">✉️ <%= contact.email %></a>
