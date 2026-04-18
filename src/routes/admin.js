@@ -996,6 +996,63 @@ router.get('/raffle/next', async (req, res) => {
 });
 
 /**
+ * POST /api/admin/treasury/reconcile
+ * Recompute raffle_fund_sats from the treasury ledger:
+ *   sum(received donations) − sum(paid-out raffle prizes)
+ *
+ * Use this to remove a manual seed amount that was set via /api/raffle-fund/set
+ * or /api/raffle-fund/add (which bypassed deposit_addresses, so the fund and
+ * the ledger drifted apart). After reconciling, the fund equals exactly what
+ * the on-chain + Lightning history shows.
+ *
+ * Returns: { previousFund, newFund, delta, breakdown }
+ */
+router.post('/treasury/reconcile', (req, res) => {
+    try {
+        const allDeposits = db.getAllDepositAddresses() || [];
+        const totalDonatedSats = allDeposits
+            .filter(d => d.received_at && d.amount_received_sats > 0)
+            .reduce((s, d) => s + (d.amount_received_sats || 0), 0);
+
+        const allRaffles = db.getAllRaffles() || [];
+        const totalPaidOutSats = allRaffles
+            .filter(r => r.paid_at && r.prize_amount_sats > 0)
+            .reduce((s, r) => s + (r.prize_amount_sats || 0), 0);
+
+        // Pending committed-but-unpaid raffles also reserve sats from the fund
+        // (commitRaffleResult subtracts them at commit time). Subtract them too
+        // so the fund matches the "available" balance that the ledger implies.
+        const pendingPayoutSats = allRaffles
+            .filter(r => !r.paid_at && r.prize_amount_sats > 0)
+            .reduce((s, r) => s + (r.prize_amount_sats || 0), 0);
+
+        const newFund = Math.max(0, totalDonatedSats - totalPaidOutSats - pendingPayoutSats);
+        const previousFund = parseInt(db.getSetting('raffle_fund_sats') || '0');
+
+        db.setSetting('raffle_fund_sats', String(newFund));
+
+        console.log(`🔧 Treasury reconcile: fund ${previousFund} → ${newFund} sats ` +
+            `(donated ${totalDonatedSats} − paid ${totalPaidOutSats} − pending ${pendingPayoutSats})`);
+
+        res.json({
+            success: true,
+            previousFund,
+            newFund,
+            delta: newFund - previousFund,
+            breakdown: {
+                totalDonatedSats,
+                totalPaidOutSats,
+                pendingPayoutSats
+            },
+            message: `Fund reconciled: ${previousFund.toLocaleString()} → ${newFund.toLocaleString()} sats`
+        });
+    } catch (error) {
+        console.error('Treasury reconcile error:', error);
+        res.status(500).json({ success: false, error: 'Failed to reconcile fund: ' + error.message });
+    }
+});
+
+/**
  * GET /api/admin/treasury
  * Returns a unified, time-sorted list of donations (incoming) and payouts
  * (outgoing — raffle prizes). Default JSON; pass ?format=csv for download.
