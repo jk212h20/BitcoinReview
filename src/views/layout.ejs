@@ -264,10 +264,26 @@
                 // heroTotal is set from data.totalFundSats/Usd in fetchFund()
             }
 
+            // Polling settings — designed to stay well under the public rate limit
+            // (300 reqs / 15 min per IP). With 60s active polling + auto-pause when
+            // tab is hidden, a single visible tab uses ~15 reqs / 15 min.
+            var POLL_INTERVAL_MS = 60000;
+            var pollTimer = null;
+            var consecutiveFailures = 0;
+
             function fetchFund() {
-                fetch('/api/raffle-fund')
-                    .then(function(res) { return res.json(); })
+                return fetch('/api/raffle-fund')
+                    .then(function(res) {
+                        if (!res.ok) {
+                            // Includes 429s. Don't surface to user; just back off.
+                            consecutiveFailures++;
+                            return null;
+                        }
+                        return res.json();
+                    })
                     .then(function(data) {
+                        if (!data) return;
+                        consecutiveFailures = 0;
                         if (data.success && typeof data.nextPrizeSats === 'number') {
                             updateFundDisplay(data.nextPrizeSats, data.nextPrizeUsd);
                             // Full fund display on homepage
@@ -292,14 +308,49 @@
                             }
                         }
                     })
-                    .catch(function() { /* silent fail */ });
+                    .catch(function() {
+                        consecutiveFailures++;
+                        // silent fail
+                    });
             }
 
-            // Initial fetch
-            fetchFund();
+            // Decide whether this page even needs the badge polling.
+            // Skip on /admin (admin doesn't see the donor-facing prize pool) and
+            // any page with no relevant DOM nodes — saves all those requests.
+            function shouldPoll() {
+                if (location.pathname.indexOf('/admin') === 0) return false;
+                return !!(fundBadge || fundBadgeMobile || fundBadgeMobileTop ||
+                    homepageFund || document.getElementById('hero-prize-wrapper'));
+            }
 
-            // Poll every 10 seconds (backend detects instantly via LND subscription)
-            setInterval(fetchFund, 10000);
+            function startPolling() {
+                if (pollTimer || !shouldPoll()) return;
+                // Exponential backoff cap on consecutive failures (max 5 min).
+                var interval = POLL_INTERVAL_MS * Math.min(1 << Math.min(consecutiveFailures, 4), 5);
+                pollTimer = setInterval(function() {
+                    if (document.hidden) return;  // skip silently when tab not visible
+                    fetchFund();
+                }, interval);
+            }
+            function stopPolling() {
+                if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+            }
+
+            // Pause/resume polling on tab visibility changes — biggest single win.
+            document.addEventListener('visibilitychange', function() {
+                if (document.hidden) {
+                    stopPolling();
+                } else {
+                    fetchFund();   // catch up immediately when refocused
+                    startPolling();
+                }
+            });
+
+            // Initial fetch + polling, only if this page actually needs it
+            if (shouldPoll()) {
+                fetchFund();
+                startPolling();
+            }
         })();
     </script>
 </body>

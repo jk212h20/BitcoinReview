@@ -50,21 +50,43 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.set('view cache', true);  // Cache compiled EJS templates in production
 
-// Rate limiting for PUBLIC API endpoints only.
+// Rate limiting for PUBLIC API endpoints.
+//
 // Admin routes are gated by session/password auth (see services/auth.js) so
-// they are intentionally exempt — otherwise an authenticated admin can be
-// locked out by their own dashboard polling (e.g. raffle-fund badge every
-// 10s + treasury refreshes can easily exceed the public 100-req/15-min cap).
+// they are intentionally exempt — otherwise an authenticated admin gets
+// locked out by their own dashboard.
+//
+// Read-only polled endpoints (raffle-fund badge, claim status) are also
+// exempt because they're called by long-lived pages on a timer. Even with
+// smart polling (60s active, paused when tab hidden) a busy NAT'd IP with
+// several visitors could otherwise share a tight budget. These endpoints
+// hit only in-memory cache or a single SQLite read — they're cheap.
+//
+// What's left under the limiter: write endpoints (/api/submit,
+// /api/generate-invoice, /api/telegram/link, etc.) — exactly the surface
+// where abuse actually hurts.
 const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100,
+    max: 300,                 // raised from 100; see comment above
+    standardHeaders: true,
+    legacyHeaders: false,
     message: { error: 'Too many requests, please try again later.' },
-    skip: (req) => req.path.startsWith('/admin')  // skip /api/admin/*
+    skip: (req) => {
+        if (req.path.startsWith('/admin')) return true;
+        // Read-only polled endpoints
+        if (req.path === '/raffle-fund') return true;
+        if (req.path.startsWith('/claim/') && req.path.endsWith('/status')) return true;
+        // Health check endpoints (Railway's healthchecker, etc.)
+        if (req.path === '/health') return true;
+        return false;
+    }
 });
 
 const registrationLimiter = rateLimit({
     windowMs: 60 * 60 * 1000, // 1 hour
-    max: 10, // Limit each IP to 10 registrations per hour
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
     message: { error: 'Too many registration attempts, please try again later.' }
 });
 

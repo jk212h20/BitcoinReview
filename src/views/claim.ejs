@@ -174,17 +174,32 @@
             claimed: false,
             polling: true,
             pollInterval: null,
+            consecutiveFailures: 0,
 
             startPolling() {
                 var self = this;
-                this.pollInterval = setInterval(function() {
+                // 5s while user is actively watching (need decent UX after they
+                // scan the QR), pause when tab hidden, exponential backoff on
+                // failures up to 60s. This stays well under the 300/15min cap.
+                function tick() {
+                    if (document.hidden || !self.polling) return;
                     self.checkStatus();
-                }, 3000); // Poll every 3 seconds
+                }
+                this.pollInterval = setInterval(tick, 5000);
+                document.addEventListener('visibilitychange', function() {
+                    if (!document.hidden && self.polling) self.checkStatus();
+                });
             },
 
             async checkStatus() {
                 try {
                     var response = await fetch('/api/claim/<%= raffle.claim_token %>/status');
+                    if (!response.ok) {
+                        // 429 etc — back off silently, will retry next tick.
+                        this.consecutiveFailures++;
+                        return;
+                    }
+                    this.consecutiveFailures = 0;
                     var data = await response.json();
                     if (data.success && data.status === 'claimed') {
                         this.claimed = true;
@@ -192,6 +207,7 @@
                         if (this.pollInterval) clearInterval(this.pollInterval);
                     }
                 } catch (e) {
+                    this.consecutiveFailures++;
                     // Silently ignore poll errors
                 }
             }
