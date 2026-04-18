@@ -1097,14 +1097,34 @@ function treasuryPanel() {
             try {
                 const url = '/api/admin/treasury' + (this.filter ? '?direction=' + this.filter : '');
                 const r = await fetch(url);
-                const d = await r.json();
+
+                if (r.status === 429) {
+                    // Rate-limited (shouldn't happen for admin routes anymore, but
+                    // guard against it). Keep the existing entries so the table
+                    // doesn't blank out — just show a non-blocking notice.
+                    this.error = 'Server is rate-limiting requests. The table below shows the last successful load.';
+                    return;
+                }
+                if (r.status === 401) {
+                    this.error = 'Session expired. Please log in again.';
+                    return;
+                }
+
+                let d;
+                try { d = await r.json(); }
+                catch (parseErr) {
+                    this.error = 'Server returned an invalid response (HTTP ' + r.status + ').';
+                    return;
+                }
+
                 if (d.success) {
                     this.entries = d.entries || [];
                     this.summary = d.summary || null;
                 } else {
-                    this.error = d.error || 'Failed to load treasury log';
+                    this.error = d.error || ('Failed to load treasury log (HTTP ' + r.status + ')');
                 }
             } catch (e) {
+                // Network failure — keep stale entries visible.
                 this.error = 'Network error: ' + e.message;
             } finally {
                 this.loading = false;

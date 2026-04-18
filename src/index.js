@@ -50,11 +50,16 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.set('view cache', true);  // Cache compiled EJS templates in production
 
-// Rate limiting for API endpoints
+// Rate limiting for PUBLIC API endpoints only.
+// Admin routes are gated by session/password auth (see services/auth.js) so
+// they are intentionally exempt — otherwise an authenticated admin can be
+// locked out by their own dashboard polling (e.g. raffle-fund badge every
+// 10s + treasury refreshes can easily exceed the public 100-req/15-min cap).
 const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // Limit each IP to 100 requests per windowMs
-    message: { error: 'Too many requests, please try again later.' }
+    max: 100,
+    message: { error: 'Too many requests, please try again later.' },
+    skip: (req) => req.path.startsWith('/admin')  // skip /api/admin/*
 });
 
 const registrationLimiter = rateLimit({
