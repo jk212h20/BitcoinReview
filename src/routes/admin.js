@@ -263,6 +263,17 @@ router.post('/raffle/test', async (req, res) => {
             return res.status(400).json({ error: 'No approved tickets to draw from' });
         }
 
+        // Site-budget guard: refuse the test if even the 100-sat fee would push
+        // this site below 0 in its ledger (donations − payouts).
+        const available = lightning.getSiteAvailableSats();
+        if (prizeSats > available) {
+            return res.status(400).json({
+                error: `Test raffle needs ${prizeSats} sats but this site only has ${available.toLocaleString()} sats available. Top up the raffle fund first.`,
+                requested: prizeSats,
+                available
+            });
+        }
+
         // Use the current block height to get a real block hash for randomness
         const currentHeight = await bitcoin.getCurrentBlockHeight();
         const blockHash = await bitcoin.getBlockHash(currentHeight);
@@ -415,11 +426,25 @@ router.post('/raffle/run', async (req, res) => {
         if (tickets.length === 0) {
             return res.status(400).json({ error: 'No valid tickets for this raffle period' });
         }
-        
+
+        // Site-budget guard: refuse to commit a raffle whose prize exceeds the
+        // site's available ledger balance. The shared LND node may have more —
+        // those funds belong to other sites.
+        if (prizeAmountSats) {
+            const available = lightning.getSiteAvailableSats();
+            if (prizeAmountSats > available) {
+                return res.status(400).json({
+                    error: `Prize ${prizeAmountSats.toLocaleString()} sats exceeds this site's available fund (${available.toLocaleString()} sats). Top up the raffle fund with a real donation first.`,
+                    requested: prizeAmountSats,
+                    available
+                });
+            }
+        }
+
         // Select winner
         const winnerIndex = bitcoin.selectWinnerIndex(blockHash, tickets.length);
         const winningTicket = tickets[winnerIndex];
-        
+
         // Create raffle record
         const raffle = db.createRaffle(
             blockHeight,
@@ -571,6 +596,33 @@ router.post('/raffle/:id/pay', async (req, res) => {
                 error: 'No prize amount available: raffle has no stamped prize and the raffle fund is empty. Donate to the fund or pass an explicit amountSats.'
             });
         }
+
+        // Don't let an admin override pay MORE than what was reserved at commit
+        // time (the advertised prize). Otherwise the override could silently
+        // drain a sibling site's funds on the shared LND node.
+        if (prizeSource === 'admin-override' && raffle.prize_amount_sats &&
+                prizeSats > raffle.prize_amount_sats) {
+            return res.status(400).json({
+                error: `Override amount (${prizeSats.toLocaleString()} sats) exceeds the reserved prize (${raffle.prize_amount_sats.toLocaleString()} sats). The advertised prize is the cap.`,
+                requested: prizeSats,
+                reserved: raffle.prize_amount_sats
+            });
+        }
+
+        // Final defense: never spend more than this site's ledger allows. The
+        // lightning service also enforces this, but a clear 400 here is nicer
+        // for the admin UI than a 500 from the LND service.
+        const siteAvailable = lightning.getSiteAvailableSats();
+        // For an already-reserved raffle, the reserved amount is part of the
+        // ledger's "available for THIS payout" — but if total over-commitment
+        // happened (e.g. multiple pending raffles), we still cap at available.
+        if (prizeSats > siteAvailable && prizeSource !== 'stamped-at-commit') {
+            return res.status(400).json({
+                error: `Cannot pay ${prizeSats.toLocaleString()} sats: site only has ${siteAvailable.toLocaleString()} sats available in its ledger.`,
+                requested: prizeSats,
+                available: siteAvailable
+            });
+        }
         console.log(`💰 Pay prize: ${prizeSats} sats (source: ${prizeSource}) for raffle #${id}`);
         
         // Pay via Lightning
@@ -608,40 +660,33 @@ router.post('/raffle/:id/pay', async (req, res) => {
 router.get('/lightning/status', async (req, res) => {
     try {
         const status = await lightning.isConfigured();
-        
+
         if (!status.configured) {
-            return res.json({ 
-                success: true, 
-                lightning: { 
-                    configured: false, 
-                    reason: status.reason 
-                } 
+            return res.json({
+                success: true,
+                lightning: {
+                    configured: false,
+                    reason: status.reason
+                }
             });
         }
-        
-        // Get balances
-        let channelBalance = null;
-        try {
-            const bal = await lightning.getChannelBalance();
-            channelBalance = {
-                localBalance: parseInt(bal.local_balance?.sat || bal.balance || 0),
-                remoteBalance: parseInt(bal.remote_balance?.sat || 0)
-            };
-        } catch (e) {
-            channelBalance = { error: e.message };
-        }
-        
+
+        // Site-scoped view only. The underlying Voltage node is shared with
+        // other sites — its node alias, pubkey, and channel balance are NOT
+        // appropriate to show to a per-site admin (information disclosure).
+        // What the admin actually needs to know:
+        //   1. Is the Lightning rail working? (configured + synced)
+        //   2. How much can THIS site spend? (siteAvailableSats from ledger)
+        //   3. Is auto-pay on?
+        const siteAvailableSats = lightning.getSiteAvailableSats();
+
         res.json({
             success: true,
             lightning: {
                 configured: true,
-                alias: status.alias,
-                pubkey: status.pubkey,
                 synced: status.synced,
-                blockHeight: status.blockHeight,
-                channelBalance,
-                autoPayEnabled: process.env.AUTO_PAY_ENABLED === 'true',
-                defaultPrizeSats: parseInt(process.env.DEFAULT_PRIZE_SATS) || 0
+                siteAvailableSats,
+                autoPayEnabled: process.env.AUTO_PAY_ENABLED === 'true'
             }
         });
     } catch (error) {

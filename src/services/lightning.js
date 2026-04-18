@@ -9,6 +9,52 @@ const db = require('./database');
 const LND_REST_URL = process.env.LND_REST_URL;
 const LND_MACAROON = process.env.LND_MACAROON;
 
+// ── Site-scoped spending guard ──────────────────────────────────────────
+// The LND node is shared with other sites, so its channel balance is NOT
+// the right ceiling for what THIS site can pay out. We compute an internal
+// budget from the local SQLite ledger:
+//
+//   getSiteAvailableSats() = totalDonated − totalPaidOut
+//
+// Every pay path goes through assertWithinBudget(sats) before touching LND.
+// If a future bug or misconfiguration tried to send more than this site has
+// ever received and not yet paid out, the call fails fast with a clear error
+// instead of draining a sibling site's funds.
+//
+// Pending committed-but-unpaid raffles are NOT subtracted here, because
+// when they DO pay they go through this same chokepoint — the guard fires
+// at pay time, not commit time. (Commit time has its own check in admin.js.)
+function getSiteAvailableSats() {
+    const allDeposits = db.getAllDepositAddresses() || [];
+    const totalDonated = allDeposits
+        .filter(d => d.received_at && d.amount_received_sats > 0)
+        .reduce((s, d) => s + (d.amount_received_sats || 0), 0);
+
+    const allRaffles = db.getAllRaffles() || [];
+    const totalPaidOut = allRaffles
+        .filter(r => r.paid_at && r.prize_amount_sats > 0)
+        .reduce((s, r) => s + (r.prize_amount_sats || 0), 0);
+
+    return Math.max(0, totalDonated - totalPaidOut);
+}
+
+function assertWithinBudget(amountSats, context) {
+    const available = getSiteAvailableSats();
+    if (amountSats > available) {
+        const err = new Error(
+            `Refusing to pay ${amountSats.toLocaleString()} sats: this site only has ` +
+            `${available.toLocaleString()} sats available in its ledger ` +
+            `(donations − payouts). The shared LND node has more, but it belongs to ` +
+            `other sites. Top up the raffle fund with a real donation first.` +
+            (context ? ` (context: ${context})` : '')
+        );
+        err.code = 'BUDGET_EXCEEDED';
+        err.available = available;
+        err.requested = amountSats;
+        throw err;
+    }
+}
+
 // In-memory cache for deposit info
 let depositCache = {
     onchainAddress: null,
@@ -89,8 +135,29 @@ async function decodePayReq(payReq) {
 /**
  * Pay a BOLT11 invoice
  * Returns payment result with payment_hash and payment_preimage
+ *
+ * SAFETY: All payments are clamped to this site's ledger budget
+ * (donations − payouts). The shared LND node may have more funds, but
+ * those belong to other sites. See assertWithinBudget() above.
  */
 async function payInvoice(payReq, amountSats = null) {
+    // If the caller provided an amount, check it directly. Otherwise decode
+    // the invoice to find out what we're committing to before contacting LND.
+    let payAmount = amountSats;
+    if (payAmount == null) {
+        try {
+            const decoded = await decodePayReq(payReq);
+            payAmount = parseInt(decoded.num_satoshis || decoded.numSatoshis || '0');
+        } catch (e) {
+            // If we can't decode, fall through to LND — LND will reject if invoice
+            // is malformed. We just lose the budget check for this edge case.
+            payAmount = 0;
+        }
+    }
+    if (payAmount > 0) {
+        assertWithinBudget(payAmount, 'payInvoice');
+    }
+
     const body = {
         payment_request: payReq,
         fee_limit: {
@@ -229,8 +296,14 @@ async function requestInvoice(callback, amountSats, comment = '') {
 /**
  * Pay a Lightning Address a specific amount in sats
  * Full flow: resolve address -> request invoice -> pay invoice
+ *
+ * SAFETY: Refuses to pay more than this site's available ledger balance.
+ * The shared LND node may have plenty more — those funds belong to other
+ * sites. The check fires BEFORE LNURL callback resolution so we don't
+ * leak any side-effects on a refused payment.
  */
 async function payLightningAddress(address, amountSats, comment = '') {
+    assertWithinBudget(amountSats, 'payLightningAddress→' + address);
     console.log(`💸 Paying ${amountSats} sats to ${address}...`);
 
     // Step 1: Resolve Lightning Address
@@ -795,6 +868,8 @@ module.exports = {
     requestInvoice,
     payLightningAddress,
     isConfigured,
+    getSiteAvailableSats,
+    assertWithinBudget,
     
     // Deposit management
     generateOnChainAddress,
