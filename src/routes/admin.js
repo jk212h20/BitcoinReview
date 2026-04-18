@@ -1137,13 +1137,29 @@ router.get('/treasury', (req, res) => {
         // even if they're viewing a filtered slice)
         const totalIn = donations.reduce((s, e) => s + (e.amountSats || 0), 0);
         const totalOut = payouts.reduce((s, e) => s + (e.amountSats || 0), 0);
+        // Reserved = pending + failed raffle payouts. These are sats already
+        // subtracted from the fund at commit time but not yet sent (so they
+        // explain the gap between Net and Current fund).
+        const reserved = pendingPayouts.reduce((s, e) => s + (e.amountSats || 0), 0);
+        const reservedPending = pendingPayouts.filter(e => e.status === 'pending').reduce((s, e) => s + (e.amountSats || 0), 0);
+        const reservedFailed = pendingPayouts.filter(e => e.status === 'failed').reduce((s, e) => s + (e.amountSats || 0), 0);
+        const fund = parseInt(db.getSetting('raffle_fund_sats') || '0');
         const summary = {
             totalDonations: donations.length,
             totalDonatedSats: totalIn,
             totalPayouts: payouts.length,
             totalPaidOutSats: totalOut,
-            netSats: totalIn - totalOut,
-            currentFundSats: parseInt(db.getSetting('raffle_fund_sats') || '0')
+            reservedSats: reserved,
+            reservedPendingSats: reservedPending,
+            reservedFailedSats: reservedFailed,
+            reservedCount: pendingPayouts.length,
+            netSats: totalIn - totalOut - reserved,  // Now matches Current fund
+            currentFundSats: fund,
+            // Drift between expected (donated − paid − reserved) and actual fund.
+            // Should be ~0 if the ledger is consistent. Non-zero means a manual
+            // seed (set via /api/raffle-fund/set or /add) or another mutation
+            // bypassed the deposit_addresses table. Click Reconcile to clear it.
+            unaccountedSats: fund - (totalIn - totalOut - reserved)
         };
 
         if (format === 'csv') {
