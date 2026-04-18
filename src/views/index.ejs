@@ -174,19 +174,20 @@ ${typeof latestRaffle !== 'undefined' && latestRaffle ? `
             <div class="bg-white rounded-xl shadow-sm p-6 text-center">
                 <div class="text-2xl mb-2">🔗</div>
                 <h3 class="text-xl font-bold mb-4">On-Chain Bitcoin</h3>
-                ${typeof onchainAddress !== 'undefined' && onchainAddress ? '<div class="mb-4"><img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=bitcoin:' + onchainAddress + '" alt="Bitcoin QR Code" class="mx-auto rounded-lg" width="200" height="200" /></div><div class="bg-gray-50 rounded-lg p-3 mb-3"><code id="onchain-addr" class="text-xs break-all select-all text-gray-700">' + onchainAddress + '</code></div><button onclick="copyToClipboard(&#39;onchain-addr&#39;, this)" class="bg-bitcoin text-white px-5 py-2 rounded-lg font-semibold hover:bg-bitcoin-dark transition text-sm">📋 Copy Address</button>' : '<p class="text-gray-400 italic">Connecting to node...</p>'}
+                ${typeof onchainAddress !== 'undefined' && onchainAddress ? '<a id="onchain-link" href="bitcoin:' + onchainAddress + '" class="block mb-2"><div id="onchain-qr" class="mx-auto rounded-lg bg-white p-2 inline-block" style="width:216px;height:216px;"></div></a><div class="text-xs text-gray-400 mb-3">Tap QR to open your wallet</div><div class="bg-gray-50 rounded-lg p-3 mb-3"><code id="onchain-addr" class="text-xs break-all select-all text-gray-700">' + onchainAddress + '</code></div><button onclick="copyToClipboard(&#39;onchain-addr&#39;, this)" class="bg-bitcoin text-white px-5 py-2 rounded-lg font-semibold hover:bg-bitcoin-dark transition text-sm">📋 Copy Address</button>' : '<p class="text-gray-400 italic">Connecting to node...</p>'}
             </div>
 
             <!-- Lightning Invoice -->
             <div class="bg-white rounded-xl shadow-sm p-6 text-center">
                 <div class="text-2xl mb-2">⚡</div>
                 <h3 class="text-xl font-bold mb-4">Lightning Network</h3>
-                ${typeof lightningInvoice !== 'undefined' && lightningInvoice ? '<div class="mb-4"><img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=lightning:' + lightningInvoice + '" alt="Lightning QR Code" class="mx-auto rounded-lg" width="200" height="200" /></div><div class="bg-gray-50 rounded-lg p-3 mb-3"><code id="ln-invoice" class="text-xs break-all select-all text-gray-700">' + lightningInvoice.substring(0, 42) + '...</code></div><button onclick="copyToClipboard(&#39;ln-invoice-full&#39;, this)" class="bg-bitcoin text-white px-5 py-2 rounded-lg font-semibold hover:bg-bitcoin-dark transition text-sm mb-3">📋 Copy Invoice</button><input type="hidden" id="ln-invoice-full" value="' + lightningInvoice + '" /><div class="mt-4 pt-4 border-t border-gray-100"><p class="text-sm text-gray-500 mb-2">Or generate an invoice with a specific amount:</p><div class="flex gap-2 justify-center"><input type="number" id="invoice-amount" placeholder="sats" min="1" class="w-28 px-3 py-2 border rounded-lg text-sm text-center" /><button onclick="generateInvoice()" id="gen-invoice-btn" class="bg-yellow-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-yellow-600 transition text-sm">Generate</button></div><div id="custom-invoice-result" class="mt-3 hidden"><div class="bg-gray-50 rounded-lg p-3 mb-2"><code id="custom-invoice-text" class="text-xs break-all select-all text-gray-700"></code></div><button onclick="copyToClipboard(&#39;custom-invoice-full&#39;, this)" class="bg-bitcoin text-white px-4 py-2 rounded-lg font-semibold hover:bg-bitcoin-dark transition text-sm">📋 Copy Invoice</button><input type="hidden" id="custom-invoice-full" value="" /></div></div>' : '<p class="text-gray-400 italic">Connecting to node...</p>'}
+                ${typeof lightningInvoice !== 'undefined' && lightningInvoice ? '<a id="ln-link" href="lightning:' + lightningInvoice + '" class="block mb-2"><div id="ln-qr" class="mx-auto rounded-lg bg-white p-2 inline-block" style="width:216px;height:216px;"></div></a><div class="text-xs text-gray-400 mb-3">Tap QR to open your wallet</div><div class="bg-gray-50 rounded-lg p-3 mb-3"><code id="ln-invoice" class="text-xs break-all select-all text-gray-700">' + lightningInvoice.substring(0, 42) + '...</code></div><button onclick="copyToClipboard(&#39;ln-invoice-full&#39;, this)" class="bg-bitcoin text-white px-5 py-2 rounded-lg font-semibold hover:bg-bitcoin-dark transition text-sm mb-3">📋 Copy Invoice</button><input type="hidden" id="ln-invoice-full" value="' + lightningInvoice + '" /><div class="mt-4 pt-4 border-t border-gray-100"><p class="text-sm text-gray-500 mb-2">Or generate an invoice with a specific amount:</p><div class="flex gap-2 justify-center"><input type="number" id="invoice-amount" placeholder="sats" min="1" class="w-28 px-3 py-2 border rounded-lg text-sm text-center" /><button onclick="generateInvoice()" id="gen-invoice-btn" class="bg-yellow-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-yellow-600 transition text-sm">Generate</button></div><div id="custom-invoice-result" class="mt-3 hidden"><a id="custom-ln-link" href="lightning:" class="block mb-2"><div id="custom-ln-qr" class="mx-auto rounded-lg bg-white p-2 inline-block" style="width:216px;height:216px;"></div></a><div class="text-xs text-gray-400 mb-2">Tap QR to open your wallet</div><div class="bg-gray-50 rounded-lg p-3 mb-2"><code id="custom-invoice-text" class="text-xs break-all select-all text-gray-700"></code></div><button onclick="copyToClipboard(&#39;custom-invoice-full&#39;, this)" class="bg-bitcoin text-white px-4 py-2 rounded-lg font-semibold hover:bg-bitcoin-dark transition text-sm">📋 Copy Invoice</button><input type="hidden" id="custom-invoice-full" value="" /></div></div>' : '<p class="text-gray-400 italic">Connecting to node...</p>'}
             </div>
         </div>
     </div>
 </section>
 
+<script src="/vendor/qrcode.min.js" defer></script>
 <script>
 function copyToClipboard(elementId, btn) {
     var text;
@@ -203,6 +204,46 @@ function copyToClipboard(elementId, btn) {
     });
 }
 
+// Render an inline-SVG QR code into the given container.
+// data: payload to encode (caller pre-formats case for BOLT11 efficiency)
+function renderQR(containerId, data) {
+    if (typeof qrcode === 'undefined') return;
+    var el = document.getElementById(containerId);
+    if (!el || !data) return;
+    try {
+        var qr = qrcode(0, 'L');
+        qr.addData(data);
+        qr.make();
+        // cellSize=4 → ~200px square at typical QR sizes; margin=0 (we already pad with bg)
+        el.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
+        var svg = el.querySelector('svg');
+        if (svg) { svg.setAttribute('width', '200'); svg.setAttribute('height', '200'); }
+    } catch (e) {
+        el.innerHTML = '<div class="text-xs text-red-500 p-4">QR error</div>';
+    }
+}
+
+function renderInitialQRs() {
+    var lnInput = document.getElementById('ln-invoice-full');
+    if (lnInput && lnInput.value) {
+        // BOLT11 invoices are encoded most efficiently as uppercase (alphanumeric mode);
+        // wallets accept either case. Display text stays lowercase.
+        renderQR('ln-qr', lnInput.value.toUpperCase());
+    }
+    var addrEl = document.getElementById('onchain-addr');
+    if (addrEl && addrEl.textContent) {
+        renderQR('onchain-qr', addrEl.textContent.trim());
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', renderInitialQRs);
+} else {
+    renderInitialQRs();
+}
+// qrcode.min.js is loaded with defer; if it arrives after DOMContentLoaded we re-run.
+window.addEventListener('load', renderInitialQRs);
+
 function generateInvoice() {
     var amount = document.getElementById('invoice-amount').value;
     if (!amount || amount < 1) {
@@ -212,7 +253,7 @@ function generateInvoice() {
     var btn = document.getElementById('gen-invoice-btn');
     btn.disabled = true;
     btn.textContent = '...';
-    
+
     fetch('/api/generate-invoice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -223,6 +264,9 @@ function generateInvoice() {
         if (data.success) {
             document.getElementById('custom-invoice-text').textContent = data.bolt11.substring(0, 60) + '...';
             document.getElementById('custom-invoice-full').value = data.bolt11;
+            var link = document.getElementById('custom-ln-link');
+            if (link) link.setAttribute('href', 'lightning:' + data.bolt11);
+            renderQR('custom-ln-qr', data.bolt11.toUpperCase());
             document.getElementById('custom-invoice-result').classList.remove('hidden');
         } else {
             alert(data.error || 'Failed to generate invoice');

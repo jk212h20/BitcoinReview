@@ -9,7 +9,7 @@
     "start": "node --no-deprecation src/index.js",
     "dev": "node --watch src/index.js",
     "db:init": "node src/scripts/init-db.js",
-    "test": "node src/tests/raffle.test.js"
+    "test": "node src/tests/raffle.test.js && node src/tests/qr-deeplink.test.js"
   },
   "keywords": [
     "bitcoin",
