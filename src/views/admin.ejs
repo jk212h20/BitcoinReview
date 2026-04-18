@@ -126,31 +126,43 @@
         <!-- Settings Panel -->
         <div class="bg-white rounded-lg p-6 shadow-sm mb-8" x-data="settingsPanel()">
             <h2 class="text-xl font-bold mb-4">⚙️ Settings</h2>
-            <div class="grid md:grid-cols-2 gap-6">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Review Approval</label>
-                    <select x-model="reviewMode" @change="saveSettings()" class="w-full px-4 py-2 border rounded-lg">
-                        <option value="manual_review">Manual Review (admin approves each ticket)</option>
-                        <option value="auto_approve">Auto-Approve (all submissions auto-validated)</option>
-                    </select>
-                    <p class="text-xs text-gray-500 mt-1" x-text="reviewMode === 'auto_approve' ? 'All new submissions will be auto-approved.' : 'New submissions require admin approval.'"></p>
+
+            <!-- Review settings sub-section -->
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold mb-3">Review &amp; Raffle</h3>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Review Approval</label>
+                        <select x-model="reviewMode" class="w-full px-4 py-2 border rounded-lg">
+                            <option value="manual_review">Manual Review (admin approves each ticket)</option>
+                            <option value="auto_approve">Auto-Approve (all submissions auto-validated)</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1" x-text="reviewMode === 'auto_approve' ? 'All new submissions will be auto-approved.' : 'New submissions require admin approval.'"></p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Accepted Review Links</label>
+                        <select x-model="reviewLinkMode" class="w-full px-4 py-2 border rounded-lg">
+                            <option value="google">Google Only (Google Maps / Google Reviews)</option>
+                            <option value="all">All Major Platforms (Google, Yelp, TripAdvisor, Trustpilot, etc.)</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1" x-text="reviewLinkMode === 'google' ? 'Only Google Maps links accepted.' : 'Accepts links from Google, Yelp, TripAdvisor, Trustpilot, Facebook, Apple Maps, and more. Trap/unknown sites are still blocked.'"></p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Auto-Pay Winner</label>
+                        <select x-model="autoPayMode" class="w-full px-4 py-2 border rounded-lg">
+                            <option value="false">Manual Payment (admin pays via dashboard)</option>
+                            <option value="true">Auto-Pay (Lightning payment sent automatically)</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1" x-text="autoPayMode === 'true' ? 'Winner will be paid automatically via Lightning when the raffle block is mined.' : 'Raffle result is committed automatically, but you must pay the winner manually.'"></p>
+                        <p class="text-xs text-gray-400 mt-1">Note: The raffle result is <strong>always</strong> determined automatically by the trigger block hash. This setting only controls whether payment is also automatic.</p>
+                    </div>
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Accepted Review Links</label>
-                    <select x-model="reviewLinkMode" @change="saveSettings()" class="w-full px-4 py-2 border rounded-lg">
-                        <option value="google">Google Only (Google Maps / Google Reviews)</option>
-                        <option value="all">All Major Platforms (Google, Yelp, TripAdvisor, Trustpilot, etc.)</option>
-                    </select>
-                    <p class="text-xs text-gray-500 mt-1" x-text="reviewLinkMode === 'google' ? 'Only Google Maps links accepted.' : 'Accepts links from Google, Yelp, TripAdvisor, Trustpilot, Facebook, Apple Maps, and more. Trap/unknown sites are still blocked.'"></p>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Auto-Pay Winner</label>
-                    <select x-model="autoPayMode" @change="saveSettings()" class="w-full px-4 py-2 border rounded-lg">
-                        <option value="false">Manual Payment (admin pays via dashboard)</option>
-                        <option value="true">Auto-Pay (Lightning payment sent automatically)</option>
-                    </select>
-                    <p class="text-xs text-gray-500 mt-1" x-text="autoPayMode === 'true' ? 'Winner will be paid automatically via Lightning when the raffle block is mined.' : 'Raffle result is committed automatically, but you must pay the winner manually.'"></p>
-                    <p class="text-xs text-gray-400 mt-1">Note: The raffle result is <strong>always</strong> determined automatically by the trigger block hash. This setting only controls whether payment is also automatic.</p>
+                <div class="mt-4 flex items-center gap-3">
+                    <button type="button" @click="saveReviewSettings()" :disabled="reviewSaving"
+                        class="bg-bitcoin text-white px-5 py-2 rounded-lg font-semibold hover:bg-bitcoin-dark transition disabled:opacity-50">
+                        <span x-text="reviewSaving ? 'Saving...' : 'Save review settings'">Save review settings</span>
+                    </button>
+                    <span x-show="reviewMsg" x-cloak class="text-sm" :class="reviewOk ? 'text-green-600' : 'text-red-600'" x-text="reviewMsg"></span>
                 </div>
             </div>
 
@@ -161,22 +173,27 @@
                 <div class="grid md:grid-cols-2 gap-6">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Telegram</label>
-                        <input type="text" x-model="contactTelegram" @blur="saveSettings()"
+                        <input type="text" x-model="contactTelegram"
                             placeholder="@yourhandle or https://t.me/yourgroup"
                             class="w-full px-4 py-2 border rounded-lg">
                         <p class="text-xs text-gray-400 mt-1">Username (with or without @) or full t.me link.</p>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                        <input type="email" x-model="contactEmail" @blur="saveSettings()"
+                        <input type="email" x-model="contactEmail"
                             placeholder="hello@example.com"
                             class="w-full px-4 py-2 border rounded-lg">
                         <p class="text-xs text-gray-400 mt-1">Rendered as a mailto: link.</p>
                     </div>
                 </div>
+                <div class="mt-4 flex items-center gap-3">
+                    <button type="button" @click="saveContactSettings()" :disabled="contactSaving"
+                        class="bg-bitcoin text-white px-5 py-2 rounded-lg font-semibold hover:bg-bitcoin-dark transition disabled:opacity-50">
+                        <span x-text="contactSaving ? 'Saving...' : 'Save contact links'">Save contact links</span>
+                    </button>
+                    <span x-show="contactMsg" x-cloak class="text-sm" :class="contactOk ? 'text-green-600' : 'text-red-600'" x-text="contactMsg"></span>
+                </div>
             </div>
-
-            <div x-show="settingsMsg" x-cloak class="mt-3 text-sm text-green-600" x-text="settingsMsg"></div>
         </div>
 
         <!-- Change Password -->
@@ -202,10 +219,9 @@
                 </div>
             </div>
             <div class="mt-4 flex items-center gap-3">
-                <button @click="changePassword()" :disabled="pwLoading"
+                <button type="button" @click="changePassword()" :disabled="pwLoading"
                     class="bg-bitcoin text-white px-5 py-2 rounded-lg font-semibold hover:bg-bitcoin-dark transition disabled:opacity-50">
-                    <span x-show="!pwLoading">Change Password</span>
-                    <span x-show="pwLoading" x-cloak>Saving...</span>
+                    <span x-text="pwLoading ? 'Saving...' : 'Change Password'">Change Password</span>
                 </button>
                 <span x-show="pwMsg" x-cloak class="text-sm" :class="pwOk ? 'text-green-600' : 'text-red-600'" x-text="pwMsg"></span>
             </div>
@@ -779,14 +795,22 @@ function telegramPanel() {
 
 function settingsPanel() {
     return {
+        // Review/raffle group
         reviewMode: 'manual_review',
         reviewLinkMode: 'google',
         autoPayMode: 'false',
+        reviewSaving: false,
+        reviewMsg: '',
+        reviewOk: false,
+        // Contact group
         contactTelegram: '',
         contactEmail: '',
-        settingsMsg: '',
+        contactSaving: false,
+        contactMsg: '',
+        contactOk: false,
+
         init() {
-            fetch('/api/admin/settings', { headers: {} })
+            fetch('/api/admin/settings')
                 .then(r => r.json())
                 .then(d => {
                     if (d.success && d.settings) {
@@ -796,6 +820,71 @@ function settingsPanel() {
                         this.contactTelegram = d.settings.contact_telegram || '';
                         this.contactEmail = d.settings.contact_email || '';
                     }
+                })
+                .catch(() => {});
+        },
+
+        async _saveSubset(subset) {
+            const response = await fetch('/api/admin/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ settings: subset })
+            });
+            return response.json();
+        },
+
+        async saveReviewSettings() {
+            this.reviewSaving = true;
+            this.reviewMsg = '';
+            this.reviewOk = false;
+            try {
+                const data = await this._saveSubset({
+                    review_mode: this.reviewMode,
+                    review_link_mode: this.reviewLinkMode,
+                    raffle_auto_trigger: this.autoPayMode
+                });
+                if (data.success) {
+                    this.reviewOk = true;
+                    this.reviewMsg = 'Saved ✓';
+                } else {
+                    this.reviewOk = false;
+                    this.reviewMsg = 'Error: ' + (data.error || 'failed');
+                }
+            } catch (e) {
+                this.reviewOk = false;
+                this.reviewMsg = 'Network error: ' + e.message;
+            } finally {
+                this.reviewSaving = false;
+                setTimeout(() => { this.reviewMsg = ''; }, 4000);
+            }
+        },
+
+        async saveContactSettings() {
+            this.contactSaving = true;
+            this.contactMsg = '';
+            this.contactOk = false;
+            try {
+                const data = await this._saveSubset({
+                    contact_telegram: (this.contactTelegram || '').trim(),
+                    contact_email: (this.contactEmail || '').trim()
+                });
+                if (data.success) {
+                    this.contactOk = true;
+                    this.contactMsg = 'Saved ✓';
+                } else {
+                    this.contactOk = false;
+                    this.contactMsg = 'Error: ' + (data.error || 'failed');
+                }
+            } catch (e) {
+                this.contactOk = false;
+                this.contactMsg = 'Network error: ' + e.message;
+            } finally {
+                this.contactSaving = false;
+                setTimeout(() => { this.contactMsg = ''; }, 4000);
+            }
+        }
+    }
+}
                 })
                 .catch(() => {});
         },
