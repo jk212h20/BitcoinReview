@@ -143,11 +143,6 @@
                         class="bg-bitcoin hover:bg-bitcoin-dark text-white px-3 py-1.5 rounded-lg text-sm font-semibold">
                         ⬇ Export CSV
                     </a>
-                    <button type="button" @click="reconcile()" :disabled="reconciling"
-                        title="Recompute the fund from the ledger (donations − payouts − pending). Use this to clear a manual seed."
-                        class="bg-gray-700 hover:bg-gray-800 text-white px-3 py-1.5 rounded-lg text-sm font-semibold disabled:opacity-50">
-                        <span x-text="reconciling ? 'Reconciling...' : '🔧 Reconcile fund'">🔧 Reconcile fund</span>
-                    </button>
                 </div>
             </div>
 
@@ -195,7 +190,6 @@
                 The current fund disagrees with the ledger by this amount —
                 <span x-show="(summary.unaccountedSats || 0) > 0">likely a manual seed (added via API outside the donation flow).</span>
                 <span x-show="(summary.unaccountedSats || 0) < 0">a deduction happened that wasn't recorded as a payout (e.g. test raffle deleted without refund).</span>
-                Click <strong>🔧 Reconcile fund</strong> to align them.
             </div>
 
             <div x-show="error" x-cloak class="bg-red-50 text-red-700 text-sm rounded p-3 mb-3" x-text="error"></div>
@@ -1087,7 +1081,6 @@ function treasuryPanel() {
         summary: null,
         filter: '',     // '', 'in', or 'out'
         loading: false,
-        reconciling: false,
         error: '',
 
         async load() {
@@ -1139,46 +1132,6 @@ function treasuryPanel() {
             // SQLite returns 'YYYY-MM-DD HH:MM:SS' (UTC). Show as 'YYYY-MM-DD HH:MM'.
             const s = String(ts).replace('T', ' ').slice(0, 16);
             return s;
-        },
-
-        async reconcile() {
-            // Show the diff before changing anything.
-            const s = this.summary || {};
-            const reserved = s.reservedSats || 0;
-            const expected = Math.max(0, (s.totalDonatedSats || 0) - (s.totalPaidOutSats || 0) - reserved);
-            const current = s.currentFundSats || 0;
-            const diff = expected - current;
-            const sign = diff >= 0 ? '+' : '−';
-            const msg =
-                'Reconcile the raffle fund to match the treasury ledger?\\n\\n' +
-                'Donations received: ' + (s.totalDonatedSats || 0).toLocaleString() + ' sats\\n' +
-                'Payouts sent:      − ' + (s.totalPaidOutSats || 0).toLocaleString() + ' sats\\n' +
-                'Reserved:          − ' + reserved.toLocaleString() + ' sats (pending/failed raffles)\\n\\n' +
-                'Current fund:      ' + current.toLocaleString() + ' sats\\n' +
-                'After reconcile: ≈ ' + expected.toLocaleString() + ' sats (' + sign + Math.abs(diff).toLocaleString() + ')\\n\\n' +
-                'Use this to clear a manual seed. Only the on-chain + Lightning history will count after this.\\n' +
-                'TIP: To release reserved sats, delete the pending/failed raffles WITH refund instead.';
-            if (!confirm(msg)) return;
-
-            this.reconciling = true;
-            this.error = '';
-            try {
-                const r = await fetch('/api/admin/treasury/reconcile', { method: 'POST' });
-                const d = await r.json();
-                if (d.success) {
-                    alert('Fund reconciled.\\n\\n' +
-                        'Was:  ' + (d.previousFund || 0).toLocaleString() + ' sats\\n' +
-                        'Now:  ' + (d.newFund || 0).toLocaleString() + ' sats\\n' +
-                        'Diff: ' + ((d.delta || 0) >= 0 ? '+' : '') + (d.delta || 0).toLocaleString() + ' sats');
-                    await this.load();
-                } else {
-                    this.error = d.error || 'Reconcile failed';
-                }
-            } catch (e) {
-                this.error = 'Network error: ' + e.message;
-            } finally {
-                this.reconciling = false;
-            }
         }
     }
 }
