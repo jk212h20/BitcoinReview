@@ -162,12 +162,35 @@ async function initializeDatabase() {
         console.log('✅ Added claim_payment_hash column to raffles');
     } catch (e) { /* already exists */ }
 
+    // Winner notification status columns for admin confidence/manual follow-up
+    try {
+        db.run(`ALTER TABLE raffles ADD COLUMN winner_email TEXT`);
+        console.log('✅ Added winner_email column to raffles');
+    } catch (e) { /* already exists */ }
+    try {
+        db.run(`ALTER TABLE raffles ADD COLUMN winner_email_status TEXT`);
+        console.log('✅ Added winner_email_status column to raffles');
+    } catch (e) { /* already exists */ }
+    try {
+        db.run(`ALTER TABLE raffles ADD COLUMN winner_email_sent_at TEXT`);
+        console.log('✅ Added winner_email_sent_at column to raffles');
+    } catch (e) { /* already exists */ }
+    try {
+        db.run(`ALTER TABLE raffles ADD COLUMN winner_email_error TEXT`);
+        console.log('✅ Added winner_email_error column to raffles');
+    } catch (e) { /* already exists */ }
+    try {
+        db.run(`ALTER TABLE raffles ADD COLUMN winner_email_message_id TEXT`);
+        console.log('✅ Added winner_email_message_id column to raffles');
+    } catch (e) { /* already exists */ }
+
     // Insert default settings if they don't exist
     const defaultSettings = [
         ['review_mode', 'manual_review'],       // 'auto_approve' or 'manual_review'
         ['review_link_mode', 'google'],         // 'google' or 'all' (all = major review sites)
         ['google_api_key', ''],
         ['raffle_auto_trigger', 'false'],        // 'true' or 'false'
+        ['raffle_auto_commit', 'false'],         // 'true' commits raffle automatically when block is mined; false requires admin button
         ['raffle_warning_sent_block', '0'],      // block number of last sent 144-warning
         ['raffle_block_notified', '0'],          // block number of last block-mined notification
         ['extra_telegram_chats', ''],            // comma-separated extra admin chat IDs
@@ -497,6 +520,16 @@ function markRafflePaymentFailed(raffleId, error) {
     run(`UPDATE raffles SET payment_status = 'failed', payment_error = ? WHERE id = ?`, [error, raffleId]);
 }
 
+function setRaffleWinnerEmailStatus(raffleId, status, winnerEmail, messageId = '', error = '') {
+    const sentAt = status === 'sent' ? new Date().toISOString() : null;
+    run(
+        `UPDATE raffles
+         SET winner_email = ?, winner_email_status = ?, winner_email_sent_at = ?, winner_email_message_id = ?, winner_email_error = ?
+         WHERE id = ?`,
+        [winnerEmail || '', status || '', sentAt, messageId || '', error || '', raffleId]
+    );
+}
+
 function getUnpaidRaffles() {
     return query(`
         SELECT r.*, t.review_link, u.email, u.lnurl_address
@@ -716,6 +749,7 @@ module.exports = {
     findRaffleByBlock,
     markRafflePaid,
     markRafflePaymentFailed,
+    setRaffleWinnerEmailStatus,
     getUnpaidRaffles,
     getAllRaffles,
     deleteRaffle,

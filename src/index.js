@@ -18,6 +18,7 @@ const bitcoin = require('./services/bitcoin');
 const btcmap = require('./services/btcmap');
 const lightning = require('./services/lightning');
 const telegram = require('./services/telegram');
+const raffleService = require('./services/raffle');
 
 // Import routes
 const apiRoutes = require('./routes/api');
@@ -455,19 +456,19 @@ async function checkRaffleEvents() {
         await telegram.notifyRaffleWarning(nextRaffleBlock, approvedTickets, db);
     }
 
-    // ── 2. Raffle block mined — ALWAYS commit result (transparent & deterministic) ─
+    // ── 2. Latest mined raffle block — optional auto-commit ─────────────────
+    // At the exact difficulty-adjustment block, getNextRaffleBlock() advances to the
+    // following cycle, so use currentRaffleBlock/latest mined block for the due raffle.
+    // Default is manual admin commit via the top admin panel; auto-commit must be
+    // explicitly enabled with raffle_auto_commit=true.
+    const currentRaffleBlock = bitcoin.getCurrentRaffleBlock(currentHeight);
     const blockAlreadyNotified = parseInt(db.getSetting('raffle_block_notified') || '0', 10);
-    const raffleBlockMined = currentHeight >= nextRaffleBlock;
-    const raffleAlreadyRun = !!db.findRaffleByBlock(nextRaffleBlock);
+    const raffleAlreadyRun = !!db.findRaffleByBlock(currentRaffleBlock);
+    const autoCommit = db.getSetting('raffle_auto_commit') === 'true';
 
-    if (raffleBlockMined && blockAlreadyNotified !== nextRaffleBlock && !raffleAlreadyRun) {
-        db.setSetting('raffle_block_notified', String(nextRaffleBlock));
-
-        // Raffle commitment is ALWAYS automatic — only payment is manual vs auto
-        const autoPay = db.getSetting('raffle_auto_trigger') === 'true';
-
-        // Always commit the raffle result
-        await commitRaffleResult(nextRaffleBlock, autoPay);
+    if (autoCommit && currentRaffleBlock > 0 && blockAlreadyNotified !== currentRaffleBlock && !raffleAlreadyRun) {
+        await raffleService.commitRealRaffle({ notifyWinner: true });
+        db.setSetting('raffle_block_notified', String(currentRaffleBlock));
     }
 }
 

@@ -12,6 +12,7 @@ const lightning = require('../services/lightning');
 const anthropic = require('../services/anthropic');
 const telegram = require('../services/telegram');
 const auth = require('../services/auth');
+const raffleService = require('../services/raffle');
 
 /**
  * Session/password authentication middleware.
@@ -241,6 +242,42 @@ router.post('/tickets/:id/validate', (req, res) => {
         });
     } catch (error) {
         res.status(500).json({ error: 'Failed to validate ticket' });
+    }
+});
+
+/**
+ * GET /admin/raffle/real-preview
+ * Server-computed preview for the first-class real raffle panel.
+ */
+router.get('/raffle/real-preview', async (req, res) => {
+    try {
+        const preview = await raffleService.getRealRafflePreview();
+        res.json({ success: true, preview });
+    } catch (error) {
+        console.error('Real raffle preview error:', error);
+        res.status(500).json({ success: false, error: 'Failed to load real raffle preview: ' + error.message });
+    }
+});
+
+/**
+ * POST /admin/raffle/run-real
+ * Commit the latest mined unrun difficulty-adjustment raffle.
+ * Block and prize are recomputed server-side; browser cannot choose either.
+ */
+router.post('/raffle/run-real', async (req, res) => {
+    try {
+        const result = await raffleService.commitRealRaffle({ notifyWinner: true });
+        res.json({ success: true, message: 'Real raffle committed.', raffle: result });
+    } catch (error) {
+        console.error('Real raffle run error:', error);
+        const status = ['NOT_DUE', 'NO_TICKETS', 'NO_PRIZE', 'DUPLICATE'].includes(error.code) ? 400 : 500;
+        res.status(status).json({
+            success: false,
+            error: error.message,
+            code: error.code,
+            preview: error.preview,
+            raffle: error.raffle
+        });
     }
 });
 

@@ -8,6 +8,7 @@ const router = express.Router();
 const { bech32 } = require('bech32');
 const db = require('../services/database');
 const bitcoin = require('../services/bitcoin');
+const raffleService = require('../services/raffle');
 const btcmap = require('../services/btcmap');
 const lightning = require('../services/lightning');
 const auth = require('../services/auth');
@@ -408,6 +409,7 @@ router.get('/admin', async (req, res) => {
         const pendingTickets = db.getPendingTickets();
         const raffles = db.getAllRaffles();
         const raffleInfo = await bitcoin.getRaffleInfo();
+        const realRafflePreview = await raffleService.getRealRafflePreview();
 
         // Sliding refresh
         auth.setSessionCookie(res, req);
@@ -418,7 +420,8 @@ router.get('/admin', async (req, res) => {
             tickets,
             pendingTickets,
             raffles,
-            raffleInfo
+            raffleInfo,
+            realRafflePreview
         });
     } catch (error) {
         console.error('Admin page error:', error);
