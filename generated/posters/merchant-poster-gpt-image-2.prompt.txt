@@ -1,0 +1,49 @@
+Create a vertical print poster for merchant venues in Roatan and Utila, Bay Islands, Honduras, for a project called “Reviews Raffle”. The poster should be eye-catching, trustworthy, tropical, and easy to understand from across a cafe/bar counter.
+
+FORMAT / PRINT REQUIREMENTS:
+- Vertical portrait poster, 9:16 aspect ratio.
+- Designed for printing at high quality on letter/A4 sized paper.
+- Leave generous safe margins; no tiny text near edges.
+- Clean modern flyer style, bold readable hierarchy, not cluttered.
+- Use warm Bitcoin orange, deep ocean teal, white, and small black accents.
+- Tropical island atmosphere: subtle Caribbean water, palm leaves, sunshine, local merchant counter/cafe vibe.
+- Include tasteful Bitcoin/Lightning iconography: orange ₿ symbol, small lightning bolt, sats/prize sparkle motifs.
+- Must feel friendly and legitimate, not like a crypto scam. Avoid hype, rockets, gambling/casino imagery, luxury cars, stacks of cash, or “get rich” visuals.
+
+MAIN TEXT — render accurately and prominently:
+Headline:
+“Paid with Bitcoin?”
+
+Subheadline:
+“Review this merchant & enter the Reviews Raffle”
+
+Three simple steps, with icons:
+“1. Pay with Bitcoin or Lightning”
+“2. Leave a Google review mentioning your Bitcoin purchase”
+“3. Submit your review to enter the sats raffle”
+
+Prize / timing callout:
+“Win sats every Bitcoin difficulty adjustment”
+
+Merchant/community trust line:
+“Support Bitcoin adoption in the Bay Islands”
+
+QR placeholder area near the bottom:
+A clean white rounded rectangle with a QR-code placeholder graphic and text:
+“Scan to submit your review”
+
+Footer text:
+“Reviews Raffle • Roatan + Utila”
+
+VISUAL COMPOSITION:
+- Top third: big headline “Paid with Bitcoin?” with Bitcoin orange highlight.
+- Middle: friendly illustration/photo-real hybrid of a local island merchant counter: a customer paying with a phone Lightning wallet, small “Bitcoin accepted here” sticker, palm/ocean hints through a window.
+- Lower middle: three-step checklist in large readable cards.
+- Bottom: QR placeholder block and footer.
+- Use high contrast and readable typography. The text must be clear, spelled correctly, and not warped.
+
+STYLE:
+- Polished nonprofit/community campaign poster.
+- Modern vector + soft realistic lighting, tropical but professional.
+- No brand logos except generic Bitcoin/Lightning symbols.
+- No actual QR code; use placeholder QR-like square only.
