@@ -13,6 +13,7 @@ const anthropic = require('../services/anthropic');
 const telegram = require('../services/telegram');
 const auth = require('../services/auth');
 const raffleService = require('../services/raffle');
+const btcmap = require('../services/btcmap');
 
 /**
  * Session/password authentication middleware.
@@ -694,6 +695,24 @@ router.post('/raffle/:id/pay', async (req, res) => {
  * GET /admin/lightning/status
  * Check LND node connection status and balance
  */
+router.post('/btcmap/refresh', async (req, res) => {
+    try {
+        btcmap.clearCache();
+        const merchants = await btcmap.getMerchantList({ forceRefresh: true });
+        res.json({
+            success: true,
+            message: 'BTCMap merchant cache refreshed',
+            count: merchants.length,
+            utilaCount: merchants.filter(m => m.location === 'Utila').length,
+            cache: btcmap.getCacheInfo(),
+            utilaMerchants: merchants.filter(m => m.location === 'Utila').map(m => ({ id: m.id, name: m.name }))
+        });
+    } catch (error) {
+        console.error('BTCMap refresh error:', error);
+        res.status(500).json({ success: false, error: error.message || 'Failed to refresh BTCMap merchants' });
+    }
+});
+
 router.get('/lightning/status', async (req, res) => {
     try {
         const status = await lightning.isConfigured();

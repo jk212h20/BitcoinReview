@@ -336,11 +336,13 @@ router.post('/submit-review', async (req, res) => {
  */
 router.get('/merchants', async (req, res) => {
     try {
-        const merchants = await btcmap.getMerchantList();
+        const forceRefresh = req.query.refresh === '1' || req.query.refresh === 'true';
+        const merchants = await btcmap.getMerchantList({ forceRefresh });
         res.json({
             success: true,
             merchants,
-            count: merchants.length
+            count: merchants.length,
+            cache: btcmap.getCacheInfo()
         });
     } catch (error) {
         console.error('Merchants fetch error:', error);
