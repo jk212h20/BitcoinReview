@@ -320,17 +320,17 @@ router.post('/raffle/test', async (req, res) => {
         const winnerIndex = bitcoin.selectWinnerIndex(blockHash, allApproved.length);
         const winningTicket = allApproved[winnerIndex];
 
-        // Deduct prize from raffle fund
+        // Create a real raffle record
+        const raffle = db.createRaffle(
+            currentHeight, blockHash, allApproved.length, winnerIndex, winningTicket.id, prizeSats
+        );
+
+        /* Deduct only after the duplicate-safe raffle insert commits. */
         const currentFund = parseInt(db.getSetting('raffle_fund_sats') || '0');
         if (currentFund >= prizeSats) {
             db.setSetting('raffle_fund_sats', String(currentFund - prizeSats));
             console.log(`🧪 Test raffle: fund ${currentFund} - ${prizeSats} = ${currentFund - prizeSats} sats`);
         }
-
-        // Create a real raffle record
-        const raffle = db.createRaffle(
-            currentHeight, blockHash, allApproved.length, winnerIndex, winningTicket.id, prizeSats
-        );
 
         console.log(`🧪 Test raffle committed! Block #${currentHeight}, winner index: ${winnerIndex}/${allApproved.length}, ticket #${winningTicket.id}, prize: ${prizeSats} sats`);
 
@@ -545,6 +545,9 @@ router.post('/raffle/run', async (req, res) => {
         
     } catch (error) {
         console.error('Raffle run error:', error);
+        if (error.code === 'DUPLICATE_RAFFLE') {
+            return res.status(409).json({ error: error.message });
+        }
         res.status(500).json({ error: 'Failed to run raffle: ' + error.message });
     }
 });

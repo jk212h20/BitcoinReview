@@ -499,15 +499,15 @@ async function commitRaffleResult(blockHeight, autoPay) {
         const currentFund = parseInt(db.getSetting('raffle_fund_sats') || '0');
         const prizeSats = Math.floor(currentFund / 2);
         
-        // Deduct prize from fund
+        const raffle = db.createRaffle(
+            blockHeight, blockHash, tickets.length, winnerIndex, winningTicket.id, prizeSats || null
+        );
+
+        /* Deduct only after the duplicate-safe raffle insert commits. */
         if (prizeSats > 0) {
             db.setSetting('raffle_fund_sats', String(currentFund - prizeSats));
             console.log(`🎯 Raffle fund: ${currentFund} - ${prizeSats} (prize) = ${currentFund - prizeSats} sats remaining`);
         }
-
-        const raffle = db.createRaffle(
-            blockHeight, blockHash, tickets.length, winnerIndex, winningTicket.id, prizeSats || null
-        );
 
         // Generate claim token and set 30-day expiry
         const claimToken = uuidv4();

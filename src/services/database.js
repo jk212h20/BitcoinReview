@@ -91,6 +91,21 @@ async function initializeDatabase() {
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (winning_ticket_id) REFERENCES tickets(id)
         );
+
+        /*
+         * Reserve each raffle block before a raffle is created. Existing production
+         * data contains duplicate raffle rows, so this separate table protects future
+         * draws without deleting or rewriting historical records during startup.
+         */
+        CREATE TABLE IF NOT EXISTS raffle_locks (
+            block_height INTEGER PRIMARY KEY,
+            locked_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+    `);
+
+    db.run(`
+        INSERT OR IGNORE INTO raffle_locks (block_height)
+        SELECT block_height FROM raffles
     `);
     
     // Settings table (key-value store for admin config)
@@ -501,11 +516,40 @@ function countValidTicketsForBlock(raffleBlock) {
 
 // Raffle functions
 function createRaffle(blockHeight, blockHash, totalTickets, winningIndex, winningTicketId, prizeAmountSats) {
-    const id = run(
-        `INSERT INTO raffles (block_height, block_hash, total_tickets, winning_index, winning_ticket_id, prize_amount_sats) VALUES (?, ?, ?, ?, ?, ?)`,
-        [blockHeight, blockHash, totalTickets, winningIndex, winningTicketId, prizeAmountSats]
-    );
-    return { id };
+    let transactionOpen = false;
+
+    try {
+        db.run('BEGIN IMMEDIATE TRANSACTION');
+        transactionOpen = true;
+        db.run(`INSERT OR IGNORE INTO raffle_locks (block_height) VALUES (?)`, [blockHeight]);
+
+        const lockResult = db.exec('SELECT changes() AS changes');
+        const lockCreated = lockResult[0].values[0][0] === 1;
+        if (!lockCreated) {
+            db.run('ROLLBACK');
+            transactionOpen = false;
+            const error = new Error(`Raffle already exists for block #${blockHeight}`);
+            error.code = 'DUPLICATE_RAFFLE';
+            throw error;
+        }
+
+        db.run(
+            `INSERT INTO raffles (block_height, block_hash, total_tickets, winning_index, winning_ticket_id, prize_amount_sats) VALUES (?, ?, ?, ?, ?, ?)`,
+            [blockHeight, blockHash, totalTickets, winningIndex, winningTicketId, prizeAmountSats]
+        );
+        const idResult = db.exec('SELECT last_insert_rowid() AS id');
+        const id = idResult[0].values[0][0];
+
+        db.run('COMMIT');
+        transactionOpen = false;
+        saveDatabase();
+        return { id };
+    } catch (error) {
+        if (transactionOpen) {
+            db.run('ROLLBACK');
+        }
+        throw error;
+    }
 }
 
 function findRaffleByBlock(blockHeight) {
