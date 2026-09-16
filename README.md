@@ -1,122 +1,114 @@
-# Reviews Raffle 🌴⚡
+# Reviews Raffle - Roatán
 
-A raffle system to incentivize Bitcoin adoption in Roatan by rewarding people who write Google reviews mentioning their Bitcoin purchases at local merchants.
+Reviews Raffle rewards people who help local Roatán merchants get genuine reviews about Bitcoin payments. A visitor pays a participating merchant with Bitcoin, writes an honest review, submits the review link, and receives one entry after the review is approved.
 
-## How It Works
+The raffle is community funded. Half of the current raffle fund is offered as the next prize, while the other half stays in the fund for the following draw.
 
-1. **Register** - Sign up with your email and Lightning address
-2. **Pay with Bitcoin** - Visit a merchant and pay with Bitcoin/Lightning
-3. **Write a Review** - Leave a Google review mentioning your Bitcoin purchase
-4. **Submit** - Submit your review link on our site
-5. **Win!** - Every ~2 weeks (Bitcoin difficulty adjustment), one random reviewer wins Bitcoin!
+## For participants
 
-## Features
+1. Visit a merchant in Roatán and pay with Bitcoin, either on-chain or Lightning.
+2. Write an honest Google or Tripadvisor review that mentions the experience.
+3. Submit the review link at the site.
+4. The team approves valid entries.
+5. At the next Bitcoin difficulty-adjustment block, one approved entry wins the raffle.
 
-- 🎫 No login required - simple email + LNURL registration
-- 🤖 AI-powered review validation (Anthropic Claude)
-- 🎲 Provably fair raffle using Bitcoin block hashes
-- 📍 Merchant list from BTCMap.org
-- ⚡ Lightning address prizes
-- 📧 Email notifications
+A Lightning address is optional. Winners receive a secure claim link and can use a Lightning wallet to collect the prize.
 
-## Tech Stack
+## How the draw is verifiable
 
-- **Backend:** Node.js + Express
-- **Database:** SQLite
-- **Frontend:** EJS templates + Tailwind CSS + Alpine.js
-- **APIs:** Anthropic, BTCMap, Mempool.space
+The raffle follows Bitcoin's 2,016-block difficulty-adjustment cycle, roughly every two weeks.
 
-## Setup
+- The draw uses the hash of the adjustment block.
+- Approved tickets are ordered by their ticket ID.
+- `integer(block hash) mod number of approved tickets` selects the winning entry.
 
-### Prerequisites
+Anyone can inspect the trigger block on [mempool.space](https://mempool.space) and repeat the calculation. The site stores the trigger block, hash, ticket count, winning index, and prize amount with each raffle.
 
-- Node.js 18+
+## Review moderation
+
+The default setting is manual review. The admin dashboard can approve or reject submitted reviews. An Anthropic API key enables an additional AI validation tool, but it does not replace the operator's responsibility for moderation.
+
+## Technical overview
+
+- **Server:** Node.js and Express
+- **Pages:** EJS templates and Tailwind CSS
+- **Database:** SQLite, managed through `sql.js`
+- **Bitcoin data:** Mempool.space
+- **Merchant data:** BTCMap
+- **Prize delivery:** Lightning claim links through the configured Lightning provider
+- **Email:** Resend when configured
+- **Hosting:** Railway
+
+## Local development
+
+### Requirements
+
+- Node.js 18 or later
 - npm
 
-### Installation
+### Start the app
 
 ```bash
-# Clone the repository
 git clone https://github.com/jk212h20/BitcoinReview.git
 cd BitcoinReview
-
-# Install dependencies
-npm install
-
-# Copy environment file
+npm ci
 cp .env.example .env
-
-# Edit .env with your settings
-# Required: ADMIN_PASSWORD
-# Optional: ANTHROPIC_API_KEY, SMTP settings, DONATION_ADDRESS
-
-# Start the server
-npm start
-```
-
-### Environment Variables
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `PORT` | Server port (default: 3000) | No |
-| `DATABASE_PATH` | SQLite database path | No |
-| `ANTHROPIC_API_KEY` | For AI review validation | No* |
-| `SMTP_HOST` | Email server host | No |
-| `SMTP_PORT` | Email server port | No |
-| `SMTP_USER` | Email username | No |
-| `SMTP_PASS` | Email password | No |
-| `SMTP_FROM` | From email address | No |
-| `ADMIN_PASSWORD` | Admin dashboard password | Yes |
-| `BASE_URL` | Public URL of the site | No |
-| `DONATION_ADDRESS` | Bitcoin donation address | No |
-
-*Without Anthropic API key, reviews are auto-approved
-
-## Development
-
-```bash
-# Run with auto-reload
 npm run dev
 ```
 
-## Deployment (Railway)
+Set at least `ADMIN_PASSWORD` in `.env`. Never commit `.env`, production credentials, database files, or payment-provider tokens.
 
-1. Push to GitHub
-2. Connect repository to Railway
-3. Set environment variables in Railway dashboard
-4. Deploy!
+Run the full test suite with:
 
-## API Endpoints
+```bash
+npm test
+```
 
-### Public
-- `POST /api/register` - Register email + LNURL
-- `POST /api/submit-review` - Submit a review
-- `GET /api/merchants` - Get merchant list
-- `GET /api/raffle-info` - Get current raffle info
-- `GET /api/stats` - Get public statistics
+Build the production CSS with:
 
-### Admin (requires password)
-- `GET /api/admin/dashboard` - Dashboard data
-- `POST /api/admin/raffle/run` - Run raffle
-- `POST /api/admin/raffle/:id/mark-paid` - Mark winner paid
+```bash
+npm run build
+```
 
-## Raffle Mechanics
+## Important environment variables
 
-The raffle uses Bitcoin's blockchain for provably fair winner selection:
+| Variable | Purpose | Required |
+| --- | --- | --- |
+| `PORT` | HTTP port, normally supplied by Railway | No |
+| `DATABASE_PATH` | SQLite file location | Yes in production |
+| `ADMIN_PASSWORD` | Admin dashboard password | Yes |
+| `BASE_URL` | Public base URL used in claim links | Yes in production |
+| `ANTHROPIC_API_KEY` | Enables AI review-assistance tool | No |
+| `RESEND_API_KEY` and `EMAIL_FROM` | Winner email notifications | No, but recommended |
+| Lightning-provider settings | Create and pay Lightning claims | Required to deliver prizes |
+| `TELEGRAM_BOT_TOKEN` and admin chat settings | Admin notifications | No |
 
-1. Every 2016 blocks (~2 weeks), Bitcoin adjusts its mining difficulty
-2. We use the hash of this difficulty adjustment block
-3. Winner = `block_hash mod total_tickets`
-4. This is deterministic and verifiable by anyone!
+See `.env.example` for the full set of supported names. Production values belong in Railway variables, not in GitHub or local files.
+
+## Railway deployment
+
+Railway runs the app with the command in `railway.json` and checks `/api/health` after deployment.
+
+1. Connect the GitHub repository to the Railway service.
+2. Configure production variables in Railway.
+3. Attach a persistent Railway Volume and set `DATABASE_PATH` to a file on that volume, for example `/data/reviews.db`.
+4. Push a commit to the branch Railway deploys, currently `main`.
+5. Confirm that the build succeeds and `/api/health` returns successfully before treating the release as live.
+
+A local change, a feature branch, or an open pull request does not change the public website. A successful push to the deployed branch does.
+
+## Safe release practice
+
+- Small, content-only UX fixes may be committed and pushed to `main` after tests pass.
+- Changes to raffle integrity, payments, security, or database migrations must go through a separate pull request, independent review, and an explicit merge decision.
+- Do not delete or alter historical raffle or payout records without a documented audit.
+
+## Useful links
+
+- Live site: https://bitcoinreviewsraffle.com/
+- Bitcoin Roatan: https://bitcoinroatan.info
+- BTCMap: https://btcmap.org
 
 ## License
 
 MIT
-
-## Contributing
-
-Contributions welcome! Please open an issue or PR.
-
----
-
-Made with ⚡ for Bitcoin adoption in Roatan 🌴

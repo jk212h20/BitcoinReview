@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><%= title %></title>
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon-180.png">
     <link href="/styles.css" rel="stylesheet">
     <!-- Prefetch main pages for instant navigation -->
     <% const locBase = (typeof location !== 'undefined' && location && !location.isDefault) ? '/' + location.slug : ''; %>
@@ -23,8 +26,8 @@
     <nav class="bg-white shadow-sm">
         <div class="max-w-6xl mx-auto px-4 py-4">
             <div class="flex justify-between items-center">
-                <a href="/" class="flex items-center space-x-2">
-                    <span class="text-2xl">₿</span>
+                <a href="/" class="flex items-center space-x-2" aria-label="Reviews Raffle home">
+                    <img src="/images/bitcoin-roatan-raffle-logo.png" alt="Bitcoin Roatan logo" class="w-8 h-8" width="32" height="32">
                     <span class="font-bold text-xl">Reviews Raffle</span>
                 </a>
                 <div class="hidden md:flex items-center space-x-6">
@@ -126,6 +129,7 @@
                         <li><a href="<%= locBase %>/submit" class="hover:text-white">Submit a Review</a></li>
                         <li><a href="<%= locBase %>/merchants" class="hover:text-white">Find Merchants</a></li>
                         <li><a href="<%= locBase %>/how-it-works" class="hover:text-white">How It Works</a></li>
+                        <li><a href="https://bitcoinroatan.info" target="_blank" rel="noopener" class="hover:text-white">Bitcoin Roatan</a></li>
                     </ul>
                 </div>
                 <div>
