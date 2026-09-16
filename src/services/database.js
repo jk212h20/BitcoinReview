@@ -17,12 +17,14 @@ if (!fs.existsSync(dbDir)) {
 }
 
 let db = null;
+let SQL = null;
+const raffleClaimLocks = new Map();
 
 // Initialize database
 async function initializeDatabase() {
     console.log(`📂 Database path: ${dbPath}`);
     console.log(`📂 Database directory: ${dbDir} (exists: ${fs.existsSync(dbDir)})`);
-    const SQL = await initSqlJs();
+    SQL = await initSqlJs();
     
     // Load existing database or create new one
     if (fs.existsSync(dbPath)) {
@@ -218,7 +220,15 @@ function saveDatabase() {
     if (db) {
         const data = db.export();
         const buffer = Buffer.from(data);
-        fs.writeFileSync(dbPath, buffer);
+        const tempPath = `${dbPath}.${process.pid}.${Date.now()}.tmp`;
+        try {
+            fs.writeFileSync(tempPath, buffer);
+            fs.renameSync(tempPath, dbPath);
+        } finally {
+            if (fs.existsSync(tempPath)) {
+                fs.unlinkSync(tempPath);
+            }
+        }
     }
 }
 
@@ -640,8 +650,129 @@ function findRaffleByClaimToken(token) {
     `, [token]);
 }
 
+function getRaffleClaimLockPath(raffleId) {
+    return `${dbPath}.claim-${raffleId}.lock`;
+}
+
+function acquireRaffleClaimLock(raffleId) {
+    const existingLock = raffleClaimLocks.get(raffleId);
+    if (existingLock) return existingLock;
+
+    const lockPath = getRaffleClaimLockPath(raffleId);
+    try {
+        const fd = fs.openSync(lockPath, 'wx');
+        fs.writeSync(fd, `${process.pid}\n`);
+        const lock = { fd, lockPath };
+        raffleClaimLocks.set(raffleId, lock);
+        return lock;
+    } catch (error) {
+        if (error.code === 'EEXIST') return null;
+        throw error;
+    }
+}
+
+function releaseRaffleClaimLock(raffleId) {
+    const lock = raffleClaimLocks.get(raffleId);
+    if (!lock) return;
+
+    raffleClaimLocks.delete(raffleId);
+    try {
+        fs.closeSync(lock.fd);
+    } finally {
+        try {
+            fs.unlinkSync(lock.lockPath);
+        } catch (error) {
+            if (error.code !== 'ENOENT') throw error;
+        }
+    }
+}
+
+function reloadDatabaseFromDisk() {
+    if (!SQL || !fs.existsSync(dbPath)) return;
+    const nextDb = new SQL.Database(fs.readFileSync(dbPath));
+    if (db) db.close();
+    db = nextDb;
+}
+
+function changeRaffleClaimState(raffleId, expectedStatus, nextStatus, paymentHash = null, paymentError = null) {
+    const lockWasAlreadyHeld = raffleClaimLocks.has(raffleId);
+    const lock = acquireRaffleClaimLock(raffleId);
+    if (!lock) {
+        return { changed: false, status: 'processing' };
+    }
+
+    let databaseBeforeTransaction = null;
+    let transactionOpen = false;
+    let keepLockForReconciliation = false;
+    try {
+        /* A second process may have changed the snapshot since this process
+           loaded it. Read the latest state while holding the claim lock. */
+        if (expectedStatus === 'pending' && nextStatus === 'processing') {
+            reloadDatabaseFromDisk();
+        }
+        databaseBeforeTransaction = db.export();
+
+        db.run('BEGIN IMMEDIATE TRANSACTION');
+        transactionOpen = true;
+        const raffle = queryOne(`SELECT claim_status FROM raffles WHERE id = ?`, [raffleId]);
+        if (!raffle || raffle.claim_status !== expectedStatus) {
+            db.run('ROLLBACK');
+            transactionOpen = false;
+            if (!lockWasAlreadyHeld) releaseRaffleClaimLock(raffleId);
+            return { changed: false, status: raffle ? raffle.claim_status : null };
+        }
+
+        if (nextStatus === 'claimed') {
+            db.run(
+                `UPDATE raffles
+                 SET claim_status = 'claimed', claimed_at = datetime('now'), claim_payment_hash = ?,
+                     payment_status = 'paid', paid_at = datetime('now'), payment_error = NULL
+                 WHERE id = ?`,
+                [paymentHash || '', raffleId]
+            );
+        } else if (nextStatus === 'pending') {
+            db.run(
+                `UPDATE raffles SET claim_status = 'pending', payment_status = 'failed', payment_error = ? WHERE id = ?`,
+                [paymentError || 'Payment failed', raffleId]
+            );
+        } else {
+            db.run(`UPDATE raffles SET claim_status = ? WHERE id = ?`, [nextStatus, raffleId]);
+        }
+
+        db.run('COMMIT');
+        transactionOpen = false;
+        try {
+            saveDatabase();
+        } catch (error) {
+            db = new SQL.Database(databaseBeforeTransaction);
+            /* The on-disk state is still processing after a finalization
+               failure. Keep the lock so no retry can pay it again. */
+            keepLockForReconciliation = nextStatus !== 'processing';
+            throw error;
+        }
+        releaseRaffleClaimLock(raffleId);
+        return { changed: true, status: nextStatus };
+    } catch (error) {
+        try {
+            if (transactionOpen) db.run('ROLLBACK');
+        } finally {
+            if (!keepLockForReconciliation) releaseRaffleClaimLock(raffleId);
+        }
+        throw error;
+    }
+}
+
+function reserveRaffleClaim(raffleId) {
+    const result = changeRaffleClaimState(raffleId, 'pending', 'processing');
+    return { reserved: result.changed, status: result.status };
+}
+
+function releaseRaffleClaim(raffleId, paymentError) {
+    return changeRaffleClaimState(raffleId, 'processing', 'pending', null, paymentError);
+}
+
 function markRaffleClaimed(raffleId, paymentHash) {
-    run(`UPDATE raffles SET claim_status = 'claimed', claimed_at = datetime('now'), claim_payment_hash = ?, payment_status = 'paid', paid_at = datetime('now') WHERE id = ?`, [paymentHash, raffleId]);
+    return changeRaffleClaimState(raffleId, 'processing', 'claimed', paymentHash);
 }
 
 function markRaffleClaimExpired(raffleId) {
@@ -760,6 +891,8 @@ module.exports = {
     // Claim functions (LNURL-withdraw)
     setRaffleClaimToken,
     findRaffleByClaimToken,
+    reserveRaffleClaim,
+    releaseRaffleClaim,
     markRaffleClaimed,
     markRaffleClaimExpired,
     getExpiredUnclaimedRaffles,

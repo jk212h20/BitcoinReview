@@ -93,15 +93,29 @@ async function lndRequest(path, method = 'GET', body = null) {
     try {
         response = await fetch(url, { ...options, signal: AbortSignal.timeout(10000) });
     } catch (fetchErr) {
-        throw new Error(`LND connection failed (${path}): ${fetchErr.message}`);
+        const error = new Error(`LND connection failed (${path}): ${fetchErr.message}`);
+        error.code = 'LND_TRANSPORT_ERROR';
+        error.paymentOutcome = 'unknown';
+        throw error;
     }
     
     if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`LND API error (${response.status} on ${path}): ${errorText}`);
+        const error = new Error(`LND API error (${response.status} on ${path}): ${errorText}`);
+        error.code = 'LND_API_ERROR';
+        error.httpStatus = response.status;
+        error.paymentOutcome = 'unknown';
+        throw error;
     }
 
-    return await response.json();
+    try {
+        return await response.json();
+    } catch (parseError) {
+        const error = new Error(`Invalid JSON response from LND (${path}): ${parseError.message}`);
+        error.code = 'LND_RESPONSE_ERROR';
+        error.paymentOutcome = 'unknown';
+        throw error;
+    }
 }
 
 /**
@@ -148,14 +162,21 @@ async function payInvoice(payReq, amountSats = null) {
         try {
             const decoded = await decodePayReq(payReq);
             payAmount = parseInt(decoded.num_satoshis || decoded.numSatoshis || '0');
-        } catch (e) {
-            // If we can't decode, fall through to LND — LND will reject if invoice
-            // is malformed. We just lose the budget check for this edge case.
-            payAmount = 0;
+        } catch (error) {
+            /* The payment request was not sent to the payment endpoint. */
+            error.code = 'PAYMENT_PRECHECK_FAILED';
+            error.paymentOutcome = 'not_sent';
+            throw error;
         }
     }
     if (payAmount > 0) {
-        assertWithinBudget(payAmount, 'payInvoice');
+        try {
+            assertWithinBudget(payAmount, 'payInvoice');
+        } catch (error) {
+            /* The budget check runs before the payment endpoint is called. */
+            error.paymentOutcome = 'not_sent';
+            throw error;
+        }
     }
 
     const body = {
@@ -171,7 +192,20 @@ async function payInvoice(payReq, amountSats = null) {
     }
 
     // Use v1 synchronous send endpoint
-    return await lndRequest('/v1/channels/transactions', 'POST', body);
+    const paymentResult = await lndRequest('/v1/channels/transactions', 'POST', body);
+    if (paymentResult.payment_error) {
+        const error = new Error(`LND payment failed: ${paymentResult.payment_error}`);
+        error.code = 'LND_PAYMENT_FAILED';
+        error.paymentOutcome = 'not_sent';
+        throw error;
+    }
+    if (!paymentResult.payment_hash) {
+        const error = new Error('LND payment response did not include payment_hash');
+        error.code = 'LND_PAYMENT_RESULT_INCOMPLETE';
+        error.paymentOutcome = 'unknown';
+        throw error;
+    }
+    return paymentResult;
 }
 
 /**

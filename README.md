@@ -92,8 +92,9 @@ Railway runs the app with the command in `railway.json` and checks `/api/health`
 1. Connect the GitHub repository to the Railway service.
 2. Configure production variables in Railway.
 3. Attach a persistent Railway Volume and set `DATABASE_PATH` to a file on that volume, for example `/data/reviews.db`.
-4. Push a commit to the branch Railway deploys, currently `main`.
-5. Confirm that the build succeeds and `/api/health` returns successfully before treating the release as live.
+4. Keep the service at exactly one Railway replica. The application uses an in-memory `sql.js` snapshot; the LNURL claim lock protects concurrent processes only when they share the same volume, while multiple replicas with independent snapshots are not a supported deployment.
+5. Push a commit to the branch Railway deploys, currently `main`.
+6. Confirm that the build succeeds and `/api/health` returns successfully before treating the release as live.
 
 A local change, a feature branch, or an open pull request does not change the public website. A successful push to the deployed branch does.
 

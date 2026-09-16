@@ -705,31 +705,56 @@ router.get('/lnurl/withdraw/:token/callback', async (req, res) => {
         // Decode invoice to verify amount
         try {
             const decoded = await lightning.decodePayReq(pr);
-            const invoiceSats = parseInt(decoded.num_satoshis || '0');
+            const invoiceSats = parseInt(decoded.num_satoshis || decoded.numSatoshis || '0');
             
-            // Allow the invoice amount to match (wallet may round slightly)
-            if (invoiceSats > prizeSats) {
-                return res.json({ status: 'ERROR', reason: `Invoice amount (${invoiceSats} sats) exceeds prize (${prizeSats} sats)` });
+            if (invoiceSats !== prizeSats) {
+                return res.json({ status: 'ERROR', reason: `Invoice amount (${invoiceSats} sats) must exactly match prize (${prizeSats} sats)` });
             }
         } catch (decodeErr) {
             console.error('Invoice decode error:', decodeErr.message);
             return res.json({ status: 'ERROR', reason: 'Failed to decode invoice' });
         }
-        
-        // Pay the invoice via LND
+
+        const reservation = db.reserveRaffleClaim(raffle.id);
+        if (!reservation.reserved) {
+            if (reservation.status === 'processing') {
+                return res.json({ status: 'ERROR', reason: 'Claim is already being processed. Do not submit another invoice.' });
+            }
+            if (reservation.status === 'claimed') {
+                return res.json({ status: 'ERROR', reason: 'Prize already claimed' });
+            }
+            return res.json({ status: 'ERROR', reason: 'Claim is no longer available' });
+        }
+
         try {
             console.log(`⚡ LNURL-withdraw: paying ${prizeSats} sats for claim ${token.substring(0, 8)}...`);
             const paymentResult = await lightning.payInvoice(pr);
-            
             const paymentHash = paymentResult.payment_hash || '';
-            db.markRaffleClaimed(raffle.id, paymentHash);
+            try {
+                const finalization = db.markRaffleClaimed(raffle.id, paymentHash);
+                if (!finalization.changed) {
+                    console.error('LNURL-withdraw claim finalization found an unexpected claim state; keeping claim for reconciliation');
+                    return res.json({ status: 'ERROR', reason: 'Payment result is being reconciled. Do not retry this claim.' });
+                }
+            } catch (claimWriteError) {
+                console.error('LNURL-withdraw payment succeeded but claim finalization failed:', claimWriteError.message);
+                return res.json({ status: 'ERROR', reason: 'Payment result is being reconciled. Do not retry this claim.' });
+            }
             
             console.log(`✅ LNURL-withdraw claim successful! Raffle #${raffle.id}, ${prizeSats} sats, hash: ${paymentHash}`);
             
             res.json({ status: 'OK' });
         } catch (payErr) {
             console.error('LNURL-withdraw payment failed:', payErr.message);
-            db.markRafflePaymentFailed(raffle.id, payErr.message);
+            if (payErr.paymentOutcome !== 'not_sent') {
+                console.error('LNURL-withdraw payment outcome is unknown; claim remains in processing for reconciliation');
+                return res.json({ status: 'ERROR', reason: 'Payment result is being reconciled. Do not retry this claim.' });
+            }
+            try {
+                db.releaseRaffleClaim(raffle.id, payErr.message);
+            } catch (releaseError) {
+                console.error('LNURL-withdraw claim release failed:', releaseError.message);
+            }
             return res.json({ status: 'ERROR', reason: 'Payment failed: ' + payErr.message });
         }
     } catch (error) {
