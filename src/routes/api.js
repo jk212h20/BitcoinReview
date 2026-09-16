@@ -705,11 +705,10 @@ router.get('/lnurl/withdraw/:token/callback', async (req, res) => {
         // Decode invoice to verify amount
         try {
             const decoded = await lightning.decodePayReq(pr);
-            const invoiceSats = parseInt(decoded.num_satoshis || '0');
+            const invoiceSats = parseInt(decoded.num_satoshis || decoded.numSatoshis || '0');
             
-            // Allow the invoice amount to match (wallet may round slightly)
-            if (invoiceSats > prizeSats) {
-                return res.json({ status: 'ERROR', reason: `Invoice amount (${invoiceSats} sats) exceeds prize (${prizeSats} sats)` });
+            if (invoiceSats !== prizeSats) {
+                return res.json({ status: 'ERROR', reason: `Invoice amount (${invoiceSats} sats) must exactly match prize (${prizeSats} sats)` });
             }
         } catch (decodeErr) {
             console.error('Invoice decode error:', decodeErr.message);
@@ -732,7 +731,11 @@ router.get('/lnurl/withdraw/:token/callback', async (req, res) => {
             const paymentResult = await lightning.payInvoice(pr);
             const paymentHash = paymentResult.payment_hash || '';
             try {
-                db.markRaffleClaimed(raffle.id, paymentHash);
+                const finalization = db.markRaffleClaimed(raffle.id, paymentHash);
+                if (!finalization.changed) {
+                    console.error('LNURL-withdraw claim finalization found an unexpected claim state; keeping claim for reconciliation');
+                    return res.json({ status: 'ERROR', reason: 'Payment result is being reconciled. Do not retry this claim.' });
+                }
             } catch (claimWriteError) {
                 console.error('LNURL-withdraw payment succeeded but claim finalization failed:', claimWriteError.message);
                 return res.json({ status: 'ERROR', reason: 'Payment result is being reconciled. Do not retry this claim.' });
@@ -743,6 +746,10 @@ router.get('/lnurl/withdraw/:token/callback', async (req, res) => {
             res.json({ status: 'OK' });
         } catch (payErr) {
             console.error('LNURL-withdraw payment failed:', payErr.message);
+            if (payErr.paymentOutcome !== 'not_sent') {
+                console.error('LNURL-withdraw payment outcome is unknown; claim remains in processing for reconciliation');
+                return res.json({ status: 'ERROR', reason: 'Payment result is being reconciled. Do not retry this claim.' });
+            }
             try {
                 db.releaseRaffleClaim(raffle.id, payErr.message);
             } catch (releaseError) {

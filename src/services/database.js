@@ -18,6 +18,7 @@ if (!fs.existsSync(dbDir)) {
 
 let db = null;
 let SQL = null;
+const raffleClaimLocks = new Map();
 
 // Initialize database
 async function initializeDatabase() {
@@ -649,16 +650,75 @@ function findRaffleByClaimToken(token) {
     `, [token]);
 }
 
-function changeRaffleClaimState(raffleId, expectedStatus, nextStatus, paymentHash = null, paymentError = null) {
-    const databaseBeforeTransaction = db.export();
-    let transactionOpen = false;
+function getRaffleClaimLockPath(raffleId) {
+    return `${dbPath}.claim-${raffleId}.lock`;
+}
+
+function acquireRaffleClaimLock(raffleId) {
+    const existingLock = raffleClaimLocks.get(raffleId);
+    if (existingLock) return existingLock;
+
+    const lockPath = getRaffleClaimLockPath(raffleId);
     try {
+        const fd = fs.openSync(lockPath, 'wx');
+        fs.writeSync(fd, `${process.pid}\n`);
+        const lock = { fd, lockPath };
+        raffleClaimLocks.set(raffleId, lock);
+        return lock;
+    } catch (error) {
+        if (error.code === 'EEXIST') return null;
+        throw error;
+    }
+}
+
+function releaseRaffleClaimLock(raffleId) {
+    const lock = raffleClaimLocks.get(raffleId);
+    if (!lock) return;
+
+    raffleClaimLocks.delete(raffleId);
+    try {
+        fs.closeSync(lock.fd);
+    } finally {
+        try {
+            fs.unlinkSync(lock.lockPath);
+        } catch (error) {
+            if (error.code !== 'ENOENT') throw error;
+        }
+    }
+}
+
+function reloadDatabaseFromDisk() {
+    if (!SQL || !fs.existsSync(dbPath)) return;
+    const nextDb = new SQL.Database(fs.readFileSync(dbPath));
+    if (db) db.close();
+    db = nextDb;
+}
+
+function changeRaffleClaimState(raffleId, expectedStatus, nextStatus, paymentHash = null, paymentError = null) {
+    const lockWasAlreadyHeld = raffleClaimLocks.has(raffleId);
+    const lock = acquireRaffleClaimLock(raffleId);
+    if (!lock) {
+        return { changed: false, status: 'processing' };
+    }
+
+    let databaseBeforeTransaction = null;
+    let transactionOpen = false;
+    let keepLockForReconciliation = false;
+    try {
+        /* A second process may have changed the snapshot since this process
+           loaded it. Read the latest state while holding the claim lock. */
+        if (expectedStatus === 'pending' && nextStatus === 'processing') {
+            reloadDatabaseFromDisk();
+        }
+        databaseBeforeTransaction = db.export();
+
         db.run('BEGIN IMMEDIATE TRANSACTION');
         transactionOpen = true;
         const raffle = queryOne(`SELECT claim_status FROM raffles WHERE id = ?`, [raffleId]);
         if (!raffle || raffle.claim_status !== expectedStatus) {
             db.run('ROLLBACK');
             transactionOpen = false;
+            if (!lockWasAlreadyHeld) releaseRaffleClaimLock(raffleId);
             return { changed: false, status: raffle ? raffle.claim_status : null };
         }
 
@@ -685,12 +745,18 @@ function changeRaffleClaimState(raffleId, expectedStatus, nextStatus, paymentHas
             saveDatabase();
         } catch (error) {
             db = new SQL.Database(databaseBeforeTransaction);
+            /* The on-disk state is still processing after a finalization
+               failure. Keep the lock so no retry can pay it again. */
+            keepLockForReconciliation = nextStatus !== 'processing';
             throw error;
         }
+        releaseRaffleClaimLock(raffleId);
         return { changed: true, status: nextStatus };
     } catch (error) {
-        if (transactionOpen) {
-            db.run('ROLLBACK');
+        try {
+            if (transactionOpen) db.run('ROLLBACK');
+        } finally {
+            if (!keepLockForReconciliation) releaseRaffleClaimLock(raffleId);
         }
         throw error;
     }
