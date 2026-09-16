@@ -17,12 +17,13 @@ if (!fs.existsSync(dbDir)) {
 }
 
 let db = null;
+let SQL = null;
 
 // Initialize database
 async function initializeDatabase() {
     console.log(`📂 Database path: ${dbPath}`);
     console.log(`📂 Database directory: ${dbDir} (exists: ${fs.existsSync(dbDir)})`);
-    const SQL = await initSqlJs();
+    SQL = await initSqlJs();
     
     // Load existing database or create new one
     if (fs.existsSync(dbPath)) {
@@ -91,6 +92,21 @@ async function initializeDatabase() {
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (winning_ticket_id) REFERENCES tickets(id)
         );
+
+        /*
+         * Reserve each raffle block before a raffle is created. Existing production
+         * data contains duplicate raffle rows, so this separate table protects future
+         * draws without deleting or rewriting historical records during startup.
+         */
+        CREATE TABLE IF NOT EXISTS raffle_locks (
+            block_height INTEGER PRIMARY KEY,
+            locked_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+    `);
+
+    db.run(`
+        INSERT OR IGNORE INTO raffle_locks (block_height)
+        SELECT block_height FROM raffles
     `);
     
     // Settings table (key-value store for admin config)
@@ -218,7 +234,15 @@ function saveDatabase() {
     if (db) {
         const data = db.export();
         const buffer = Buffer.from(data);
-        fs.writeFileSync(dbPath, buffer);
+        const tempPath = `${dbPath}.${process.pid}.${Date.now()}.tmp`;
+        try {
+            fs.writeFileSync(tempPath, buffer);
+            fs.renameSync(tempPath, dbPath);
+        } finally {
+            if (fs.existsSync(tempPath)) {
+                fs.unlinkSync(tempPath);
+            }
+        }
     }
 }
 
@@ -500,12 +524,84 @@ function countValidTicketsForBlock(raffleBlock) {
 }
 
 // Raffle functions
-function createRaffle(blockHeight, blockHash, totalTickets, winningIndex, winningTicketId, prizeAmountSats) {
-    const id = run(
-        `INSERT INTO raffles (block_height, block_hash, total_tickets, winning_index, winning_ticket_id, prize_amount_sats) VALUES (?, ?, ?, ?, ?, ?)`,
-        [blockHeight, blockHash, totalTickets, winningIndex, winningTicketId, prizeAmountSats]
-    );
-    return { id };
+function createRaffle(blockHeight, blockHash, totalTickets, winningIndex, winningTicketId, prizeAmountSats, raffleFundSats, claimToken, claimExpiresAt) {
+    const prizeSats = Number(prizeAmountSats || 0);
+    if (!Number.isSafeInteger(prizeSats) || prizeSats < 0) {
+        const error = new Error('Raffle prize must be a non-negative whole number of sats');
+        error.code = 'INVALID_RAFFLE_PRIZE';
+        throw error;
+    }
+    if (prizeSats > 0 && raffleFundSats === undefined) {
+        const error = new Error('A positive raffle prize requires an atomically reserved raffle fund balance');
+        error.code = 'RAFFLE_FUND_RESERVATION_REQUIRED';
+        throw error;
+    }
+    if (raffleFundSats !== undefined && (!Number.isSafeInteger(raffleFundSats) || raffleFundSats < 0)) {
+        const error = new Error('Raffle fund balance must be a non-negative whole number of sats');
+        error.code = 'INVALID_RAFFLE_FUND';
+        throw error;
+    }
+
+    let transactionOpen = false;
+    const databaseBeforeTransaction = db.export();
+
+    try {
+        db.run('BEGIN IMMEDIATE TRANSACTION');
+        transactionOpen = true;
+        db.run(`INSERT OR IGNORE INTO raffle_locks (block_height) VALUES (?)`, [blockHeight]);
+
+        const lockResult = db.exec('SELECT changes() AS changes');
+        const lockCreated = lockResult[0].values[0][0] === 1;
+        if (!lockCreated) {
+            db.run('ROLLBACK');
+            transactionOpen = false;
+            const error = new Error(`Raffle already exists for block #${blockHeight}`);
+            error.code = 'DUPLICATE_RAFFLE';
+            throw error;
+        }
+
+        if (prizeSats > 0) {
+            const currentFund = parseInt(
+                queryOne(`SELECT value FROM settings WHERE key = 'raffle_fund_sats'`)?.value || '0',
+                10
+            ) || 0;
+            if (currentFund !== raffleFundSats) {
+                const error = new Error('Raffle fund changed before this raffle could be committed');
+                error.code = 'STALE_RAFFLE_FUND';
+                throw error;
+            }
+            if (currentFund < prizeSats) {
+                const error = new Error('Raffle fund cannot cover this prize');
+                error.code = 'INSUFFICIENT_RAFFLE_FUND';
+                throw error;
+            }
+            db.run(
+                `INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('raffle_fund_sats', ?, datetime('now'))`,
+                [String(currentFund - prizeSats)]
+            );
+        }
+
+        db.run(
+            `INSERT INTO raffles (block_height, block_hash, total_tickets, winning_index, winning_ticket_id, prize_amount_sats, claim_token, claim_expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [blockHeight, blockHash, totalTickets, winningIndex, winningTicketId, prizeSats, claimToken || null, claimExpiresAt || null]
+        );
+        const idResult = db.exec('SELECT last_insert_rowid() AS id');
+        const id = idResult[0].values[0][0];
+        db.run('COMMIT');
+        transactionOpen = false;
+        try {
+            saveDatabase();
+        } catch (error) {
+            db = new SQL.Database(databaseBeforeTransaction);
+            throw error;
+        }
+        return { id };
+    } catch (error) {
+        if (transactionOpen) {
+            db.run('ROLLBACK');
+        }
+        throw error;
+    }
 }
 
 function findRaffleByBlock(blockHeight) {
@@ -563,8 +659,49 @@ function getMostRecentlyReviewedMerchant() {
     `);
 }
 
-function deleteRaffle(raffleId) {
-    run(`DELETE FROM raffles WHERE id = ?`, [raffleId]);
+function deleteRaffle(raffleId, refundSats = 0) {
+    const raffle = queryOne(`SELECT block_height, payment_status FROM raffles WHERE id = ?`, [raffleId]);
+    if (!raffle) return false;
+    if (raffle.payment_status === 'paid') {
+        const error = new Error('A paid raffle cannot be deleted or refunded');
+        error.code = 'PAID_RAFFLE';
+        throw error;
+    }
+
+    let transactionOpen = false;
+    const databaseBeforeTransaction = db.export();
+    try {
+        db.run('BEGIN IMMEDIATE TRANSACTION');
+        transactionOpen = true;
+        db.run(`DELETE FROM raffles WHERE id = ?`, [raffleId]);
+        const refund = Math.max(0, parseInt(refundSats, 10) || 0);
+        if (refund > 0) {
+            const currentFund = parseInt(queryOne(`SELECT value FROM settings WHERE key = 'raffle_fund_sats'`)?.value || '0', 10) || 0;
+            db.run(
+                `INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('raffle_fund_sats', ?, datetime('now'))`,
+                [String(currentFund + refund)]
+            );
+        }
+        const remainingResult = db.exec(`SELECT COUNT(*) AS count FROM raffles WHERE block_height = ${Number(raffle.block_height)}`);
+        const remainingRaffles = remainingResult[0].values[0][0];
+        if (remainingRaffles === 0) {
+            db.run(`DELETE FROM raffle_locks WHERE block_height = ?`, [raffle.block_height]);
+        }
+        db.run('COMMIT');
+        transactionOpen = false;
+        try {
+            saveDatabase();
+        } catch (error) {
+            db = new SQL.Database(databaseBeforeTransaction);
+            throw error;
+        }
+        return true;
+    } catch (error) {
+        if (transactionOpen) {
+            db.run('ROLLBACK');
+        }
+        throw error;
+    }
 }
 
 function getLatestRaffle() {
@@ -625,10 +762,6 @@ function getTotalDonationsReceived() {
 }
 
 // Claim functions (LNURL-withdraw)
-function setRaffleClaimToken(raffleId, claimToken, expiresAt) {
-    run(`UPDATE raffles SET claim_token = ?, claim_status = 'pending', claim_expires_at = ? WHERE id = ?`, [claimToken, expiresAt, raffleId]);
-}
-
 function findRaffleByClaimToken(token) {
     if (!token) return null;
     return queryOne(`
@@ -758,7 +891,6 @@ module.exports = {
     getLatestRaffle,
     
     // Claim functions (LNURL-withdraw)
-    setRaffleClaimToken,
     findRaffleByClaimToken,
     markRaffleClaimed,
     markRaffleClaimExpired,

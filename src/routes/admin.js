@@ -271,7 +271,9 @@ router.post('/raffle/run-real', async (req, res) => {
         res.json({ success: true, message: 'Real raffle committed.', raffle: result });
     } catch (error) {
         console.error('Real raffle run error:', error);
-        const status = ['NOT_DUE', 'NO_TICKETS', 'NO_PRIZE', 'DUPLICATE'].includes(error.code) ? 400 : 500;
+        const status = error.code === 'DUPLICATE_RAFFLE'
+            ? 409
+            : ['NOT_DUE', 'NO_TICKETS', 'NO_PRIZE', 'DUPLICATE'].includes(error.code) ? 400 : 500;
         res.status(status).json({
             success: false,
             error: error.message,
@@ -301,14 +303,27 @@ router.post('/raffle/test', async (req, res) => {
             return res.status(400).json({ error: 'No approved tickets to draw from' });
         }
 
-        // Site-budget guard: refuse the test if even the 100-sat fee would push
-        // this site below 0 in its ledger (donations − payouts).
+        const currentFund = parseInt(db.getSetting('raffle_fund_sats') || '0', 10) || 0;
+
+        /*
+         * The ledger and the raffle fund are both relevant. The ledger protects
+         * shared-node accounting; the raffle fund is the exact balance reserved
+         * atomically with this raffle record.
+         */
         const available = lightning.getSiteAvailableSats();
         if (prizeSats > available) {
             return res.status(400).json({
                 error: `Test raffle needs ${prizeSats} sats but this site only has ${available.toLocaleString()} sats available. Top up the raffle fund first.`,
                 requested: prizeSats,
                 available
+            });
+        }
+
+        if (prizeSats > currentFund) {
+            return res.status(400).json({
+                error: `Test raffle needs ${prizeSats} sats but the raffle fund only has ${currentFund.toLocaleString()} sats. Top up the raffle fund first.`,
+                requested: prizeSats,
+                available: currentFund
             });
         }
 
@@ -319,25 +334,21 @@ router.post('/raffle/test', async (req, res) => {
         // Select winner deterministically
         const winnerIndex = bitcoin.selectWinnerIndex(blockHash, allApproved.length);
         const winningTicket = allApproved[winnerIndex];
-
-        // Deduct prize from raffle fund
-        const currentFund = parseInt(db.getSetting('raffle_fund_sats') || '0');
-        if (currentFund >= prizeSats) {
-            db.setSetting('raffle_fund_sats', String(currentFund - prizeSats));
-            console.log(`🧪 Test raffle: fund ${currentFund} - ${prizeSats} = ${currentFund - prizeSats} sats`);
-        }
+        const claimToken = crypto.randomUUID();
+        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
         // Create a real raffle record
         const raffle = db.createRaffle(
-            currentHeight, blockHash, allApproved.length, winnerIndex, winningTicket.id, prizeSats
+            currentHeight, blockHash, allApproved.length, winnerIndex, winningTicket.id, prizeSats,
+            currentFund,
+            claimToken,
+            expiresAt
         );
+
+        console.log(`🧪 Test raffle: fund ${currentFund} - ${prizeSats} = ${currentFund - prizeSats} sats`);
 
         console.log(`🧪 Test raffle committed! Block #${currentHeight}, winner index: ${winnerIndex}/${allApproved.length}, ticket #${winningTicket.id}, prize: ${prizeSats} sats`);
 
-        // Generate claim token (LNURL-withdraw) — winner scans QR to claim
-        const claimToken = crypto.randomUUID();
-        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-        db.setRaffleClaimToken(raffle.id, claimToken, expiresAt);
         const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
         const claimLink = `${baseUrl}/claim/${claimToken}`;
 
@@ -384,6 +395,9 @@ router.post('/raffle/test', async (req, res) => {
 
     } catch (error) {
         console.error('Test raffle error:', error);
+        if (error.code === 'DUPLICATE_RAFFLE') {
+            return res.status(409).json({ error: error.message });
+        }
         res.status(500).json({ error: 'Test raffle failed: ' + error.message });
     }
 });
@@ -406,16 +420,21 @@ router.delete('/raffle/:id', (req, res) => {
             return res.status(404).json({ error: 'Raffle not found' });
         }
         
+        const refundSats = refund && raffle.prize_amount_sats ? raffle.prize_amount_sats : 0;
+
+        if (raffle.payment_status === 'paid') {
+            return res.status(409).json({ error: 'A paid raffle cannot be deleted or refunded' });
+        }
+
         // Optionally refund the prize to the raffle fund
         if (refund && raffle.prize_amount_sats) {
             const currentFund = parseInt(db.getSetting('raffle_fund_sats') || '0');
-            db.setSetting('raffle_fund_sats', String(currentFund + raffle.prize_amount_sats));
             console.log(`🗑️ Raffle #${id} deleted — refunded ${raffle.prize_amount_sats} sats to fund (${currentFund} + ${raffle.prize_amount_sats} = ${currentFund + raffle.prize_amount_sats})`);
         } else {
             console.log(`🗑️ Raffle #${id} deleted (no refund)`);
         }
         
-        db.deleteRaffle(parseInt(id));
+        db.deleteRaffle(parseInt(id), refundSats);
         
         res.json({
             success: true,
@@ -424,7 +443,8 @@ router.delete('/raffle/:id', (req, res) => {
         });
     } catch (error) {
         console.error('Delete raffle error:', error);
-        res.status(500).json({ error: 'Failed to delete raffle: ' + error.message });
+        const status = error.code === 'PAID_RAFFLE' ? 409 : 500;
+        res.status(status).json({ error: 'Failed to delete raffle: ' + error.message });
     }
 });
 
@@ -465,15 +485,27 @@ router.post('/raffle/run', async (req, res) => {
             return res.status(400).json({ error: 'No valid tickets for this raffle period' });
         }
 
+        const defaultPrizeSats = Number(process.env.DEFAULT_PRIZE_SATS || 0);
+        const prizeSats = prizeAmountSats === undefined || prizeAmountSats === null || prizeAmountSats === ''
+            ? defaultPrizeSats
+            : Number(prizeAmountSats);
+        if (!Number.isSafeInteger(prizeSats) || prizeSats <= 0) {
+            return res.status(400).json({ error: 'Prize must be a positive whole number of sats' });
+        }
+
+        /*
+         * Validate the numeric input before it reaches either budget calculation.
+         * This prevents string, NaN, and negative values from corrupting settings.
+         */
         // Site-budget guard: refuse to commit a raffle whose prize exceeds the
         // site's available ledger balance. The shared LND node may have more —
         // those funds belong to other sites.
-        if (prizeAmountSats) {
+        if (prizeSats) {
             const available = lightning.getSiteAvailableSats();
-            if (prizeAmountSats > available) {
+            if (prizeSats > available) {
                 return res.status(400).json({
-                    error: `Prize ${prizeAmountSats.toLocaleString()} sats exceeds this site's available fund (${available.toLocaleString()} sats). Top up the raffle fund with a real donation first.`,
-                    requested: prizeAmountSats,
+                    error: `Prize ${prizeSats.toLocaleString()} sats exceeds this site's available fund (${available.toLocaleString()} sats). Top up the raffle fund with a real donation first.`,
+                    requested: prizeSats,
                     available
                 });
             }
@@ -482,6 +514,15 @@ router.post('/raffle/run', async (req, res) => {
         // Select winner
         const winnerIndex = bitcoin.selectWinnerIndex(blockHash, tickets.length);
         const winningTicket = tickets[winnerIndex];
+        const crypto = require('crypto');
+        const currentFund = parseInt(db.getSetting('raffle_fund_sats') || '0', 10) || 0;
+        if (prizeSats > currentFund) {
+            return res.status(400).json({
+                error: `Prize ${prizeSats.toLocaleString()} sats exceeds the current raffle fund (${currentFund.toLocaleString()} sats).`
+            });
+        }
+        const claimToken = crypto.randomUUID();
+        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
         // Create raffle record
         const raffle = db.createRaffle(
@@ -490,16 +531,11 @@ router.post('/raffle/run', async (req, res) => {
             tickets.length,
             winnerIndex,
             winningTicket.id,
-            prizeAmountSats || null
+            prizeSats,
+            currentFund,
+            claimToken,
+            expiresAt
         );
-        
-        const crypto = require('crypto');
-        const prizeSats = prizeAmountSats || parseInt(process.env.DEFAULT_PRIZE_SATS) || 0;
-        
-        // Generate claim token (LNURL-withdraw)
-        const claimToken = crypto.randomUUID();
-        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-        db.setRaffleClaimToken(raffle.id, claimToken, expiresAt);
         const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
         const claimLink = `${baseUrl}/claim/${claimToken}`;
         
@@ -545,6 +581,9 @@ router.post('/raffle/run', async (req, res) => {
         
     } catch (error) {
         console.error('Raffle run error:', error);
+        if (error.code === 'DUPLICATE_RAFFLE') {
+            return res.status(409).json({ error: error.message });
+        }
         res.status(500).json({ error: 'Failed to run raffle: ' + error.message });
     }
 });

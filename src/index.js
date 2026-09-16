@@ -498,21 +498,19 @@ async function commitRaffleResult(blockHeight, autoPay) {
         // Prize = 50% of the raffle fund (the other 50% carries over to the next raffle)
         const currentFund = parseInt(db.getSetting('raffle_fund_sats') || '0');
         const prizeSats = Math.floor(currentFund / 2);
-        
-        // Deduct prize from fund
-        if (prizeSats > 0) {
-            db.setSetting('raffle_fund_sats', String(currentFund - prizeSats));
-            console.log(`🎯 Raffle fund: ${currentFund} - ${prizeSats} (prize) = ${currentFund - prizeSats} sats remaining`);
-        }
-
-        const raffle = db.createRaffle(
-            blockHeight, blockHash, tickets.length, winnerIndex, winningTicket.id, prizeSats || null
-        );
-
-        // Generate claim token and set 30-day expiry
         const claimToken = uuidv4();
         const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-        db.setRaffleClaimToken(raffle.id, claimToken, expiresAt);
+        
+        const raffle = db.createRaffle(
+            blockHeight, blockHash, tickets.length, winnerIndex, winningTicket.id, prizeSats || null,
+            prizeSats > 0 ? currentFund : undefined,
+            claimToken,
+            expiresAt
+        );
+
+        if (prizeSats > 0) {
+            console.log(`🎯 Raffle fund: ${currentFund} - ${prizeSats} (prize) = ${currentFund - prizeSats} sats remaining`);
+        }
 
         console.log(`🎰 Raffle committed! Block #${blockHeight}, hash: ${blockHash.substring(0, 16)}..., winner index: ${winnerIndex}/${tickets.length}, ticket #${winningTicket.id}`);
         console.log(`🔗 Claim link: ${process.env.BASE_URL || 'http://localhost:3000'}/claim/${claimToken}`);
