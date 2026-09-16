@@ -40,13 +40,41 @@ async function main() {
 
         assert.strictEqual(db.getAllRaffles().length, 2, 'legacy duplicate raffle rows must remain untouched');
 
+        const persistenceFailureArgs = [
+            939455,
+            '0000000000000000000000000000000000000000000000000000000000000002',
+            3,
+            1,
+            41,
+            40000
+        ];
+        const originalWriteFileSync = fs.writeFileSync;
+        fs.writeFileSync = (targetPath, ...args) => {
+            if (String(targetPath).startsWith(`${databasePath}.`) || String(targetPath) === databasePath) {
+                throw new Error('simulated persistence failure');
+            }
+            return originalWriteFileSync(targetPath, ...args);
+        };
+        try {
+            assert.throws(
+                () => db.createRaffle(...persistenceFailureArgs),
+                /simulated persistence failure/,
+                'a failed database snapshot must reject the raffle'
+            );
+        } finally {
+            fs.writeFileSync = originalWriteFileSync;
+        }
+        assert.strictEqual(db.findRaffleByBlock(939455), null, 'failed persistence must restore the in-memory database');
+        assert.strictEqual(db.getAllRaffles().length, 2, 'failed persistence must not retain a raffle row');
+
         const raffleArgs = [
             939456,
             '0000000000000000000000000000000000000000000000000000000000000001',
             3,
             1,
             42,
-            50000
+            50000,
+            50001
         ];
 
         const first = db.createRaffle(...raffleArgs);
@@ -58,7 +86,13 @@ async function main() {
             'a second raffle for the same block must be rejected'
         );
 
-        assert.strictEqual(db.getAllRaffles().length, 3, 'only one new raffle record must be created');
+        db.deleteRaffle(first.id);
+        assert.strictEqual(db.findRaffleByBlock(939456), null, 'deleted test raffle must be removed');
+
+        const replacement = db.createRaffle(...raffleArgs);
+        assert.ok(replacement.id, 'a deleted test raffle block can be reused');
+        assert.strictEqual(db.getAllRaffles().length, 3, 'only one new raffle record must remain');
+        assert.strictEqual(db.getSetting('raffle_fund_sats'), '50001', 'raffle and new fund balance must persist together');
 
         const persisted = new SQL.Database(fs.readFileSync(databasePath));
         const locks = persisted.exec('SELECT block_height FROM raffle_locks ORDER BY block_height')[0].values;

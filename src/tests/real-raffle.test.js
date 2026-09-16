@@ -62,8 +62,12 @@ function loadWithMocks({ height = 939456, existing = null, fund = 100001, ticket
     setSetting(key, value) { state.settings[key] = String(value); if (key === 'raffle_fund_sats') state.fund = parseInt(value, 10); },
     findRaffleByBlock(block) { return state.existing && state.existing.block_height === block ? state.existing : null; },
     getValidTicketsForBlock() { return state.tickets; },
-    createRaffle(blockHeight, blockHash, totalTickets, winningIndex, winningTicketId, prizeAmountSats) {
+    createRaffle(blockHeight, blockHash, totalTickets, winningIndex, winningTicketId, prizeAmountSats, raffleFundSats) {
       state.created = { id: 99, blockHeight, blockHash, totalTickets, winningIndex, winningTicketId, prizeAmountSats };
+      if (raffleFundSats !== undefined) {
+        state.settings.raffle_fund_sats = String(raffleFundSats);
+        state.fund = raffleFundSats;
+      }
       return { id: 99 };
     },
     setRaffleClaimToken(id, token, expiresAt) { state.claim = { id, token, expiresAt }; },

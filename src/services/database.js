@@ -17,12 +17,13 @@ if (!fs.existsSync(dbDir)) {
 }
 
 let db = null;
+let SQL = null;
 
 // Initialize database
 async function initializeDatabase() {
     console.log(`📂 Database path: ${dbPath}`);
     console.log(`📂 Database directory: ${dbDir} (exists: ${fs.existsSync(dbDir)})`);
-    const SQL = await initSqlJs();
+    SQL = await initSqlJs();
     
     // Load existing database or create new one
     if (fs.existsSync(dbPath)) {
@@ -233,7 +234,15 @@ function saveDatabase() {
     if (db) {
         const data = db.export();
         const buffer = Buffer.from(data);
-        fs.writeFileSync(dbPath, buffer);
+        const tempPath = `${dbPath}.${process.pid}.${Date.now()}.tmp`;
+        try {
+            fs.writeFileSync(tempPath, buffer);
+            fs.renameSync(tempPath, dbPath);
+        } finally {
+            if (fs.existsSync(tempPath)) {
+                fs.unlinkSync(tempPath);
+            }
+        }
     }
 }
 
@@ -515,8 +524,9 @@ function countValidTicketsForBlock(raffleBlock) {
 }
 
 // Raffle functions
-function createRaffle(blockHeight, blockHash, totalTickets, winningIndex, winningTicketId, prizeAmountSats) {
+function createRaffle(blockHeight, blockHash, totalTickets, winningIndex, winningTicketId, prizeAmountSats, raffleFundSats) {
     let transactionOpen = false;
+    const databaseBeforeTransaction = db.export();
 
     try {
         db.run('BEGIN IMMEDIATE TRANSACTION');
@@ -539,10 +549,21 @@ function createRaffle(blockHeight, blockHash, totalTickets, winningIndex, winnin
         );
         const idResult = db.exec('SELECT last_insert_rowid() AS id');
         const id = idResult[0].values[0][0];
+        if (raffleFundSats !== undefined) {
+            db.run(
+                `INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('raffle_fund_sats', ?, datetime('now'))`,
+                [String(raffleFundSats)]
+            );
+        }
 
         db.run('COMMIT');
         transactionOpen = false;
-        saveDatabase();
+        try {
+            saveDatabase();
+        } catch (error) {
+            db = new SQL.Database(databaseBeforeTransaction);
+            throw error;
+        }
         return { id };
     } catch (error) {
         if (transactionOpen) {
@@ -608,7 +629,35 @@ function getMostRecentlyReviewedMerchant() {
 }
 
 function deleteRaffle(raffleId) {
-    run(`DELETE FROM raffles WHERE id = ?`, [raffleId]);
+    const raffle = queryOne(`SELECT block_height FROM raffles WHERE id = ?`, [raffleId]);
+    if (!raffle) return false;
+
+    let transactionOpen = false;
+    const databaseBeforeTransaction = db.export();
+    try {
+        db.run('BEGIN IMMEDIATE TRANSACTION');
+        transactionOpen = true;
+        db.run(`DELETE FROM raffles WHERE id = ?`, [raffleId]);
+        const remainingResult = db.exec(`SELECT COUNT(*) AS count FROM raffles WHERE block_height = ${Number(raffle.block_height)}`);
+        const remainingRaffles = remainingResult[0].values[0][0];
+        if (remainingRaffles === 0) {
+            db.run(`DELETE FROM raffle_locks WHERE block_height = ?`, [raffle.block_height]);
+        }
+        db.run('COMMIT');
+        transactionOpen = false;
+        try {
+            saveDatabase();
+        } catch (error) {
+            db = new SQL.Database(databaseBeforeTransaction);
+            throw error;
+        }
+        return true;
+    } catch (error) {
+        if (transactionOpen) {
+            db.run('ROLLBACK');
+        }
+        throw error;
+    }
 }
 
 function getLatestRaffle() {

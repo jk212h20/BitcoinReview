@@ -220,10 +220,9 @@ async function commitRealRaffle(options = {}) {
         tickets.length,
         winnerIndex,
         winningTicket.id,
-        prizeSats
+        prizeSats,
+        fundAfterSats
     );
-
-    db.setSetting('raffle_fund_sats', String(fundAfterSats));
     console.log(`🎯 Real raffle fund: ${fundBeforeSats} - ${prizeSats} = ${fundAfterSats} sats remaining`);
 
     const claimToken = crypto.randomUUID();

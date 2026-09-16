@@ -500,12 +500,11 @@ async function commitRaffleResult(blockHeight, autoPay) {
         const prizeSats = Math.floor(currentFund / 2);
         
         const raffle = db.createRaffle(
-            blockHeight, blockHash, tickets.length, winnerIndex, winningTicket.id, prizeSats || null
+            blockHeight, blockHash, tickets.length, winnerIndex, winningTicket.id, prizeSats || null,
+            prizeSats > 0 ? currentFund - prizeSats : undefined
         );
 
-        /* Deduct only after the duplicate-safe raffle insert commits. */
         if (prizeSats > 0) {
-            db.setSetting('raffle_fund_sats', String(currentFund - prizeSats));
             console.log(`🎯 Raffle fund: ${currentFund} - ${prizeSats} (prize) = ${currentFund - prizeSats} sats remaining`);
         }
 

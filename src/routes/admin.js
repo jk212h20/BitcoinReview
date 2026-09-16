@@ -271,7 +271,9 @@ router.post('/raffle/run-real', async (req, res) => {
         res.json({ success: true, message: 'Real raffle committed.', raffle: result });
     } catch (error) {
         console.error('Real raffle run error:', error);
-        const status = ['NOT_DUE', 'NO_TICKETS', 'NO_PRIZE', 'DUPLICATE'].includes(error.code) ? 400 : 500;
+        const status = error.code === 'DUPLICATE_RAFFLE'
+            ? 409
+            : ['NOT_DUE', 'NO_TICKETS', 'NO_PRIZE', 'DUPLICATE'].includes(error.code) ? 400 : 500;
         res.status(status).json({
             success: false,
             error: error.message,
@@ -320,15 +322,15 @@ router.post('/raffle/test', async (req, res) => {
         const winnerIndex = bitcoin.selectWinnerIndex(blockHash, allApproved.length);
         const winningTicket = allApproved[winnerIndex];
 
+        const currentFund = parseInt(db.getSetting('raffle_fund_sats') || '0');
+
         // Create a real raffle record
         const raffle = db.createRaffle(
-            currentHeight, blockHash, allApproved.length, winnerIndex, winningTicket.id, prizeSats
+            currentHeight, blockHash, allApproved.length, winnerIndex, winningTicket.id, prizeSats,
+            currentFund >= prizeSats ? currentFund - prizeSats : undefined
         );
 
-        /* Deduct only after the duplicate-safe raffle insert commits. */
-        const currentFund = parseInt(db.getSetting('raffle_fund_sats') || '0');
         if (currentFund >= prizeSats) {
-            db.setSetting('raffle_fund_sats', String(currentFund - prizeSats));
             console.log(`🧪 Test raffle: fund ${currentFund} - ${prizeSats} = ${currentFund - prizeSats} sats`);
         }
 
@@ -384,6 +386,9 @@ router.post('/raffle/test', async (req, res) => {
 
     } catch (error) {
         console.error('Test raffle error:', error);
+        if (error.code === 'DUPLICATE_RAFFLE') {
+            return res.status(409).json({ error: error.message });
+        }
         res.status(500).json({ error: 'Test raffle failed: ' + error.message });
     }
 });
