@@ -503,7 +503,7 @@ async function commitRaffleResult(blockHeight, autoPay) {
         
         const raffle = db.createRaffle(
             blockHeight, blockHash, tickets.length, winnerIndex, winningTicket.id, prizeSats || null,
-            prizeSats > 0 ? currentFund - prizeSats : undefined,
+            prizeSats > 0 ? currentFund : undefined,
             claimToken,
             expiresAt
         );

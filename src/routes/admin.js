@@ -340,7 +340,7 @@ router.post('/raffle/test', async (req, res) => {
         // Create a real raffle record
         const raffle = db.createRaffle(
             currentHeight, blockHash, allApproved.length, winnerIndex, winningTicket.id, prizeSats,
-            currentFund - prizeSats,
+            currentFund,
             claimToken,
             expiresAt
         );
@@ -532,7 +532,7 @@ router.post('/raffle/run', async (req, res) => {
             winnerIndex,
             winningTicket.id,
             prizeSats,
-            currentFund - prizeSats,
+            currentFund,
             claimToken,
             expiresAt
         );

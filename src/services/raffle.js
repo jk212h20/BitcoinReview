@@ -223,7 +223,7 @@ async function commitRealRaffle(options = {}) {
         winnerIndex,
         winningTicket.id,
         prizeSats,
-        fundAfterSats,
+        fundBeforeSats,
         claimToken,
         expiresAt
     );

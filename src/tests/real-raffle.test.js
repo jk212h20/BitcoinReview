@@ -64,9 +64,14 @@ function loadWithMocks({ height = 939456, existing = null, fund = 100001, ticket
     getValidTicketsForBlock() { return state.tickets; },
     createRaffle(blockHeight, blockHash, totalTickets, winningIndex, winningTicketId, prizeAmountSats, raffleFundSats, claimToken, claimExpiresAt) {
       state.created = { id: 99, blockHeight, blockHash, totalTickets, winningIndex, winningTicketId, prizeAmountSats };
-      if (raffleFundSats !== undefined) {
-        state.settings.raffle_fund_sats = String(raffleFundSats);
-        state.fund = raffleFundSats;
+      if (prizeAmountSats > 0) {
+        if (raffleFundSats !== state.fund || raffleFundSats < prizeAmountSats) {
+          const error = new Error('Raffle fund cannot cover this prize');
+          error.code = 'INSUFFICIENT_RAFFLE_FUND';
+          throw error;
+        }
+        state.fund = raffleFundSats - prizeAmountSats;
+        state.settings.raffle_fund_sats = String(state.fund);
       }
       if (claimToken) state.claim = { id: 99, token: claimToken, expiresAt: claimExpiresAt };
       return { id: 99 };

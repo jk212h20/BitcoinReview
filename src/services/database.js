@@ -560,19 +560,33 @@ function createRaffle(blockHeight, blockHash, totalTickets, winningIndex, winnin
             throw error;
         }
 
+        if (prizeSats > 0) {
+            const currentFund = parseInt(
+                queryOne(`SELECT value FROM settings WHERE key = 'raffle_fund_sats'`)?.value || '0',
+                10
+            ) || 0;
+            if (currentFund !== raffleFundSats) {
+                const error = new Error('Raffle fund changed before this raffle could be committed');
+                error.code = 'STALE_RAFFLE_FUND';
+                throw error;
+            }
+            if (currentFund < prizeSats) {
+                const error = new Error('Raffle fund cannot cover this prize');
+                error.code = 'INSUFFICIENT_RAFFLE_FUND';
+                throw error;
+            }
+            db.run(
+                `INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('raffle_fund_sats', ?, datetime('now'))`,
+                [String(currentFund - prizeSats)]
+            );
+        }
+
         db.run(
             `INSERT INTO raffles (block_height, block_hash, total_tickets, winning_index, winning_ticket_id, prize_amount_sats, claim_token, claim_expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             [blockHeight, blockHash, totalTickets, winningIndex, winningTicketId, prizeSats, claimToken || null, claimExpiresAt || null]
         );
         const idResult = db.exec('SELECT last_insert_rowid() AS id');
         const id = idResult[0].values[0][0];
-        if (raffleFundSats !== undefined) {
-            db.run(
-                `INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('raffle_fund_sats', ?, datetime('now'))`,
-                [String(raffleFundSats)]
-            );
-        }
-
         db.run('COMMIT');
         transactionOpen = false;
         try {
