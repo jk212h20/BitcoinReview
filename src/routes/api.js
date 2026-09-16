@@ -715,21 +715,39 @@ router.get('/lnurl/withdraw/:token/callback', async (req, res) => {
             console.error('Invoice decode error:', decodeErr.message);
             return res.json({ status: 'ERROR', reason: 'Failed to decode invoice' });
         }
-        
-        // Pay the invoice via LND
+
+        const reservation = db.reserveRaffleClaim(raffle.id);
+        if (!reservation.reserved) {
+            if (reservation.status === 'processing') {
+                return res.json({ status: 'ERROR', reason: 'Claim is already being processed. Do not submit another invoice.' });
+            }
+            if (reservation.status === 'claimed') {
+                return res.json({ status: 'ERROR', reason: 'Prize already claimed' });
+            }
+            return res.json({ status: 'ERROR', reason: 'Claim is no longer available' });
+        }
+
         try {
             console.log(`⚡ LNURL-withdraw: paying ${prizeSats} sats for claim ${token.substring(0, 8)}...`);
             const paymentResult = await lightning.payInvoice(pr);
-            
             const paymentHash = paymentResult.payment_hash || '';
-            db.markRaffleClaimed(raffle.id, paymentHash);
+            try {
+                db.markRaffleClaimed(raffle.id, paymentHash);
+            } catch (claimWriteError) {
+                console.error('LNURL-withdraw payment succeeded but claim finalization failed:', claimWriteError.message);
+                return res.json({ status: 'ERROR', reason: 'Payment result is being reconciled. Do not retry this claim.' });
+            }
             
             console.log(`✅ LNURL-withdraw claim successful! Raffle #${raffle.id}, ${prizeSats} sats, hash: ${paymentHash}`);
             
             res.json({ status: 'OK' });
         } catch (payErr) {
             console.error('LNURL-withdraw payment failed:', payErr.message);
-            db.markRafflePaymentFailed(raffle.id, payErr.message);
+            try {
+                db.releaseRaffleClaim(raffle.id, payErr.message);
+            } catch (releaseError) {
+                console.error('LNURL-withdraw claim release failed:', releaseError.message);
+            }
             return res.json({ status: 'ERROR', reason: 'Payment failed: ' + payErr.message });
         }
     } catch (error) {

@@ -17,12 +17,13 @@ if (!fs.existsSync(dbDir)) {
 }
 
 let db = null;
+let SQL = null;
 
 // Initialize database
 async function initializeDatabase() {
     console.log(`📂 Database path: ${dbPath}`);
     console.log(`📂 Database directory: ${dbDir} (exists: ${fs.existsSync(dbDir)})`);
-    const SQL = await initSqlJs();
+    SQL = await initSqlJs();
     
     // Load existing database or create new one
     if (fs.existsSync(dbPath)) {
@@ -218,7 +219,15 @@ function saveDatabase() {
     if (db) {
         const data = db.export();
         const buffer = Buffer.from(data);
-        fs.writeFileSync(dbPath, buffer);
+        const tempPath = `${dbPath}.${process.pid}.${Date.now()}.tmp`;
+        try {
+            fs.writeFileSync(tempPath, buffer);
+            fs.renameSync(tempPath, dbPath);
+        } finally {
+            if (fs.existsSync(tempPath)) {
+                fs.unlinkSync(tempPath);
+            }
+        }
     }
 }
 
@@ -640,8 +649,64 @@ function findRaffleByClaimToken(token) {
     `, [token]);
 }
 
+function changeRaffleClaimState(raffleId, expectedStatus, nextStatus, paymentHash = null, paymentError = null) {
+    const databaseBeforeTransaction = db.export();
+    let transactionOpen = false;
+    try {
+        db.run('BEGIN IMMEDIATE TRANSACTION');
+        transactionOpen = true;
+        const raffle = queryOne(`SELECT claim_status FROM raffles WHERE id = ?`, [raffleId]);
+        if (!raffle || raffle.claim_status !== expectedStatus) {
+            db.run('ROLLBACK');
+            transactionOpen = false;
+            return { changed: false, status: raffle ? raffle.claim_status : null };
+        }
+
+        if (nextStatus === 'claimed') {
+            db.run(
+                `UPDATE raffles
+                 SET claim_status = 'claimed', claimed_at = datetime('now'), claim_payment_hash = ?,
+                     payment_status = 'paid', paid_at = datetime('now'), payment_error = NULL
+                 WHERE id = ?`,
+                [paymentHash || '', raffleId]
+            );
+        } else if (nextStatus === 'pending') {
+            db.run(
+                `UPDATE raffles SET claim_status = 'pending', payment_status = 'failed', payment_error = ? WHERE id = ?`,
+                [paymentError || 'Payment failed', raffleId]
+            );
+        } else {
+            db.run(`UPDATE raffles SET claim_status = ? WHERE id = ?`, [nextStatus, raffleId]);
+        }
+
+        db.run('COMMIT');
+        transactionOpen = false;
+        try {
+            saveDatabase();
+        } catch (error) {
+            db = new SQL.Database(databaseBeforeTransaction);
+            throw error;
+        }
+        return { changed: true, status: nextStatus };
+    } catch (error) {
+        if (transactionOpen) {
+            db.run('ROLLBACK');
+        }
+        throw error;
+    }
+}
+
+function reserveRaffleClaim(raffleId) {
+    const result = changeRaffleClaimState(raffleId, 'pending', 'processing');
+    return { reserved: result.changed, status: result.status };
+}
+
+function releaseRaffleClaim(raffleId, paymentError) {
+    return changeRaffleClaimState(raffleId, 'processing', 'pending', null, paymentError);
+}
+
 function markRaffleClaimed(raffleId, paymentHash) {
-    run(`UPDATE raffles SET claim_status = 'claimed', claimed_at = datetime('now'), claim_payment_hash = ?, payment_status = 'paid', paid_at = datetime('now') WHERE id = ?`, [paymentHash, raffleId]);
+    return changeRaffleClaimState(raffleId, 'processing', 'claimed', paymentHash);
 }
 
 function markRaffleClaimExpired(raffleId) {
@@ -760,6 +825,8 @@ module.exports = {
     // Claim functions (LNURL-withdraw)
     setRaffleClaimToken,
     findRaffleByClaimToken,
+    reserveRaffleClaim,
+    releaseRaffleClaim,
     markRaffleClaimed,
     markRaffleClaimExpired,
     getExpiredUnclaimedRaffles,
