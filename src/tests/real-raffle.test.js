@@ -62,15 +62,16 @@ function loadWithMocks({ height = 939456, existing = null, fund = 100001, ticket
     setSetting(key, value) { state.settings[key] = String(value); if (key === 'raffle_fund_sats') state.fund = parseInt(value, 10); },
     findRaffleByBlock(block) { return state.existing && state.existing.block_height === block ? state.existing : null; },
     getValidTicketsForBlock() { return state.tickets; },
-    createRaffle(blockHeight, blockHash, totalTickets, winningIndex, winningTicketId, prizeAmountSats, raffleFundSats) {
+    createRaffle(blockHeight, blockHash, totalTickets, winningIndex, winningTicketId, prizeAmountSats, raffleFundSats, claimToken, claimExpiresAt) {
       state.created = { id: 99, blockHeight, blockHash, totalTickets, winningIndex, winningTicketId, prizeAmountSats };
       if (raffleFundSats !== undefined) {
         state.settings.raffle_fund_sats = String(raffleFundSats);
         state.fund = raffleFundSats;
       }
+      if (claimToken) state.claim = { id: 99, token: claimToken, expiresAt: claimExpiresAt };
       return { id: 99 };
     },
-    setRaffleClaimToken(id, token, expiresAt) { state.claim = { id, token, expiresAt }; },
+
     setRaffleWinnerEmailStatus(id, status, to, messageId, error) { state.emailStatus = { id, status, to, messageId, error }; },
     findUserByEmail() { return null; }
   };
@@ -125,6 +126,7 @@ asyncTest('commit deducts/reserves 50% prize, creates claim link, and records em
   assertEqual(state.fund, 50001, 'fund deducted');
   assertEqual(state.created.prizeAmountSats, 50000, 'raffle stamped prize');
   assertEqual(state.created.winningTicketId, 11, 'hash 1 mod 3 selects ticket index 1');
+  assertEqual(state.claim.token, result.claimToken, 'claim token is committed with raffle');
   assert(result.claimLink.includes('/claim/'), 'claim link created');
   assertEqual(result.winner.email, 'winner@example.com', 'winner email returned');
   assertEqual(result.email.status, 'sent', 'email sent status');

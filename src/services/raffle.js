@@ -213,6 +213,8 @@ async function commitRealRaffle(options = {}) {
 
     const winnerIndex = bitcoin.selectWinnerIndex(blockHash, tickets.length);
     const winningTicket = tickets[winnerIndex];
+    const claimToken = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
     const raffle = db.createRaffle(
         blockHeight,
@@ -221,13 +223,12 @@ async function commitRealRaffle(options = {}) {
         winnerIndex,
         winningTicket.id,
         prizeSats,
-        fundAfterSats
+        fundAfterSats,
+        claimToken,
+        expiresAt
     );
     console.log(`🎯 Real raffle fund: ${fundBeforeSats} - ${prizeSats} = ${fundAfterSats} sats remaining`);
 
-    const claimToken = crypto.randomUUID();
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-    db.setRaffleClaimToken(raffle.id, claimToken, expiresAt);
     const claimLink = buildClaimLink(claimToken);
 
     let emailStatus = {

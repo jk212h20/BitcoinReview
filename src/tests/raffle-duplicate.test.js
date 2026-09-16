@@ -74,7 +74,9 @@ async function main() {
             1,
             42,
             50000,
-            50001
+            50001,
+            'claim-token-939456',
+            '2030-01-01T00:00:00.000Z'
         ];
 
         const first = db.createRaffle(...raffleArgs);
@@ -86,13 +88,33 @@ async function main() {
             'a second raffle for the same block must be rejected'
         );
 
-        db.deleteRaffle(first.id);
+        fs.writeFileSync = (targetPath, ...args) => {
+            if (String(targetPath).startsWith(`${databasePath}.`) || String(targetPath) === databasePath) {
+                throw new Error('simulated persistence failure');
+            }
+            return originalWriteFileSync(targetPath, ...args);
+        };
+        try {
+            assert.throws(
+                () => db.deleteRaffle(first.id, 50000),
+                /simulated persistence failure/,
+                'a failed raffle deletion must reject the refund'
+            );
+        } finally {
+            fs.writeFileSync = originalWriteFileSync;
+        }
+        assert.ok(db.findRaffleByBlock(939456), 'failed deletion must restore the raffle');
+        assert.strictEqual(db.getSetting('raffle_fund_sats'), '50001', 'failed deletion must not refund the fund');
+
+        db.deleteRaffle(first.id, 50000);
         assert.strictEqual(db.findRaffleByBlock(939456), null, 'deleted test raffle must be removed');
+        assert.strictEqual(db.getSetting('raffle_fund_sats'), '100001', 'deletion refund must persist with raffle cleanup');
 
         const replacement = db.createRaffle(...raffleArgs);
         assert.ok(replacement.id, 'a deleted test raffle block can be reused');
         assert.strictEqual(db.getAllRaffles().length, 3, 'only one new raffle record must remain');
         assert.strictEqual(db.getSetting('raffle_fund_sats'), '50001', 'raffle and new fund balance must persist together');
+        assert.strictEqual(db.findRaffleByBlock(939456).claim_token, 'claim-token-939456', 'claim token must persist with raffle creation');
 
         const persisted = new SQL.Database(fs.readFileSync(databasePath));
         const locks = persisted.exec('SELECT block_height FROM raffle_locks ORDER BY block_height')[0].values;

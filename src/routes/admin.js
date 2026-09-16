@@ -321,13 +321,17 @@ router.post('/raffle/test', async (req, res) => {
         // Select winner deterministically
         const winnerIndex = bitcoin.selectWinnerIndex(blockHash, allApproved.length);
         const winningTicket = allApproved[winnerIndex];
+        const claimToken = crypto.randomUUID();
+        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
         const currentFund = parseInt(db.getSetting('raffle_fund_sats') || '0');
 
         // Create a real raffle record
         const raffle = db.createRaffle(
             currentHeight, blockHash, allApproved.length, winnerIndex, winningTicket.id, prizeSats,
-            currentFund >= prizeSats ? currentFund - prizeSats : undefined
+            currentFund >= prizeSats ? currentFund - prizeSats : undefined,
+            claimToken,
+            expiresAt
         );
 
         if (currentFund >= prizeSats) {
@@ -336,10 +340,6 @@ router.post('/raffle/test', async (req, res) => {
 
         console.log(`🧪 Test raffle committed! Block #${currentHeight}, winner index: ${winnerIndex}/${allApproved.length}, ticket #${winningTicket.id}, prize: ${prizeSats} sats`);
 
-        // Generate claim token (LNURL-withdraw) — winner scans QR to claim
-        const claimToken = crypto.randomUUID();
-        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-        db.setRaffleClaimToken(raffle.id, claimToken, expiresAt);
         const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
         const claimLink = `${baseUrl}/claim/${claimToken}`;
 
@@ -411,16 +411,17 @@ router.delete('/raffle/:id', (req, res) => {
             return res.status(404).json({ error: 'Raffle not found' });
         }
         
+        const refundSats = refund && raffle.prize_amount_sats ? raffle.prize_amount_sats : 0;
+
         // Optionally refund the prize to the raffle fund
         if (refund && raffle.prize_amount_sats) {
             const currentFund = parseInt(db.getSetting('raffle_fund_sats') || '0');
-            db.setSetting('raffle_fund_sats', String(currentFund + raffle.prize_amount_sats));
             console.log(`🗑️ Raffle #${id} deleted — refunded ${raffle.prize_amount_sats} sats to fund (${currentFund} + ${raffle.prize_amount_sats} = ${currentFund + raffle.prize_amount_sats})`);
         } else {
             console.log(`🗑️ Raffle #${id} deleted (no refund)`);
         }
         
-        db.deleteRaffle(parseInt(id));
+        db.deleteRaffle(parseInt(id), refundSats);
         
         res.json({
             success: true,
@@ -487,6 +488,16 @@ router.post('/raffle/run', async (req, res) => {
         // Select winner
         const winnerIndex = bitcoin.selectWinnerIndex(blockHash, tickets.length);
         const winningTicket = tickets[winnerIndex];
+        const crypto = require('crypto');
+        const prizeSats = prizeAmountSats || parseInt(process.env.DEFAULT_PRIZE_SATS) || 0;
+        const currentFund = parseInt(db.getSetting('raffle_fund_sats') || '0');
+        if (prizeSats > currentFund) {
+            return res.status(400).json({
+                error: `Prize ${prizeSats.toLocaleString()} sats exceeds the current raffle fund (${currentFund.toLocaleString()} sats).`
+            });
+        }
+        const claimToken = crypto.randomUUID();
+        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
         // Create raffle record
         const raffle = db.createRaffle(
@@ -495,16 +506,11 @@ router.post('/raffle/run', async (req, res) => {
             tickets.length,
             winnerIndex,
             winningTicket.id,
-            prizeAmountSats || null
+            prizeSats || null,
+            currentFund - prizeSats,
+            claimToken,
+            expiresAt
         );
-        
-        const crypto = require('crypto');
-        const prizeSats = prizeAmountSats || parseInt(process.env.DEFAULT_PRIZE_SATS) || 0;
-        
-        // Generate claim token (LNURL-withdraw)
-        const claimToken = crypto.randomUUID();
-        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-        db.setRaffleClaimToken(raffle.id, claimToken, expiresAt);
         const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
         const claimLink = `${baseUrl}/claim/${claimToken}`;
         

@@ -524,7 +524,7 @@ function countValidTicketsForBlock(raffleBlock) {
 }
 
 // Raffle functions
-function createRaffle(blockHeight, blockHash, totalTickets, winningIndex, winningTicketId, prizeAmountSats, raffleFundSats) {
+function createRaffle(blockHeight, blockHash, totalTickets, winningIndex, winningTicketId, prizeAmountSats, raffleFundSats, claimToken, claimExpiresAt) {
     let transactionOpen = false;
     const databaseBeforeTransaction = db.export();
 
@@ -544,8 +544,8 @@ function createRaffle(blockHeight, blockHash, totalTickets, winningIndex, winnin
         }
 
         db.run(
-            `INSERT INTO raffles (block_height, block_hash, total_tickets, winning_index, winning_ticket_id, prize_amount_sats) VALUES (?, ?, ?, ?, ?, ?)`,
-            [blockHeight, blockHash, totalTickets, winningIndex, winningTicketId, prizeAmountSats]
+            `INSERT INTO raffles (block_height, block_hash, total_tickets, winning_index, winning_ticket_id, prize_amount_sats, claim_token, claim_expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [blockHeight, blockHash, totalTickets, winningIndex, winningTicketId, prizeAmountSats, claimToken || null, claimExpiresAt || null]
         );
         const idResult = db.exec('SELECT last_insert_rowid() AS id');
         const id = idResult[0].values[0][0];
@@ -628,7 +628,7 @@ function getMostRecentlyReviewedMerchant() {
     `);
 }
 
-function deleteRaffle(raffleId) {
+function deleteRaffle(raffleId, refundSats = 0) {
     const raffle = queryOne(`SELECT block_height FROM raffles WHERE id = ?`, [raffleId]);
     if (!raffle) return false;
 
@@ -638,6 +638,14 @@ function deleteRaffle(raffleId) {
         db.run('BEGIN IMMEDIATE TRANSACTION');
         transactionOpen = true;
         db.run(`DELETE FROM raffles WHERE id = ?`, [raffleId]);
+        const refund = Math.max(0, parseInt(refundSats, 10) || 0);
+        if (refund > 0) {
+            const currentFund = parseInt(queryOne(`SELECT value FROM settings WHERE key = 'raffle_fund_sats'`)?.value || '0', 10) || 0;
+            db.run(
+                `INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('raffle_fund_sats', ?, datetime('now'))`,
+                [String(currentFund + refund)]
+            );
+        }
         const remainingResult = db.exec(`SELECT COUNT(*) AS count FROM raffles WHERE block_height = ${Number(raffle.block_height)}`);
         const remainingRaffles = remainingResult[0].values[0][0];
         if (remainingRaffles === 0) {
@@ -718,10 +726,6 @@ function getTotalDonationsReceived() {
 }
 
 // Claim functions (LNURL-withdraw)
-function setRaffleClaimToken(raffleId, claimToken, expiresAt) {
-    run(`UPDATE raffles SET claim_token = ?, claim_status = 'pending', claim_expires_at = ? WHERE id = ?`, [claimToken, expiresAt, raffleId]);
-}
-
 function findRaffleByClaimToken(token) {
     if (!token) return null;
     return queryOne(`
@@ -851,7 +855,6 @@ module.exports = {
     getLatestRaffle,
     
     // Claim functions (LNURL-withdraw)
-    setRaffleClaimToken,
     findRaffleByClaimToken,
     markRaffleClaimed,
     markRaffleClaimExpired,
