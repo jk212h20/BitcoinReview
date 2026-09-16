@@ -46,6 +46,7 @@ async function main() {
             3,
             1,
             41,
+            40000,
             40000
         ];
         const originalWriteFileSync = fs.writeFileSync;
@@ -115,6 +116,28 @@ async function main() {
         assert.strictEqual(db.getAllRaffles().length, 3, 'only one new raffle record must remain');
         assert.strictEqual(db.getSetting('raffle_fund_sats'), '50001', 'raffle and new fund balance must persist together');
         assert.strictEqual(db.findRaffleByBlock(939456).claim_token, 'claim-token-939456', 'claim token must persist with raffle creation');
+
+        db.markRafflePaid(replacement.id, 'paid-hash');
+        assert.throws(
+            () => db.deleteRaffle(replacement.id, 50000),
+            error => error && error.code === 'PAID_RAFFLE',
+            'a paid raffle must never be deleted or refunded'
+        );
+        assert.ok(db.findRaffleByBlock(939456), 'a paid raffle must remain in payout history');
+        assert.strictEqual(db.getSetting('raffle_fund_sats'), '50001', 'a paid raffle must not refund the fund');
+
+        assert.throws(
+            () => db.createRaffle(939457, 'invalid-prize-hash', 1, 0, 43, -1, 50002),
+            error => error && error.code === 'INVALID_RAFFLE_PRIZE',
+            'negative prizes must be rejected before persistence'
+        );
+        assert.throws(
+            () => db.createRaffle(939458, 'missing-fund-hash', 1, 0, 44, 100),
+            error => error && error.code === 'RAFFLE_FUND_RESERVATION_REQUIRED',
+            'a positive prize must reserve a raffle-fund balance'
+        );
+        assert.strictEqual(db.findRaffleByBlock(939457), null, 'invalid prize must not create a raffle');
+        assert.strictEqual(db.findRaffleByBlock(939458), null, 'missing fund reservation must not create a raffle');
 
         const persisted = new SQL.Database(fs.readFileSync(databasePath));
         const locks = persisted.exec('SELECT block_height FROM raffle_locks ORDER BY block_height')[0].values;

@@ -525,6 +525,23 @@ function countValidTicketsForBlock(raffleBlock) {
 
 // Raffle functions
 function createRaffle(blockHeight, blockHash, totalTickets, winningIndex, winningTicketId, prizeAmountSats, raffleFundSats, claimToken, claimExpiresAt) {
+    const prizeSats = Number(prizeAmountSats || 0);
+    if (!Number.isSafeInteger(prizeSats) || prizeSats < 0) {
+        const error = new Error('Raffle prize must be a non-negative whole number of sats');
+        error.code = 'INVALID_RAFFLE_PRIZE';
+        throw error;
+    }
+    if (prizeSats > 0 && raffleFundSats === undefined) {
+        const error = new Error('A positive raffle prize requires an atomically reserved raffle fund balance');
+        error.code = 'RAFFLE_FUND_RESERVATION_REQUIRED';
+        throw error;
+    }
+    if (raffleFundSats !== undefined && (!Number.isSafeInteger(raffleFundSats) || raffleFundSats < 0)) {
+        const error = new Error('Raffle fund balance must be a non-negative whole number of sats');
+        error.code = 'INVALID_RAFFLE_FUND';
+        throw error;
+    }
+
     let transactionOpen = false;
     const databaseBeforeTransaction = db.export();
 
@@ -545,7 +562,7 @@ function createRaffle(blockHeight, blockHash, totalTickets, winningIndex, winnin
 
         db.run(
             `INSERT INTO raffles (block_height, block_hash, total_tickets, winning_index, winning_ticket_id, prize_amount_sats, claim_token, claim_expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [blockHeight, blockHash, totalTickets, winningIndex, winningTicketId, prizeAmountSats, claimToken || null, claimExpiresAt || null]
+            [blockHeight, blockHash, totalTickets, winningIndex, winningTicketId, prizeSats, claimToken || null, claimExpiresAt || null]
         );
         const idResult = db.exec('SELECT last_insert_rowid() AS id');
         const id = idResult[0].values[0][0];
@@ -629,8 +646,13 @@ function getMostRecentlyReviewedMerchant() {
 }
 
 function deleteRaffle(raffleId, refundSats = 0) {
-    const raffle = queryOne(`SELECT block_height FROM raffles WHERE id = ?`, [raffleId]);
+    const raffle = queryOne(`SELECT block_height, payment_status FROM raffles WHERE id = ?`, [raffleId]);
     if (!raffle) return false;
+    if (raffle.payment_status === 'paid') {
+        const error = new Error('A paid raffle cannot be deleted or refunded');
+        error.code = 'PAID_RAFFLE';
+        throw error;
+    }
 
     let transactionOpen = false;
     const databaseBeforeTransaction = db.export();

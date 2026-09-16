@@ -303,14 +303,27 @@ router.post('/raffle/test', async (req, res) => {
             return res.status(400).json({ error: 'No approved tickets to draw from' });
         }
 
-        // Site-budget guard: refuse the test if even the 100-sat fee would push
-        // this site below 0 in its ledger (donations − payouts).
+        const currentFund = parseInt(db.getSetting('raffle_fund_sats') || '0', 10) || 0;
+
+        /*
+         * The ledger and the raffle fund are both relevant. The ledger protects
+         * shared-node accounting; the raffle fund is the exact balance reserved
+         * atomically with this raffle record.
+         */
         const available = lightning.getSiteAvailableSats();
         if (prizeSats > available) {
             return res.status(400).json({
                 error: `Test raffle needs ${prizeSats} sats but this site only has ${available.toLocaleString()} sats available. Top up the raffle fund first.`,
                 requested: prizeSats,
                 available
+            });
+        }
+
+        if (prizeSats > currentFund) {
+            return res.status(400).json({
+                error: `Test raffle needs ${prizeSats} sats but the raffle fund only has ${currentFund.toLocaleString()} sats. Top up the raffle fund first.`,
+                requested: prizeSats,
+                available: currentFund
             });
         }
 
@@ -324,19 +337,15 @@ router.post('/raffle/test', async (req, res) => {
         const claimToken = crypto.randomUUID();
         const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
-        const currentFund = parseInt(db.getSetting('raffle_fund_sats') || '0');
-
         // Create a real raffle record
         const raffle = db.createRaffle(
             currentHeight, blockHash, allApproved.length, winnerIndex, winningTicket.id, prizeSats,
-            currentFund >= prizeSats ? currentFund - prizeSats : undefined,
+            currentFund - prizeSats,
             claimToken,
             expiresAt
         );
 
-        if (currentFund >= prizeSats) {
-            console.log(`🧪 Test raffle: fund ${currentFund} - ${prizeSats} = ${currentFund - prizeSats} sats`);
-        }
+        console.log(`🧪 Test raffle: fund ${currentFund} - ${prizeSats} = ${currentFund - prizeSats} sats`);
 
         console.log(`🧪 Test raffle committed! Block #${currentHeight}, winner index: ${winnerIndex}/${allApproved.length}, ticket #${winningTicket.id}, prize: ${prizeSats} sats`);
 
@@ -413,6 +422,10 @@ router.delete('/raffle/:id', (req, res) => {
         
         const refundSats = refund && raffle.prize_amount_sats ? raffle.prize_amount_sats : 0;
 
+        if (raffle.payment_status === 'paid') {
+            return res.status(409).json({ error: 'A paid raffle cannot be deleted or refunded' });
+        }
+
         // Optionally refund the prize to the raffle fund
         if (refund && raffle.prize_amount_sats) {
             const currentFund = parseInt(db.getSetting('raffle_fund_sats') || '0');
@@ -430,7 +443,8 @@ router.delete('/raffle/:id', (req, res) => {
         });
     } catch (error) {
         console.error('Delete raffle error:', error);
-        res.status(500).json({ error: 'Failed to delete raffle: ' + error.message });
+        const status = error.code === 'PAID_RAFFLE' ? 409 : 500;
+        res.status(status).json({ error: 'Failed to delete raffle: ' + error.message });
     }
 });
 
@@ -471,15 +485,27 @@ router.post('/raffle/run', async (req, res) => {
             return res.status(400).json({ error: 'No valid tickets for this raffle period' });
         }
 
+        const defaultPrizeSats = Number(process.env.DEFAULT_PRIZE_SATS || 0);
+        const prizeSats = prizeAmountSats === undefined || prizeAmountSats === null || prizeAmountSats === ''
+            ? defaultPrizeSats
+            : Number(prizeAmountSats);
+        if (!Number.isSafeInteger(prizeSats) || prizeSats <= 0) {
+            return res.status(400).json({ error: 'Prize must be a positive whole number of sats' });
+        }
+
+        /*
+         * Validate the numeric input before it reaches either budget calculation.
+         * This prevents string, NaN, and negative values from corrupting settings.
+         */
         // Site-budget guard: refuse to commit a raffle whose prize exceeds the
         // site's available ledger balance. The shared LND node may have more —
         // those funds belong to other sites.
-        if (prizeAmountSats) {
+        if (prizeSats) {
             const available = lightning.getSiteAvailableSats();
-            if (prizeAmountSats > available) {
+            if (prizeSats > available) {
                 return res.status(400).json({
-                    error: `Prize ${prizeAmountSats.toLocaleString()} sats exceeds this site's available fund (${available.toLocaleString()} sats). Top up the raffle fund with a real donation first.`,
-                    requested: prizeAmountSats,
+                    error: `Prize ${prizeSats.toLocaleString()} sats exceeds this site's available fund (${available.toLocaleString()} sats). Top up the raffle fund with a real donation first.`,
+                    requested: prizeSats,
                     available
                 });
             }
@@ -489,8 +515,7 @@ router.post('/raffle/run', async (req, res) => {
         const winnerIndex = bitcoin.selectWinnerIndex(blockHash, tickets.length);
         const winningTicket = tickets[winnerIndex];
         const crypto = require('crypto');
-        const prizeSats = prizeAmountSats || parseInt(process.env.DEFAULT_PRIZE_SATS) || 0;
-        const currentFund = parseInt(db.getSetting('raffle_fund_sats') || '0');
+        const currentFund = parseInt(db.getSetting('raffle_fund_sats') || '0', 10) || 0;
         if (prizeSats > currentFund) {
             return res.status(400).json({
                 error: `Prize ${prizeSats.toLocaleString()} sats exceeds the current raffle fund (${currentFund.toLocaleString()} sats).`
@@ -506,7 +531,7 @@ router.post('/raffle/run', async (req, res) => {
             tickets.length,
             winnerIndex,
             winningTicket.id,
-            prizeSats || null,
+            prizeSats,
             currentFund - prizeSats,
             claimToken,
             expiresAt
